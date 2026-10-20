@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
 import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useAuth } from "./lib/auth";
 import { cn } from "./lib/utils";
 import { Spinner } from "./components/ui";
+import CommandPalette from "./components/CommandPalette";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Repositories from "./pages/Repositories";
@@ -30,6 +31,12 @@ const nav = [
 
 function Shell() {
   const { user, loading, logout } = useAuth();
+  const [palette, setPalette] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPalette((v) => !v); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   if (loading) return <div className="grid h-screen place-items-center"><Spinner /></div>;
   if (!user) return <Navigate to="/login" replace />;
   return (
@@ -38,6 +45,9 @@ function Shell() {
         <div className="mb-6 flex items-center gap-2 px-2 pt-2 text-white">
           <Activity className="h-5 w-5 text-indigo-400" /><span className="font-semibold">RepoLens AI</span>
         </div>
+        <button onClick={() => setPalette(true)} className="mb-3 flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-left text-xs text-slate-400 hover:bg-white/10">
+          <Search className="h-3.5 w-3.5" />Jump to…<kbd className="ml-auto rounded border border-white/20 px-1">Ctrl K</kbd>
+        </button>
         <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
           {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
@@ -61,6 +71,7 @@ function Shell() {
         </nav>
         <Outlet />
       </main>
+      <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </div>
   );
 }

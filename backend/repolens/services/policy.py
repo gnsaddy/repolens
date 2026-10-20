@@ -17,6 +17,7 @@ ACTION_MIN_ROLE = {
     "jira.publish": "member",
     "user.create": "admin",
     "collection.create": "member",
+    "collection.delete": "admin",
     "document.write": "member",
     "document.delete": "member",
     "llm.configure": "admin",

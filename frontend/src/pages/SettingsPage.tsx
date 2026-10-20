@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
@@ -14,6 +15,7 @@ const PROVIDERS = [
 ] as const;
 
 export default function SettingsPage() {
+  const ask = useConfirm();
   const { user } = useAuth();
   const admin = user?.role === "admin";
   const qc = useQueryClient();
@@ -64,7 +66,7 @@ export default function SettingsPage() {
               <div className="flex flex-wrap gap-2">
                 <Button disabled={save.isPending}>Save</Button>
                 <Button type="button" variant="outline" disabled={test.isPending || !data || data.offline} onClick={() => test.mutate()}>Test connection</Button>
-                {data?.source === "org" && <Button type="button" variant="ghost" onClick={() => { if (confirm("Remove the stored key and revert to server defaults?")) reset.mutate(); }}>Reset</Button>}
+                {data?.source === "org" && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove the stored key?", message: "The organisation reverts to the server defaults.", confirmLabel: "Remove key", danger: true })) reset.mutate(); }}>Reset</Button>}
               </div>) : <p className="text-sm text-muted">Only workspace admins can change these settings.</p>}
             {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
           </form>

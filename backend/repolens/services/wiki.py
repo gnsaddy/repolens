@@ -334,6 +334,12 @@ def page(db: Session, org_id: str, scope: Scope, repo_id: str, path: str) -> dic
             "updated_at": (doc_row.source_updated_at or doc_row.updated_at) if doc_row else None,
             "repo_url": repo.web_url,
         },
+        "deletable": bool(
+            repo.source == "docs" and doc_row is not None and doc_row.source_type in ("upload", "url", "")
+        ),
+        "managed_by": doc_row.source_type
+        if doc_row is not None and doc_row.source_type not in ("upload", "url", "")
+        else None,
         "backlinks": sorted(back.values(), key=lambda x: x["title"]),
         "links_out": sorted(out_links.values(), key=lambda x: x["title"]),
         "mentions_code": sorted(code.values(), key=lambda x: -x["weight"])[:25],

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { Copy, ExternalLink, GitPullRequest } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label } from "@/components/ui";
@@ -11,6 +12,7 @@ const SCOPES = [
 
 /** GitHub sign-in via the OAuth device flow (no redirect URI, no client secret, token never reaches the browser). */
 export default function GithubConnect({ admin }: { admin: boolean }) {
+  const ask = useConfirm();
   const qc = useQueryClient();
   const conn = useQuery({ queryKey: ["github-conn"], queryFn: () => api<GithubConn>("/github/connection") });
   const [clientId, setClientId] = useState("");
@@ -77,7 +79,7 @@ export default function GithubConnect({ admin }: { admin: boolean }) {
             <div className="flex flex-wrap gap-2">
               <Button type="button" disabled={start.isPending || !clientId} onClick={() => start.mutate()}>{c?.connected ? "Reconnect with GitHub" : "Connect with GitHub"}</Button>
               {c?.connected && <Button type="button" variant="outline" disabled={test.isPending} onClick={() => test.mutate()}>Test</Button>}
-              {c?.connected && <Button type="button" variant="ghost" onClick={() => { if (confirm("Remove the stored GitHub token? Revoke the app at github.com/settings/applications too.")) remove.mutate(); }}>Disconnect</Button>}
+              {c?.connected && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Disconnect GitHub?", message: "The stored token is deleted. Also revoke the app at github.com/settings/applications.", confirmLabel: "Disconnect", danger: true })) remove.mutate(); }}>Disconnect</Button>}
             </div>
             <p className="text-xs text-muted">Register an OAuth App at github.com/settings/developers, tick “Enable Device Flow”, and paste its Client ID. No client secret is needed.</p>
           </div>)}

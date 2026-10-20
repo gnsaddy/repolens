@@ -1,10 +1,11 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { BookOpen, ChevronDown, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat } from "@/components/ui";
 import { api, type AskResult, type ConceptDetail, type ConceptRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
+import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
 import Sources from "./wiki/Sources";
 
@@ -38,7 +39,7 @@ export default function Wiki() {
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => go(k)} className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>
             <Icon className="h-4 w-4" />{label}</button>))}
       </div>
-      {tab === "browse" && <Browse sources={o?.sources ?? []} repo={sp.get("repo")} path={sp.get("path")} anchor={sp.get("a")} open={open} openConcept={(t) => go("concepts", { term: t })} />}
+      {tab === "browse" && <Browse sources={o?.sources ?? []} repo={sp.get("repo")} path={sp.get("path")} anchor={sp.get("a")} open={open} openConcept={(t) => go("concepts", { term: t })} onAdd={() => go("sources")} />}
       {tab === "ask" && <AskWiki open={open} />}
       {tab === "concepts" && <Concepts initial={sp.get("term")} open={open} />}
       {tab === "health" && <Health open={open} />}
@@ -73,15 +74,32 @@ function RefList({ title, items, open, empty }: { title: string; items: PageRef[
   );
 }
 
-function Browse({ sources, repo, path, anchor, open, openConcept }: { sources: WikiSource[]; repo: string | null; path: string | null; anchor: string | null; open: Open; openConcept: (t: string) => void }) {
+function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sources: WikiSource[]; repo: string | null; path: string | null; anchor: string | null; open: Open; openConcept: (t: string) => void; onAdd: () => void }) {
+  const ask = useConfirm();
+  const toast = useToast();
+  const qc = useQueryClient();
   const repoId = repo ?? sources[0]?.repo_id ?? null;
   const tree = useQuery({ queryKey: ["wiki-tree", repoId], enabled: !!repoId, queryFn: () => api<WikiTreeNode[]>(`/wiki/tree?repo_id=${repoId}`) });
   const firstPage = (nodes: WikiTreeNode[]): string | null => { for (const n of nodes) { if (n.path) return n.path; const c = firstPage(n.children); if (c) return c; } return null; };
   const pagePath = path ?? (tree.data ? firstPage(tree.data) : null);
   const page = useQuery({ queryKey: ["wiki-page", repoId, pagePath], enabled: !!repoId && !!pagePath, queryFn: () => api<WikiPage>(`/wiki/page?repo_id=${repoId}&path=${encodeURIComponent(pagePath!)}`) });
+  const del = useMutation({
+    mutationFn: () => api(`/wiki/page?repo_id=${repoId}&path=${encodeURIComponent(pagePath!)}`, { method: "DELETE" }),
+    onSuccess: () => { toast("Page deleted"); qc.invalidateQueries({ queryKey: ["wiki-overview"] }); qc.invalidateQueries({ queryKey: ["wiki-tree"] }); qc.removeQueries({ queryKey: ["wiki-page"] }); open(repoId!, ""); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
   useEffect(() => { if (page.data && anchor) document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [page.data, anchor]);
 
-  if (!sources.length) return <Empty>No documentation yet. Add a source under the <b>Sources</b> tab, or index a repository that has a README.</Empty>;
+  if (!sources.length) return (
+    <Card className="mx-auto max-w-2xl text-center">
+      <h2 className="text-lg font-semibold">Start your wiki</h2>
+      <p className="mt-1 text-sm text-muted">Everything you add is split into sections, linked to your code and searchable. Pick where your documentation lives:</p>
+      <div className="mt-4 grid gap-3 text-left sm:grid-cols-3">
+        {[["A README or notes", "Upload .md / .txt files or paste text."], ["A web page", "Import a README from a GitHub link or any public page."], ["Confluence", "Connect with an API token and import a page, tree or space."]].map(([t, d]) => (
+          <button key={t} onClick={onAdd} className="rounded-lg border border-line p-3 hover:border-brand hover:bg-indigo-50/40"><div className="text-sm font-medium">{t}</div><div className="mt-1 text-xs text-muted">{d}</div></button>))}
+      </div>
+      <p className="mt-4 text-xs text-muted">Repositories you index also show their README and docs here automatically.</p>
+    </Card>);
   const p = page.data;
   return (
     <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
@@ -100,6 +118,9 @@ function Browse({ sources, repo, path, anchor, open, openConcept }: { sources: W
               {p.source.version != null && p.source.version > 0 && <span>version {p.source.version}</span>}
               {p.source.updated_at && <span>updated {timeAgo(p.source.updated_at)}</span>}
               {p.source.synced_at && <span>synced {timeAgo(p.source.synced_at)}</span>}
+              {p.deletable && <button className="ml-auto inline-flex items-center gap-1 text-red-600 hover:underline" onClick={async () => { if (await ask({ title: `Delete "${p.title}"?`, message: "The page is removed from search, the graph and the wiki. You can upload it again later.", confirmLabel: "Delete page", danger: true })) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" />Delete page</button>}
+              {!p.deletable && !p.managed_by && <span className="ml-auto" title="Part of a code repository's index">From repository {p.repo}</span>}
+              {p.managed_by && <span className="ml-auto" title="This page is kept in sync with its source. Remove the source on the Sources tab to delete it.">Synced from {p.managed_by}</span>}
               {p.source.url && /^https?:\/\//.test(p.source.url) && <a className="inline-flex items-center gap-1 text-brand hover:underline" href={p.source.url} target="_blank" rel="noopener noreferrer">Open original<ExternalLink className="h-3 w-3" /></a>}
             </div>
             {!!p.unresolved_links.length && <p role="alert" className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{p.unresolved_links.length} link(s) on this page point to pages that do not exist: {p.unresolved_links.map((l) => l.link).join(", ")}</p>}

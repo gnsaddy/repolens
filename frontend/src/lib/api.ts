@@ -107,7 +107,7 @@ export interface AskResult {
     node_id: string | null; snippet: string; via_graph: { from: string; relation: string } | null }[];
   connections: { from: string; label: string; to: string; to_type: string; provenance: string }[];
 }
-export interface DocRow { id: string; path: string; size: number; updated_at: string }
+export interface DocRow { id: string; path: string; size: number; updated_at: string; source_type?: string; deletable?: boolean }
 
 export interface LLMSettings {
   provider: "heuristic" | "anthropic" | "openai" | "github-models"; model: string; base_url: string; has_key: boolean; source: "org" | "env";
@@ -141,6 +141,7 @@ export interface WikiOverview { sources: WikiSource[]; totals: { sources: number
 export interface WikiTreeNode { key: string; title: string; path: string | null; children: WikiTreeNode[] }
 export interface PageRef { repo: string; repo_id: string; path: string; title: string; sections?: string[]; weight?: number }
 export interface WikiPage {
+  deletable?: boolean; managed_by?: string | null;
   repo_id: string; repo: string; path: string; title: string; markdown: string; unresolved_links: { link: string }[];
   breadcrumbs: { title: string; path: string | null }[]; outline: { title: string; anchor: string; line: number }[];
   source: { type: string; url: string; version: number | null; synced_at: string | null; updated_at: string | null; repo_url: string };

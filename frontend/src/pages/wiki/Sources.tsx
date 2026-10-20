@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { RefreshCw, Trash2, Upload } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, Spinner, Textarea, statusTone } from "@/components/ui";
 import { api, type ConfluenceConn, type ConfluencePreview, type WikiOverview, type WikiSourceStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
+import Collections from "./Collections";
 
 const DOC_RE = /\.(md|mdx|rst|txt|adoc)$/i;
 
 export default function Sources({ overview }: { overview?: WikiOverview }) {
+  const ask = useConfirm();
   const { user } = useAuth();
   const admin = user?.role === "admin";
   const qc = useQueryClient();
@@ -32,9 +35,10 @@ export default function Sources({ overview }: { overview?: WikiOverview }) {
               <Badge tone={statusTone(s.status)}>{s.status}</Badge><Badge tone={s.visibility === "restricted" ? "amber" : "gray"}>{s.visibility}</Badge>
               {admin && <>
                 <Button variant="outline" size="sm" aria-label={`Sync ${s.name}`} disabled={sync.isPending} onClick={() => sync.mutate(s.id)}><RefreshCw className="h-3.5 w-3.5" />Sync</Button>
-                <Button variant="ghost" size="sm" aria-label={`Remove ${s.name}`} onClick={() => { if (confirm(`Remove "${s.name}" and all its imported pages?`)) del.mutate(s.id); }}><Trash2 className="h-3.5 w-3.5" /></Button></>}
+                <Button variant="ghost" size="sm" aria-label={`Remove ${s.name}`} onClick={async () => { if (await ask({ title: `Remove "${s.name}"?`, message: "All pages imported from this source are deleted from the wiki. The original Confluence content is not touched.", confirmLabel: "Remove source", danger: true })) del.mutate(s.id); }}><Trash2 className="h-3.5 w-3.5" /></Button></>}
             </li>))}</ul>)}
       </Card>
+      <Collections sources={overview?.sources ?? []} onChanged={refresh} />
       <div className="grid gap-4 lg:grid-cols-2">
         <AddDocs collections={collections.map((c) => ({ id: c.repo_id, name: c.name }))} onDone={refresh} />
         <ImportUrl collections={collections.map((c) => ({ id: c.repo_id, name: c.name }))} onDone={refresh} />
@@ -115,6 +119,7 @@ function ImportUrl({ collections, onDone }: { collections: { id: string; name: s
 }
 
 function ConfluenceForm({ onDone }: { onDone: () => void }) {
+  const ask = useConfirm();
   const qc = useQueryClient();
   const conn = useQuery({ queryKey: ["confluence-conn"], queryFn: () => api<ConfluenceConn>("/wiki/confluence/connection") });
   const [f, setF] = useState({ base_url: "", deployment: "cloud", email: "", token: "" });
@@ -145,7 +150,7 @@ function ConfluenceForm({ onDone }: { onDone: () => void }) {
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => test.mutate()} disabled={test.isPending}>Test connection</Button>
           <Button variant="outline" size="sm" onClick={() => { setF({ base_url: c.base_url ?? "", deployment: c.deployment ?? "cloud", email: c.email ?? "", token: "" }); setEdit(true); }}>Change</Button>
-          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Disconnect Confluence? Imported pages stay.")) remove.mutate(); }}>Disconnect</Button>
+          <Button variant="ghost" size="sm" onClick={async () => { if (await ask({ title: "Disconnect Confluence?", message: "The stored token is deleted. Pages already imported stay in the wiki, but they stop syncing.", confirmLabel: "Disconnect", danger: true })) remove.mutate(); }}>Disconnect</Button>
           {test.data && <span role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Authenticated as ${test.data.user}` : test.data.error}</span>}
           <ErrorNote error={test.error} /></div>
         <ConfluenceImport onDone={onDone} />

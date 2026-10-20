@@ -210,14 +210,9 @@ def delete_source(
     db.delete(s)
     db.commit()
     if delete_pages:
-        from ..models import CodeChunk, IndexRun
-        from .knowledge import delete_repo_graph
+        from .repos import purge_repository
 
-        delete_repo_graph(db, repo.id)
-        for model in (CodeChunk, IndexRun):
-            db.query(model).filter(model.repo_id == repo.id).delete()
-        db.delete(repo)
-        db.commit()
+        purge_repository(db, repo)
 
 
 # ------------------------------------------------------------------------------------------------ README / text URLs
@@ -301,6 +296,31 @@ def get_page(
     if result is None:
         raise HTTPException(404, "Page not found")
     return result
+
+
+@router.delete("/page", status_code=204)
+def delete_page(
+    repo_id: str,
+    path: str = Query(min_length=1, max_length=1000),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Delete an uploaded/pasted/URL-imported page. Pages synced from Confluence are removed with their source."""
+    from .knowledge import managed_by_sync
+
+    repo = _get_repo(db, p, repo_id)
+    if repo.source != "docs":
+        raise HTTPException(400, "This page belongs to a code repository. Remove the repository to remove it.")
+    authorize(db, p, "document.delete", path)
+    doc = db.scalar(select(Document).where(Document.repo_id == repo.id, Document.path == path))
+    if doc is None:
+        raise HTTPException(404, "Page not found")
+    if managed_by_sync(doc):
+        raise HTTPException(409, f"This page is synced from {doc.source_type}. Remove the source instead.")
+    db.delete(doc)
+    repo.status = "indexing"
+    db.commit()
+    schedule_index(repo.id)
 
 
 @router.get("/concepts")

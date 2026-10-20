@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { HardDrive } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote } from "@/components/ui";
@@ -9,6 +10,7 @@ export const fmtBytes = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` 
 
 /** Disk used by cloned repositories, and a button to free clones nobody has used lately (indexes are kept). */
 export default function StoragePanel() {
+  const ask = useConfirm();
   const qc = useQueryClient();
   const [days, setDays] = useState(30);
   const info = useQuery({ queryKey: ["storage"], queryFn: () => api<StorageInfo>("/repositories/storage") });
@@ -30,7 +32,7 @@ export default function StoragePanel() {
         <label htmlFor="ttl">Unused for</label>
         <select id="ttl" className="h-8 rounded-md border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[0, 7, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? "any time" : `${n} days`}</option>)}</select>
         <Button size="sm" variant="outline" disabled={clean.isPending} onClick={() => clean.mutate(true)}>Preview</Button>
-        <Button size="sm" disabled={clean.isPending} onClick={() => { if (confirm("Delete unused clones? Indexes stay; clones are re-created when re-indexing.")) clean.mutate(false); }}>Free space</Button>
+        <Button size="sm" disabled={clean.isPending} onClick={async () => { if (await ask({ title: "Delete unused clones?", message: "Indexes stay. Clones are re-created the next time you re-index.", confirmLabel: "Delete clones", danger: true })) clean.mutate(false); }}>Free space</Button>
       </div>
       <p className="mt-1 text-xs text-muted">Automatic cleanup after {d.ttl_days || "∞"} days unused. Deleted clones are re-created on the next index.</p>
       <ErrorNote error={clean.error} />

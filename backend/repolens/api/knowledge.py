@@ -102,7 +102,34 @@ def upload_documents(
 def list_documents(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     _get_repo(db, p, repo_id)
     rows = db.scalars(select(Document).where(Document.repo_id == repo_id).order_by(Document.path))
-    return [{"id": d.id, "path": d.path, "size": len(d.content), "updated_at": d.updated_at} for d in rows]
+    return [
+        {
+            "id": d.id,
+            "path": d.path,
+            "size": len(d.content),
+            "updated_at": d.updated_at,
+            "source_type": d.source_type,
+            "deletable": not managed_by_sync(d),
+        }
+        for d in rows
+    ]
+
+
+@router.delete("/knowledge/collections/{repo_id}", status_code=204)
+def delete_collection(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Delete a documentation collection with all its documents, chunks and graph nodes."""
+    from .repos import purge_repository
+
+    repo = _get_repo(db, p, repo_id)
+    if repo.source != "docs":
+        raise HTTPException(400, "Only documentation collections can be deleted here")
+    authorize(db, p, "collection.delete", repo.name)
+    purge_repository(db, repo)
+
+
+def managed_by_sync(doc: Document) -> bool:
+    """Pages owned by a connected source (e.g. Confluence) return on the next sync, so they are not deleted by hand."""
+    return doc.source_type not in ("upload", "url", "")
 
 
 @router.delete("/knowledge/collections/{repo_id}/documents/{doc_id}", status_code=204)
@@ -114,6 +141,8 @@ def delete_document(
     doc = db.get(Document, doc_id)
     if doc is None or doc.repo_id != repo.id:
         raise HTTPException(404, "Document not found")
+    if managed_by_sync(doc):
+        raise HTTPException(409, f"This page is synced from {doc.source_type}. Remove the source instead.")
     db.delete(doc)
     repo.status = "indexing"
     db.commit()

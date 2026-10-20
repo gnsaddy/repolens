@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Network, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
 import { api, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeDetail, type Repo } from "@/lib/api";
@@ -222,6 +223,8 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
 const ACCEPT = ".md,.mdx,.rst,.txt,.adoc";
 
 function DocsTab({ repos }: { repos: Repo[] }) {
+  const ask = useConfirm();
+  const toast = useToast();
   const { user } = useAuth();
   const qc = useQueryClient();
   const collections = repos.filter((r) => r.source === "docs");
@@ -247,6 +250,8 @@ function DocsTab({ repos }: { repos: Repo[] }) {
     const documents = await Promise.all(ok.map(async (f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, content: await f.text() })));
     if (documents.length) upload.mutate(documents);
   }
+  const dropCollection = useMutation({ mutationFn: (id: string) => api(`/knowledge/collections/${id}`, { method: "DELETE" }),
+    onSuccess: () => { setSel(null); qc.invalidateQueries({ queryKey: ["repos"] }); toast("Collection deleted"); } });
   const writable = canWrite(user);
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
@@ -265,7 +270,9 @@ function DocsTab({ repos }: { repos: Repo[] }) {
       <Card>
         {!active ? <Empty>Create a collection, then upload Markdown, reStructuredText or text files. They are split by heading, linked to your code and added to the graph.</Empty> : (<>
           <CardTitle right={writable && (<label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600">
-            <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}</CardTitle>
+            <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}
+            {user?.role === "admin" && <button aria-label="Delete collection" title="Delete this collection and all its documents" className="ml-2 align-middle text-muted hover:text-red-600"
+              onClick={async () => { if (await ask({ title: `Delete the collection "${active.name}"?`, message: `All ${active.file_count} documents, their search entries and graph nodes are removed.`, confirmLabel: "Delete collection", danger: true })) dropCollection.mutate(active.id); }}><Trash2 className="inline h-4 w-4" /></button>}</CardTitle>
           <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (max 1 MB each)</div>
           <ErrorNote error={upload.error ?? remove.error} />
           {note && <p className="mb-2 text-xs text-amber-700">{note}</p>}
@@ -273,7 +280,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
           {!docs.data?.length ? <Empty>No documents yet.</Empty> : (
             <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Path</th><th className="font-medium">Size</th><th /></tr></thead>
               <tbody>{docs.data.map((d) => (<tr key={d.id} className="border-t border-line"><td className="py-2">{d.path}</td><td className="text-muted">{(d.size / 1024).toFixed(1)} KB</td>
-                <td className="text-right">{writable && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={() => { if (confirm(`Delete ${d.path}?`)) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}</td></tr>))}</tbody></table>)}
+                <td className="text-right">{writable && d.deletable !== false && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "It is removed from search, the graph and the wiki.", confirmLabel: "Delete document", danger: true })) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}{writable && d.deletable === false && <span className="text-xs text-muted" title="Synced from a connected source; remove the source to delete it">synced</span>}</td></tr>))}</tbody></table>)}
         </>)}
       </Card>
     </div>

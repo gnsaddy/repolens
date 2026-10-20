@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { File, GitPullRequest, Lock, RefreshCw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, statusTone } from "@/components/ui";
@@ -9,6 +10,7 @@ import AccessPanel from "@/components/AccessPanel";
 import { timeAgo } from "@/lib/utils";
 
 export default function Repositories() {
+  const ask = useConfirm();
   const { user } = useAuth();
   const qc = useQueryClient();
   const [sel, setSel] = useState<string | null>(null);
@@ -103,7 +105,7 @@ export default function Repositories() {
             <Card>
               <CardTitle right={canWrite(user) && (<div className="flex gap-1">
                 <Button size="sm" variant="outline" onClick={() => reindex.mutate(repo.id)} disabled={repo.status === "indexing"}><RefreshCw className="h-3.5 w-3.5" />Re-index</Button>
-                {user?.role === "admin" && <Button size="sm" variant="ghost" aria-label="Delete repository" onClick={() => { if (confirm(`Delete ${repo.name} and its index?`)) remove.mutate(repo.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>)}>{repo.name}</CardTitle>
+                {user?.role === "admin" && <Button size="sm" variant="ghost" aria-label="Delete repository" onClick={async () => { if (await ask({ title: `Delete ${repo.name}?`, message: "Its index, graph, investigations and clone are removed. The source repository is not touched.", confirmLabel: "Delete repository", danger: true })) remove.mutate(repo.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>)}>{repo.name}</CardTitle>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
                 <span>{repo.file_count} files</span><span>{repo.chunk_count} chunks</span><span>branch {repo.branch || repo.default_branch}</span>{lastRun?.finished_at && <span>last index {Math.max(1, Math.round((+new Date(lastRun.finished_at) - +new Date(lastRun.started_at)) / 1000))}s</span>}
                 <span>revision {repo.indexed_sha?.slice(0, 10) ?? "—"}</span><span>updated {timeAgo(repo.updated_at)}</span></div>

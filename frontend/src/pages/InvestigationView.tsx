@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "@/components/feedback";
 import { CheckCircle2, CircleDot, FileText, FlaskConical, GitCommit, GitPullRequest, Network, ThumbsDown, ThumbsUp, Ticket } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -12,6 +13,7 @@ const TABS = ["Overview", "Timeline", "Findings", "Evidence", "Report"] as const
 type Tab = (typeof TABS)[number];
 
 export default function InvestigationView() {
+  const ask = useConfirm();
   const { id = "" } = useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -53,7 +55,7 @@ export default function InvestigationView() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={!inv.jira_issue_key || publish.isPending || publish.isSuccess}
               title={inv.jira_issue_key ? "Posts the RCA as a Jira comment" : "Link a Jira issue first (Jira page)"}
-              onClick={() => { if (confirm(`Publish this RCA report to ${inv.jira_issue_key}?`)) publish.mutate(); }}>
+              onClick={async () => { if (await ask({ title: `Publish to ${inv.jira_issue_key}?`, message: "The RCA report is posted as a comment on the Jira issue.", confirmLabel: "Publish" })) publish.mutate(); }}>
               <Ticket className="h-4 w-4" />{publish.isSuccess ? "Published" : "Approve & publish to Jira"}
             </Button>
           </div>)}

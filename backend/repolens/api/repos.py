@@ -155,18 +155,25 @@ def reindex(repo_id: str, p: Principal = Depends(current_principal), db: Session
     return {"status": "scheduled"}
 
 
+def purge_repository(db: Session, repo: Repository) -> None:
+    """Delete a repository/collection and everything that references it (graph, chunks, runs, grants, sources...)."""
+    from ..db import Base
+    from .knowledge import delete_repo_graph
+
+    delete_repo_graph(db, repo.id)
+    for table in reversed(Base.metadata.sorted_tables):
+        if "repo_id" in table.c and table.name != "repositories":
+            db.execute(table.delete().where(table.c.repo_id == repo.id))
+    checkouts.remove_if_unshared(db, repo)
+    db.delete(repo)
+    db.commit()
+
+
 @router.delete("/repositories/{repo_id}", status_code=204)
 def delete_repo(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     repo = _get_repo(db, p, repo_id)
     authorize(db, p, "repo.delete", repo.name)
-    from .knowledge import delete_repo_graph
-
-    delete_repo_graph(db, repo.id)
-    for model in (CodeChunk, Change, IndexRun):
-        db.query(model).filter(model.repo_id == repo.id).delete()
-    checkouts.remove_if_unshared(db, repo)
-    db.delete(repo)
-    db.commit()
+    purge_repository(db, repo)
 
 
 @router.get("/repositories/{repo_id}/runs")
