@@ -1,0 +1,89 @@
+# Implemented features
+
+Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline defaults · ❌ not built
+
+## Ingestion
+* ✅ Git repositories: local path or https/ssh clone; incremental re-index by content hash; commit + diff history
+* ✅ Tree-sitter symbol chunking: Python, JavaScript, TypeScript/TSX, Go, Java; line-window fallback for other files
+* ✅ Configuration and deployment files: `Dockerfile*`, `Makefile`, `Jenkinsfile`, Terraform, `.ini/.conf/.properties/.xml/.proto`, YAML/TOML/JSON, `.env.example` (real `.env`, keys and certificates are never indexed)
+* ✅ Documentation: Markdown / MDX / RST / text / AsciiDoc, heading-aware sections, front matter, links, `[[wiki]]` links, code mentions
+* ✅ Uploaded document collections (no git needed), edit/delete with incremental re-index
+* ⚠️ GitHub pull requests (title, body, discussion, files, commits, labels, Jira keys) via PAT or OAuth device flow; webhook re-sync
+* ✅ GitHub push webhook re-indexing (HMAC-verified)
+* ✅ Private clones use the connected GitHub token via an environment-passed header, only for the host it was issued for; URLs with embedded credentials are rejected
+* ❌ GitLab / Bitbucket, GitHub App installation flow
+
+## Retrieval and knowledge graph
+* ✅ Hybrid search: pgvector similarity + Postgres full-text + symbol/path matching, reciprocal-rank fusion, deterministic ties, light stemming
+* ✅ Stack-trace understanding (Python/JS/Java), innermost-frame priority
+* ✅ Evidence links: GitHub/GitLab permalinks for commits, file ranges and PRs in evidence, reports, search and Ask (Jira comments get real link marks)
+* ✅ Git blame endpoint and failing-line blame (SZZ-style) as an RCA signal — neutral on the benchmark, see `evals/`
+* ✅ Knowledge graph (files, symbols, doc sections, commits, PRs) with typed edges: CONTAINS, IMPORTS, CALLS, TESTS, LINKS_TO, MENTIONS, MODIFIES, INCLUDES, RELATED_TO (semantic) — each with provenance; cross-repository links
+* ✅ Graph API + interactive graph view: filters, search, neighbours, shortest path, expand
+* ✅ Graph-expanded search and **Ask** with numbered, verified citations; extractive fallback when no model is configured
+* ⚠️ Embeddings: local hash embedder by default (offline); OpenAI-compatible provider implemented but not evaluated
+* ❌ Reranker model, Neo4j/NetworkX graph store (graph lives in Postgres)
+
+## Investigation (RCA)
+* ✅ LangGraph workflow: plan → gather → rank → (retry loop with limits) → synthesize → report → verify
+* ✅ Evidence of five kinds: code, commits (with changed lines), docs, tests, callers, PRs — every citation re-checked against the index
+* ✅ Hypotheses with a heuristic confidence (capped at 92%, labelled as not a probability); root cause stays *unconfirmed* until a human reviews it
+* ✅ Human review → verified incident memory; cached synthesis; budget-aware LLM fallback
+* ⚠️ Narrative synthesis with Anthropic / OpenAI-compatible / GitHub Models (tested with mocks)
+* ❌ Separate Blue/Red/Judge/Oracle-as-agent roles, fix generation, adversarial review, sandboxed test execution
+
+## Change-risk scoring (Oracle)
+* ✅ Interpretable 0–100 score from seven weighted signals (size, dependency centrality, public interfaces, historical defects, test gap, sensitive paths, similar past changes) with evidence, model version and limitations
+* ✅ Assess a commit, a branch range before merge, a synced PR, or a raw file list; ranks recent commits; auto-assesses PRs on webhook sync
+* ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
+* ❌ Calibration against real outcomes (needs labelled incidents)
+
+## Branches, clones and disk
+
+- **Branches:** when adding a repository, "Choose branches" lists the remote's branches (`git ls-remote`, no clone). Each selected branch becomes its own index (`name`, `name@branch`) with its own graph, risk scores and investigations, while all of them share a single clone. Up to `REPOLENS_MAX_BRANCHES` (8).
+- **Lean clones:** git clones are blob-less and have no working tree (`REPOLENS_CLONE_FILTER=blob:none`; set empty for full clones). History stays complete for blame, log and risk; file contents are downloaded in one batch at index time, and only for files that will be indexed. Servers that do not support partial clone fall back to a full clone.
+- **Cleanup:** clones unused for `REPOLENS_CHECKOUT_TTL_DAYS` (30; 0 disables) are deleted by a background job; indexes are kept and the clone is re-created on the next re-index. Admins see sizes and can preview or run a cleanup under Repositories -> Clone storage. Deleting a repository removes its clone unless another branch still uses it. Only directories under `REPOLENS_REPOS_DIR` are ever deleted.
+- Local-path repositories are read in place and are never cloned or deleted.
+
+## Graph: connections and heat map
+
+- Arrowheads show direction; hovering or selecting a node labels its links (calls, imports, mentions...). Relationship types can be toggled on and off, and the side panel summarises a node's connections by kind.
+- **Colour by** switches nodes from type colours to a heat map: recent change (lines changed in 90 days), bug-fix activity (commits whose message says fix/bug/hotfix/revert/regression/crash/patch), most connected, or public code no document mentions. Churn and bug heat apply to files and are inherited by the symbols inside them; nodes without data are grey.
+
+## DeepMind Wiki
+
+A browsable, connected knowledge base over everything that is documentation.
+
+- **Sources**: README/Markdown/txt/rst uploads or pasted text, public web URLs (GitHub blob links become raw links), and **Confluence** (Cloud: email + API token; Data Center: personal access token) by page, page tree or whole space. Credentials are Fernet-encrypted, never returned by the API, and never placed in URLs. Imports default to *restricted* visibility; only admins connect or import.
+- **Incremental sync**: pages are re-fetched only when their Confluence version changes; deleted pages are removed; one click re-sync per source.
+- **Browse**: page tree mirroring Confluence hierarchy, breadcrumbs, outline, backlinks, outgoing links, related pages (embedding similarity), code each page describes (links into the code graph), and concepts. `[[wiki links]]` and relative links resolve in-app.
+- **Ask**: question answering restricted to documentation, with cited sources and graph connections.
+- **Concepts**: terms recurring across pages, with definition, mentions, and related code.
+- **Health**: orphan pages, broken links, stale pages, near-duplicates, undocumented public code, outdated references (docs naming code that no longer exists).
+- Everything respects per-repository access control.
+
+Caveat: the Confluence flow is tested against an in-repo fake server (`python -m repolens.devtools.fake_confluence`), not a live Confluence instance.
+
+## Integrations
+* ⚠️ Jira Cloud (email + API token) and Data Center (PAT): read issues/JQL, investigate tickets, publish an approved RCA comment (ADF); SSRF-guarded
+* ⚠️ Jira field updates / transitions ❌
+* ⚠️ GitHub OAuth device-flow sign-in (own OAuth App) and GitHub Models provider
+* ✅ Anthropic by API key (Claude subscription sign-in is not available to third-party apps); ❌ Copilot (no public API)
+
+## Usage, cost and memory
+* ✅ Per-call events: tokens, cached tokens, latency, cache hit, versioned pricing, usage source (provider-reported / estimated / local)
+* ✅ Dashboard: totals, trend vs previous period, by model / agent / workflow, cost per successful RCA, tokens avoided (estimate)
+* ✅ Daily/monthly hard budgets (stop optional inference); per-organisation pricing override
+* ✅ Incident memory + exact cache with version-aware keys
+* ❌ Budget settings UI, per-model/per-workflow limits and alerts, repository summaries, semantic cache, small/large model routing
+
+## Platform
+* ✅ FastAPI backend, Vite + React + TypeScript + Tailwind frontend (Dashboard, Knowledge, Change Risk, Repositories, Investigations, Jira, Token Usage, Settings)
+* ✅ JWT auth, roles (admin/member/viewer), multi-organisation isolation, policy gateway (deny-by-default) with audit log, Fernet-encrypted secrets, secret redaction in prompts
+* ✅ **Per-repository access control**: restricted repositories are hidden (with their code, history, graph nodes/edges, search hits, Ask sources, investigations, memory, risk dependents and dashboard counts) from users who are not granted access; admins manage grants; revoking takes effect immediately
+* ✅ **Secret redaction at ingestion**: API keys, tokens, private keys, JWTs, URL credentials and quoted secret literals are removed from stored chunks, commit diffs, uploaded docs, PR text and the file viewer, with a per-run counter
+* ✅ Alembic migrations (0001–0005), Docker images, Compose (+Jaeger profile), Kubernetes manifests (default-deny network policy, non-root), GitHub Actions CI/CD
+* ✅ Prometheus metrics, OpenTelemetry tracing, structured logs
+* ✅ Evaluation harness with a synthetic benchmark (see `evals/`)
+* ❌ CLI, isolated code-execution sandbox, CI/PR-triggered analysis beyond the webhook, retention/deletion policies, rate limiting on login
+* ⚠️ Access control has no per-repo *write* levels (roles still decide who can change things) and aggregate numbers such as a risk signal's "N dependents" may count hidden dependents
