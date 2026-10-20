@@ -1,0 +1,342 @@
+[
+  {
+    "id": "case-01-null_guard-notify",
+    "domain": "notify",
+    "template": "null_guard",
+    "variant": "trace",
+    "bug_report": "Looking up a message that was deleted now fails with an error page.\n\nTraceback (most recent call last):\n  File \"notify/api.py\", line 9, in fetch_message_endpoint\n    return {\"status\": 200, \"body\": service.get_message(message_id)}\n  File \"notify/service.py\", line 16, in get_message\n    return {\"id\": message_id, \"name\": record[\"name\"]\nTypeError: 'NoneType' object is not subscriptable",
+    "gold_commit": "df93dc2b880eb42c142a756e1a187ae78a4a069b",
+    "gold_file": "notify/service.py",
+    "gold_symbol": "MessageService.get_message",
+    "gold_lines": [
+      15,
+      15
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-01-null_guard-notify",
+    "commits": 5
+  },
+  {
+    "id": "case-02-off_by_one-notify",
+    "domain": "notify",
+    "template": "off_by_one",
+    "variant": "behavioral",
+    "bug_report": "The first page of the messages list is missing entries and the last page comes back empty.",
+    "gold_commit": "0ab7249866d693c98943c824d8a1700410bf68af",
+    "gold_file": "notify/service.py",
+    "gold_symbol": "MessageService.list_messages",
+    "gold_lines": [
+      23,
+      23
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-02-off_by_one-notify",
+    "commits": 5
+  },
+  {
+    "id": "case-03-retry_removed-catalog",
+    "domain": "catalog",
+    "template": "retry_removed",
+    "variant": "feature",
+    "bug_report": "Intermittent timeouts when loading a product after the latest release; the remote store looks healthy.",
+    "gold_commit": "69a85582f00fbea2f97b13beba9f9873f0dd54c7",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.fetch_with_retry",
+    "gold_lines": [
+      27,
+      27
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-03-retry_removed-catalog",
+    "commits": 6
+  },
+  {
+    "id": "case-04-missing_validation-billing",
+    "domain": "billing",
+    "template": "missing_validation",
+    "variant": "behavioral",
+    "bug_report": "Reserving a negative quantity is accepted and the balance goes up instead of being rejected.",
+    "gold_commit": "2238479e22b38fcc3bd744b11936507650a9f141",
+    "gold_file": "billing/service.py",
+    "gold_symbol": "InvoiceService.reserve",
+    "gold_lines": [
+      35,
+      35
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-04-missing_validation-billing",
+    "commits": 7
+  },
+  {
+    "id": "case-05-case_sensitivity-catalog",
+    "domain": "catalog",
+    "template": "case_sensitivity",
+    "variant": "behavioral",
+    "bug_report": "Searching a product by name only works when typing it exactly as stored; capital letters find nothing.",
+    "gold_commit": "41101870560eadd73bb14763fd4ad637f48b0d70",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.find_by_name",
+    "gold_lines": [
+      43,
+      43
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-05-case_sensitivity-catalog",
+    "commits": 7
+  },
+  {
+    "id": "case-06-rounding-shipping",
+    "domain": "shipping",
+    "template": "rounding",
+    "variant": "feature",
+    "bug_report": "Customers are charged whole numbers; fractional parts of the parcels total vanish in the receipt.",
+    "gold_commit": "c99cc55123a88022a5203afcfd69e6d20d7e86f1",
+    "gold_file": "shipping/service.py",
+    "gold_symbol": "ParcelService.total_price",
+    "gold_lines": [
+      49,
+      49
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-06-rounding-shipping",
+    "commits": 5
+  },
+  {
+    "id": "case-07-cache_key-catalog",
+    "domain": "catalog",
+    "template": "cache_key",
+    "variant": "behavioral",
+    "bug_report": "One customer can see another customer's products after caching was switched on: data leaks between tenants.",
+    "gold_commit": "b038eb62092e60f993f77e4f513599566b1f4452",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.cache_key",
+    "gold_lines": [
+      52,
+      52
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-07-cache_key-catalog",
+    "commits": 7
+  },
+  {
+    "id": "case-08-wrong_default-catalog",
+    "domain": "catalog",
+    "template": "wrong_default",
+    "variant": "behavioral",
+    "bug_report": "Every call to the remote store now fails instantly, as if there were no time allowed for a response.",
+    "gold_commit": "fba6fe88fc6da5acbb6e6f288b3a322c00e3ff30",
+    "gold_file": "catalog/config.py",
+    "gold_symbol": "",
+    "gold_lines": [
+      2,
+      2
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-08-wrong_default-catalog",
+    "commits": 6
+  },
+  {
+    "id": "case-09-swapped_args-catalog",
+    "domain": "catalog",
+    "template": "swapped_args",
+    "variant": "feature",
+    "bug_report": "Transfers between locations are reversed in the repository log; balances end up swapped.",
+    "gold_commit": "7f93a5eadfdca4995bf3e5f9df29386929f3f0fd",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.transfer",
+    "gold_lines": [
+      55,
+      55
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-09-swapped_args-catalog",
+    "commits": 7
+  },
+  {
+    "id": "case-10-status_code-billing",
+    "domain": "billing",
+    "template": "status_code",
+    "variant": "behavioral",
+    "bug_report": "API clients treat a missing invoice as a success because the response code no longer signals the problem.",
+    "gold_commit": "4e8dc26d1823e6129fd6ca6057d2e0c03274c5b0",
+    "gold_file": "billing/api.py",
+    "gold_symbol": "get_invoice_endpoint",
+    "gold_lines": [
+      8,
+      8
+    ],
+    "recurrence_of": null,
+    "repo_dir": "repos/case-10-status_code-billing",
+    "commits": 7
+  },
+  {
+    "id": "case-11-null_guard-inventory",
+    "domain": "inventory",
+    "template": "null_guard",
+    "variant": "behavioral",
+    "bug_report": "Looking up a item that was deleted now fails with an error page. It used to show a placeholder entry.",
+    "gold_commit": "bd33db53d54df6034ab21b1861795ceea5b32164",
+    "gold_file": "inventory/service.py",
+    "gold_symbol": "ItemService.get_item",
+    "gold_lines": [
+      15,
+      15
+    ],
+    "recurrence_of": "case-01-null_guard-notify",
+    "repo_dir": "repos/case-11-null_guard-inventory",
+    "commits": 5
+  },
+  {
+    "id": "case-12-off_by_one-notify",
+    "domain": "notify",
+    "template": "off_by_one",
+    "variant": "feature",
+    "bug_report": "GET /messages?page=1 skips the first records and the final page comes back empty.",
+    "gold_commit": "56904ae48e953282a15ac5270aedabca94ae1878",
+    "gold_file": "notify/service.py",
+    "gold_symbol": "MessageService.list_messages",
+    "gold_lines": [
+      22,
+      22
+    ],
+    "recurrence_of": "case-02-off_by_one-notify",
+    "repo_dir": "repos/case-12-off_by_one-notify",
+    "commits": 5
+  },
+  {
+    "id": "case-13-retry_removed-bookings",
+    "domain": "bookings",
+    "template": "retry_removed",
+    "variant": "trace",
+    "bug_report": "Loading a reservation from the remote store fails intermittently.\n\nTraceback (most recent call last):\n  File \"bookings/api.py\", line 13, in fetch_reservation_endpoint\n    return {\"status\": 200, \"body\": service.get_reservation(reservation_id)}\n  File \"bookings/service.py\", line 34, in fetch_with_retry\n    raise last_error\nTimeoutError: remote store did not answer in time",
+    "gold_commit": "0e2ec1488c47888144f42f8cb6d9789dac2fe024",
+    "gold_file": "bookings/service.py",
+    "gold_symbol": "ReservationService.fetch_with_retry",
+    "gold_lines": [
+      28,
+      28
+    ],
+    "recurrence_of": "case-03-retry_removed-catalog",
+    "repo_dir": "repos/case-13-retry_removed-bookings",
+    "commits": 5
+  },
+  {
+    "id": "case-14-missing_validation-inventory",
+    "domain": "inventory",
+    "template": "missing_validation",
+    "variant": "behavioral",
+    "bug_report": "Reserving a negative quantity is accepted and the stock level goes up instead of being rejected.",
+    "gold_commit": "da1b6e795c0ce5d20763878953d14593f42e2c59",
+    "gold_file": "inventory/service.py",
+    "gold_symbol": "ItemService.reserve",
+    "gold_lines": [
+      36,
+      36
+    ],
+    "recurrence_of": "case-04-missing_validation-billing",
+    "repo_dir": "repos/case-14-missing_validation-inventory",
+    "commits": 7
+  },
+  {
+    "id": "case-15-case_sensitivity-inventory",
+    "domain": "inventory",
+    "template": "case_sensitivity",
+    "variant": "feature",
+    "bug_report": "Name search for items became case sensitive; 'ALPHA' no longer finds 'alpha'.",
+    "gold_commit": "f477dbfb21271f46a10f18ba23b63f72cf5bd9a9",
+    "gold_file": "inventory/service.py",
+    "gold_symbol": "ItemService.find_by_name",
+    "gold_lines": [
+      43,
+      43
+    ],
+    "recurrence_of": "case-05-case_sensitivity-catalog",
+    "repo_dir": "repos/case-15-case_sensitivity-inventory",
+    "commits": 6
+  },
+  {
+    "id": "case-16-rounding-inventory",
+    "domain": "inventory",
+    "template": "rounding",
+    "variant": "behavioral",
+    "bug_report": "Order totals lose their cents: a total of 10.50 is reported as 10.",
+    "gold_commit": "d845d730275ca2cb8ac7bad240cde28159736673",
+    "gold_file": "inventory/service.py",
+    "gold_symbol": "ItemService.total_price",
+    "gold_lines": [
+      49,
+      49
+    ],
+    "recurrence_of": "case-06-rounding-shipping",
+    "repo_dir": "repos/case-16-rounding-inventory",
+    "commits": 7
+  },
+  {
+    "id": "case-17-cache_key-catalog",
+    "domain": "catalog",
+    "template": "cache_key",
+    "variant": "behavioral",
+    "bug_report": "One customer can see another customer's products after caching was switched on: data leaks between tenants.",
+    "gold_commit": "a69ddf5d502e193453950cac39e979a933baa462",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.cache_key",
+    "gold_lines": [
+      52,
+      52
+    ],
+    "recurrence_of": "case-07-cache_key-catalog",
+    "repo_dir": "repos/case-17-cache_key-catalog",
+    "commits": 7
+  },
+  {
+    "id": "case-18-wrong_default-notify",
+    "domain": "notify",
+    "template": "wrong_default",
+    "variant": "feature",
+    "bug_report": "All remote message loads time out immediately since the settings change; retries do not help.",
+    "gold_commit": "fa76f56533098e6e81ce72331749c6972a082c46",
+    "gold_file": "notify/config.py",
+    "gold_symbol": "",
+    "gold_lines": [
+      2,
+      2
+    ],
+    "recurrence_of": "case-08-wrong_default-catalog",
+    "repo_dir": "repos/case-18-wrong_default-notify",
+    "commits": 7
+  },
+  {
+    "id": "case-19-swapped_args-catalog",
+    "domain": "catalog",
+    "template": "swapped_args",
+    "variant": "behavioral",
+    "bug_report": "Moving inventory between two locations goes the wrong way: the source gains what it should lose.",
+    "gold_commit": "3a80163e3ea759a2b73e1ca45313ca43db2c70e6",
+    "gold_file": "catalog/service.py",
+    "gold_symbol": "ProductService.transfer",
+    "gold_lines": [
+      55,
+      55
+    ],
+    "recurrence_of": "case-09-swapped_args-catalog",
+    "repo_dir": "repos/case-19-swapped_args-catalog",
+    "commits": 6
+  },
+  {
+    "id": "case-20-status_code-bookings",
+    "domain": "bookings",
+    "template": "status_code",
+    "variant": "behavioral",
+    "bug_report": "API clients treat a missing reservation as a success because the response code no longer signals the problem.",
+    "gold_commit": "865b3dbd825eab0e7f8aade7037c291f8bb0c2b5",
+    "gold_file": "bookings/api.py",
+    "gold_symbol": "get_reservation_endpoint",
+    "gold_lines": [
+      8,
+      8
+    ],
+    "recurrence_of": "case-10-status_code-billing",
+    "repo_dir": "repos/case-20-status_code-bookings",
+    "commits": 6
+  }
+]
