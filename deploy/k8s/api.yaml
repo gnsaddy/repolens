@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: repolens-repos, namespace: repolens }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 50Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: api, namespace: repolens }
+spec:
+  replicas: 1   # clones live on a RWO volume; use RWX storage before scaling out
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata:
+      labels: { app: api }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: /metrics }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: api
+          image: ghcr.io/OWNER/repolens-api:latest
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - configMapRef: { name: repolens-config }
+            - secretRef: { name: repolens-secrets }
+          startupProbe: { httpGet: { path: /healthz, port: 8000 }, failureThreshold: 30, periodSeconds: 2 }
+          livenessProbe: { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 15 }
+          readinessProbe: { httpGet: { path: /readyz, port: 8000 }, periodSeconds: 10 }
+          resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 2Gi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts:
+            - { name: repos, mountPath: /data/repos }
+            - { name: tmp, mountPath: /tmp }
+            - { name: home, mountPath: /home/app }
+      volumes:
+        - { name: repos, persistentVolumeClaim: { claimName: repolens-repos } }
+        - { name: tmp, emptyDir: {} }
+        - { name: home, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: api, namespace: repolens }
+spec:
+  selector: { app: api }
+  ports: [{ port: 8000, targetPort: 8000 }]

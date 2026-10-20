@@ -1,0 +1,83 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+permissions: { contents: read }
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: repolens }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/pyproject.toml }
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy repolens
+      - name: Tests (SQLite)
+        run: pytest --cov=repolens --cov-report=term-missing
+      - name: Tests (PostgreSQL + pgvector)
+        env: { REPOLENS_TEST_DATABASE_URL: "postgresql+psycopg://postgres:pw@localhost:5432/repolens" }
+        run: pytest
+      - name: Benchmark smoke (offline, deterministic)
+        run: python -m repolens.evals --cases 10 --no-org-wide --out /tmp/eval-report
+      - uses: actions/upload-artifact@v4
+        with: { name: eval-report, path: /tmp/eval-report }
+      - name: Migrations apply cleanly
+        env: { REPOLENS_DATABASE_URL: "postgresql+psycopg://postgres:pw@localhost:5432/repolens" }
+        run: |
+          python - <<'PY'
+          from sqlalchemy import create_engine, text
+          from repolens.config import get_settings
+          e = create_engine(get_settings().database_url)
+          with e.begin() as c:
+              c.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
+          PY
+          alembic upgrade head
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  images:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build api (no push)
+        uses: docker/build-push-action@v6
+        with: { context: backend, load: true, tags: repolens-api:ci, cache-from: type=gha, cache-to: "type=gha,mode=max" }
+      - name: Build web (no push)
+        uses: docker/build-push-action@v6
+        with: { context: frontend, load: true, tags: repolens-web:ci, cache-from: type=gha, cache-to: "type=gha,mode=max" }
+      - name: Scan images
+        uses: aquasecurity/trivy-action@0.28.0
+        with: { image-ref: repolens-api:ci, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
+      - name: Validate Kubernetes manifests
+        run: |
+          kubectl kustomize deploy/k8s > /tmp/all.yaml
+          python3 -c "import yaml,sys; [d for d in yaml.safe_load_all(open('/tmp/all.yaml'))]; print('manifests parse')"

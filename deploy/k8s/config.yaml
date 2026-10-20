@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: repolens-config, namespace: repolens }
+data:
+  REPOLENS_ENV: prod
+  REPOLENS_LLM_PROVIDER: heuristic
+  REPOLENS_EMBEDDING_PROVIDER: hash
+  REPOLENS_LOCAL_REPO_ROOTS: '["/mnt/repos"]'
+  REPOLENS_ALLOW_REGISTRATION: "true"
+  REPOLENS_OTLP_ENDPOINT: ""
+  REPOLENS_CORS_ORIGINS: '["https://repolens.example.com"]'

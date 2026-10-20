@@ -1,0 +1,45 @@
+# Local / self-hosted stack:  docker compose up --build   ->  http://localhost:8080
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: repolens
+      POSTGRES_USER: repolens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repolens}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repolens -d repolens"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    env_file: [{ path: .env, required: false }]
+    environment:
+      REPOLENS_ENV: ${REPOLENS_ENV:-dev}
+      REPOLENS_DATABASE_URL: postgresql+psycopg://repolens:${POSTGRES_PASSWORD:-repolens}@db:5432/repolens
+      REPOLENS_OTLP_ENDPOINT: ${REPOLENS_OTLP_ENDPOINT:-}
+    volumes:
+      - repos:/data/repos
+      - ${REPOLENS_LOCAL_REPOS:-./data/local-repos}:/mnt/repos:ro   # mount local git repos here
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["${API_PORT:-8000}:8000"]
+
+  web:
+    build: ./frontend
+    environment:
+      API_UPSTREAM: http://api:8000
+    depends_on: [api]
+    ports: ["${WEB_PORT:-8080}:8080"]
+
+  # Optional tracing UI:  docker compose --profile telemetry up
+  jaeger:
+    profiles: [telemetry]
+    image: jaegertracing/all-in-one:1.62.0
+    environment: { COLLECTOR_OTLP_ENABLED: "true" }
+    ports: ["16686:16686", "4318:4318"]
+
+volumes:
+  pgdata:
+  repos:
