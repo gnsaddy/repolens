@@ -5,7 +5,7 @@ import logging
 import posixpath
 import re
 import socket
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import httpx
@@ -18,6 +18,9 @@ from ..db import session_factory
 from ..models import ConfluenceConnection, Document, Repository, WikiSource
 from ..security import decrypt_secret, redact_secrets, redact_stored
 from .confluence import ConfluenceClient, ConfluenceError, parse_confluence_url, slugify, storage_to_markdown
+from .connectors import ConnectorError, Ctx
+from .connectors import get as get_connector
+from .connectors.base import sync_documents
 
 log = logging.getLogger("repolens.wiki")
 MAX_DEPTH = 25
@@ -234,7 +237,10 @@ def run_source_sync(source_id: str) -> None:
         source.last_status, source.last_error = "running", None
         db.commit()
         try:
-            stats = sync_confluence(db, source, client_for_org(db, source.org_id))
+            if source.kind == "confluence":
+                stats = sync_confluence(db, source, client_for_org(db, source.org_id))
+            else:
+                stats = _sync_connector(db, source)
             repo = db.get(Repository, source.repo_id)
             if repo is not None:
                 repo.status = "indexing"
@@ -245,16 +251,56 @@ def run_source_sync(source_id: str) -> None:
             source.last_status = "completed"
             source.pages_total = stats["fetched"]
             source.last_synced_at = datetime.now(UTC)
-            source.last_error = "page limit reached; raise max_pages to import the rest" if stats["truncated"] else None
+            source.next_sync_at = (
+                source.last_synced_at + timedelta(hours=source.sync_interval_hours)
+                if source.sync_interval_hours
+                else None
+            )
+            source.last_error = "limit reached; raise the maximum to import the rest" if stats["truncated"] else None
         except Exception as e:  # visible on the source, never crashes the worker
             db.rollback()
             log.exception("wiki sync failed for %s", source_id)
             source = db.get(WikiSource, source_id)
             assert source is not None
-            source.last_status, source.last_error = "failed", redact_secrets(f"{type(e).__name__}: {e}")[:500]
+            source.last_status = "failed"
+            source.last_error = redact_secrets(str(e) if isinstance(e, ConnectorError) else f"{type(e).__name__}: {e}")[
+                :500
+            ]
+            if source.sync_interval_hours:  # a failing source retries on schedule instead of hammering the service
+                source.next_sync_at = datetime.now(UTC) + timedelta(hours=source.sync_interval_hours)
         db.commit()
     finally:
         db.close()
+
+
+def _sync_connector(db: Session, source: WikiSource) -> dict:
+    from . import connectors
+
+    connectors.load_all()
+    conn = get_connector(source.kind)
+    ctx = Ctx(
+        db,
+        source.org_id,
+        dict(source.config or {}),
+        decrypt_secret(source.secret_encrypted) if source.secret_encrypted else "",
+        source.max_pages,
+        connectors.transports.get(source.kind),
+    )
+    return sync_documents(db, source, conn.fetch(ctx))
+
+
+def due_sources(db: Session, now: datetime | None = None) -> list[str]:
+    """Sources whose scheduled sync is due (never while one is already running)."""
+    now = now or datetime.now(UTC)
+    rows = db.scalars(select(WikiSource).where(WikiSource.sync_interval_hours > 0, WikiSource.last_status != "running"))
+    due = []
+    for s in rows:
+        when = s.next_sync_at
+        if when is not None and when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        if when is None or when <= now:
+            due.append(s.id)
+    return due
 
 
 def schedule_source_sync(source_id: str) -> None:

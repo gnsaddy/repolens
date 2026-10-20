@@ -162,7 +162,7 @@ export interface WikiHealth {
   duplicates: { similarity: number; a: PageRef; b: PageRef }[];
   undocumented_code: GraphNode[]; outdated_references: { repo: string; repo_id: string; path: string; section: string; term: string }[];
 }
-export interface WikiSourceStatus { id: string; repo_id: string; name: string; kind: string; url: string; mode: string; space_key: string; pages: number; status: string; repo_status: string; error: string | null; last_synced_at: string | null; visibility: string }
+export interface WikiSourceStatus { sync_interval_hours?: number; next_sync_at?: string | null; label?: string; id: string; repo_id: string; name: string; kind: string; url: string; mode: string; space_key: string; pages: number; status: string; repo_status: string; error: string | null; last_synced_at: string | null; visibility: string }
 export interface ConfluenceConn { connected: boolean; base_url?: string; deployment?: "cloud" | "datacenter"; email?: string }
 export interface ConfluencePreview { kind: "page" | "space"; space_key: string; title: string; page_id: string; suggested_mode: "tree" | "space" }
 
@@ -178,3 +178,5 @@ export interface OwnershipOverview { repo_id: string; repo: string; summary: { p
 export interface PathOwners { path: string; owners: OwnerRow[]; bus_factor: number }
 export interface CiFailure { index: number; name: string; kind: string; message: string; details: string; file: string; line: number; count: number }
 export interface CiPreview { format: string; failures: CiFailure[] }
+export interface ConnectorField { key: string; label: string; type?: string; required: boolean; secret: boolean; placeholder?: string; help?: string; options?: string[] }
+export interface ConnectorInfo { kind: string; label: string; description: string; needs_secret: boolean; fields: ConnectorField[] }

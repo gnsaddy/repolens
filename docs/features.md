@@ -38,6 +38,10 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Sources: Jira, Slack and scheduled sync
+
+Wiki > Sources connects more than documents. **Jira tickets** (a JQL query; uses the Jira connection from Settings) become one page per issue with fields, description and the last 20 comments, so "has this broken before?" is answered from past incidents. **Slack channels** (bot token with `channels:history`, `channels:read`, `users:read`; channels listed by name) turn threads with replies into pages and busy days into digests, with mentions and links resolved; a Slack workspace export can be uploaded instead, with no token. Imports are incremental (changed items rewritten, deleted ones removed), redact secrets before storing, default to restricted visibility, and are admin-only. Each connected source can be re-synced on a schedule (hourly to weekly) or manually; a failing source retries on its schedule instead of hammering the service. Tokens are encrypted and never returned. Items synced from a source cannot be deleted one by one, because they would return on the next sync: remove the source.
+
 ## Investigations from CI failures
 
 Investigations > **From a CI log**: upload or paste a JUnit XML report, pytest, Jest or Go test output, or any log with stack traces. The failures are listed (duplicates merged, with their file and line), you choose up to ten, and each becomes its own investigation. Secrets in the log are redacted before storing or sending to a model, XML with a DOCTYPE is rejected, and logs over 2 MB are refused. The server parses the log again when you start, so the browser cannot inject a different query.

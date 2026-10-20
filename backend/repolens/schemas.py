@@ -261,6 +261,28 @@ class ImportUrlIn(BaseModel):
     name: str = Field(default="", max_length=200, pattern=r"^[\w.\-: ]*$")
 
 
+class ConnectorCheckIn(BaseModel):
+    config: dict = Field(default_factory=dict)
+    secret: str = Field(default="", max_length=20000)
+
+
+class ConnectorImportIn(ConnectorCheckIn):
+    name: str = Field(default="", max_length=200, pattern=r"^[\w.\-: #@]*$")
+    visibility: str = Field(default="restricted", pattern="^(org|restricted)$")
+    sync_interval_hours: int = Field(default=0, ge=0, le=720)
+    max_docs: int = Field(default=500, ge=1, le=2000)
+
+
+class ScheduleIn(BaseModel):
+    sync_interval_hours: int = Field(ge=0, le=720)
+
+
+class SlackExportIn(BaseModel):
+    files: list[DocIn] = Field(min_length=1, max_length=400)  # path like "general/2026-01-31.json"
+    collection_id: str | None = Field(default=None, max_length=64)
+    name: str = Field(default="", max_length=200, pattern=r"^[\w.\-: ]*$")
+
+
 class WikiAskIn(BaseModel):
     query: str = Field(min_length=2, max_length=2000)
     repo_ids: list[str] = Field(default_factory=list, max_length=100)

@@ -455,6 +455,10 @@ class WikiSource(Base):
     root_page_id: Mapped[str] = mapped_column(String(100), default="")
     max_pages: Mapped[int] = mapped_column(Integer, default=300)
     pages_total: Mapped[int] = mapped_column(Integer, default=0)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)  # non-secret settings of a connector (jql, channels...)
+    secret_encrypted: Mapped[str] = mapped_column(Text, default="")  # Fernet token; never returned by the API
+    sync_interval_hours: Mapped[int] = mapped_column(Integer, default=0)  # 0 = manual only
+    next_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_status: Mapped[str] = mapped_column(String(20), default="never")  # never | running | completed | failed
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

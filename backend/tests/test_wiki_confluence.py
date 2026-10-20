@@ -379,7 +379,7 @@ def test_page_limit_truncates_and_reports_it(client, auth, fake, session):
     imp = do_import(client, auth, SPACE, max_pages=2)
     assert len(docs(session, imp["repo_id"])) == 2
     src = client.get("/api/wiki/sources", headers=auth).json()[0]
-    assert src["status"] == "completed" and "page limit" in src["error"]
+    assert src["status"] == "completed" and "limit reached" in src["error"]
 
 
 def test_incremental_sync_updates_changes_adds_new_and_removes_deleted_pages(client, auth, fake, session):

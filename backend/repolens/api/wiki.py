@@ -1,6 +1,6 @@
 import hashlib
 import posixpath
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -9,8 +9,19 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import ConfluenceConnection, Document, Repository, WikiSource
-from ..schemas import ConfluenceConnectionIn, ConfluenceImportIn, ConfluencePreviewIn, ImportUrlIn, WikiAskIn
+from ..schemas import (
+    ConfluenceConnectionIn,
+    ConfluenceImportIn,
+    ConfluencePreviewIn,
+    ConnectorCheckIn,
+    ConnectorImportIn,
+    ImportUrlIn,
+    ScheduleIn,
+    SlackExportIn,
+    WikiAskIn,
+)
 from ..security import encrypt_secret, redact_secrets, redact_stored
+from ..services import connectors
 from ..services import knowledge as kb
 from ..services import wiki as wk
 from ..services import wiki_import as wi
@@ -167,7 +178,155 @@ def _source_view(db: Session, s: WikiSource, repo: Repository) -> dict:
         "error": s.last_error,
         "last_synced_at": s.last_synced_at,
         "visibility": repo.visibility,
+        "sync_interval_hours": s.sync_interval_hours,
+        "next_sync_at": s.next_sync_at,
+        "label": connectors.get(s.kind).describe(s.config or {}) if s.kind in connectors.REGISTRY else s.url,
     }
+
+
+# ------------------------------------------------------------------------------------------------ connectors
+def _connector(kind: str):
+    connectors.load_all()
+    try:
+        return connectors.get(kind)
+    except connectors.ConnectorError:
+        raise HTTPException(404, "Unknown source type") from None
+
+
+@router.get("/connectors")
+def list_connectors(p: Principal = Depends(current_principal)):
+    """The kinds of source that can be connected, with the fields each one needs (secrets are write-only)."""
+    connectors.load_all()
+    return [
+        {
+            "kind": c.kind,
+            "label": c.label,
+            "description": c.description,
+            "needs_secret": c.needs_secret,
+            "fields": [
+                {k: v for k, v in f.__dict__.items() if v not in ("", [], None) or k in ("required", "secret")}
+                for f in c.fields
+            ],
+        }
+        for c in connectors.REGISTRY.values()
+    ]
+
+
+@router.post("/connectors/{kind}/check")
+def check_connector(
+    kind: str, body: ConnectorCheckIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    authorize(db, p, "wiki.configure", kind, op="check")
+    c = _connector(kind)
+    try:
+        config = c.validate(body.config)
+        detail = c.check(connectors.Ctx(db, p.org_id, config, body.secret.strip(), 1, connectors.transports.get(kind)))
+    except connectors.ConnectorError as e:
+        return {"ok": False, "error": redact_secrets(str(e))}
+    return {"ok": True, "detail": detail}
+
+
+@router.post("/connectors/{kind}/import", status_code=202)
+def import_connector(
+    kind: str, body: ConnectorImportIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Create a collection fed by a connector. Content defaults to restricted visibility because tickets and chat
+    can be sensitive."""
+    authorize(db, p, "wiki.import", kind, op="connector")
+    c = _connector(kind)
+    try:
+        config = c.validate(body.config)
+    except connectors.ConnectorError as e:
+        raise HTTPException(400, str(e)) from None
+    secret = body.secret.strip()
+    if c.needs_secret and not secret:
+        raise HTTPException(400, "A token or key is required")
+    base_name = body.name or c.describe(config)
+    name, n = base_name[:190], 1
+    while db.scalar(select(Repository.id).where(Repository.org_id == p.org_id, Repository.name == name)):
+        n += 1
+        name = f"{base_name[:180]} ({n})"
+    repo = Repository(org_id=p.org_id, name=name, source="docs", url="", status="indexing", visibility=body.visibility)
+    db.add(repo)
+    db.flush()
+    src = WikiSource(
+        org_id=p.org_id,
+        repo_id=repo.id,
+        kind=kind,
+        url=c.describe(config),
+        mode="sync",
+        max_pages=body.max_docs,
+        config=config,
+        secret_encrypted=encrypt_secret(secret) if secret else "",
+        sync_interval_hours=body.sync_interval_hours,
+        last_status="running",
+        created_by=p.user_id,
+    )
+    db.add(src)
+    db.commit()
+    wi.schedule_source_sync(src.id)
+    return {"source_id": src.id, "repo_id": repo.id, "name": name, "visibility": body.visibility}
+
+
+@router.put("/sources/{source_id}/schedule")
+def set_schedule(
+    source_id: str, body: ScheduleIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    s, repo = _get_source(db, p, source_id)
+    authorize(db, p, "wiki.import", repo.name, op="schedule")
+    s.sync_interval_hours = body.sync_interval_hours
+    s.next_sync_at = datetime.now(UTC) + timedelta(hours=body.sync_interval_hours) if body.sync_interval_hours else None
+    db.commit()
+    return {"sync_interval_hours": s.sync_interval_hours, "next_sync_at": s.next_sync_at}
+
+
+@router.post("/slack-export", status_code=201)
+def import_slack_export(body: SlackExportIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Import files from a Slack workspace export (channel folders of daily JSON files). Not synced afterwards."""
+    from ..services.connectors.slack import export_to_docs
+
+    authorize(db, p, "document.write", "slack-export", count=len(body.files))
+    try:
+        docs = export_to_docs([(f.path, f.content) for f in body.files])
+    except connectors.ConnectorError as e:
+        raise HTTPException(400, str(e)) from None
+    if not docs:
+        raise HTTPException(400, "No conversations found in those files")
+    if body.collection_id:
+        repo = _get_repo(db, p, body.collection_id)
+        if repo.source != "docs":
+            raise HTTPException(400, "Pick a docs collection")
+    else:
+        base = body.name or "Slack export"
+        name, n = base[:190], 1
+        while db.scalar(select(Repository.id).where(Repository.org_id == p.org_id, Repository.name == name)):
+            n += 1
+            name = f"{base[:180]} ({n})"
+        repo = Repository(org_id=p.org_id, name=name, source="docs", url="", status="indexing", visibility="restricted")
+        db.add(repo)
+        db.flush()
+    for d in docs:
+        content, _ = redact_stored(d.markdown)
+        h = hashlib.sha256(content.encode()).hexdigest()
+        row = db.scalar(select(Document).where(Document.repo_id == repo.id, Document.path == d.path))
+        if row is None:
+            db.add(
+                Document(
+                    org_id=p.org_id,
+                    repo_id=repo.id,
+                    path=d.path,
+                    title=d.title[:500],
+                    content=content,
+                    content_hash=h,
+                    created_by=p.user_id,
+                )
+            )
+        elif row.content_hash != h:
+            row.content, row.content_hash = content, h
+    repo.status = "indexing"
+    db.commit()
+    schedule_index(repo.id)
+    return {"repo_id": repo.id, "documents": len(docs)}
 
 
 @router.get("/sources")

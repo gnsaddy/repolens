@@ -35,6 +35,32 @@ async def _checkout_janitor(hours: float = 6.0) -> None:
         await asyncio.sleep(hours * 3600)
 
 
+async def _source_scheduler(minutes: float = 5.0) -> None:
+    """Re-sync connected sources (Confluence, Jira, Slack, ...) whose schedule says they are due."""
+    from .db import session_factory
+    from .models import Repository, WikiSource
+    from .services import wiki_import as wi
+
+    def tick() -> None:
+        with session_factory()() as db:
+            for sid in wi.due_sources(db):
+                src = db.get(WikiSource, sid)
+                repo = db.get(Repository, src.repo_id) if src else None
+                if src is None or repo is None:
+                    continue
+                src.last_status, src.last_error = "running", None
+                repo.status = "indexing"
+                db.commit()
+                wi.schedule_source_sync(sid)
+
+    while True:
+        try:
+            await asyncio.to_thread(tick)
+        except Exception:
+            logging.getLogger("repolens.wiki").exception("scheduled source sync failed")
+        await asyncio.sleep(minutes * 60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
@@ -42,10 +68,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev")
     if s.env == "dev":  # other environments run `alembic upgrade head` (see Dockerfile entrypoint)
         create_all()
-    janitor = asyncio.create_task(_checkout_janitor()) if s.checkout_ttl_days > 0 else None
+    tasks = [asyncio.create_task(_source_scheduler())]
+    if s.checkout_ttl_days > 0:
+        tasks.append(asyncio.create_task(_checkout_janitor()))
     yield
-    if janitor:
-        janitor.cancel()
+    for t in tasks:
+        t.cancel()
 
 
 def create_app() -> FastAPI:

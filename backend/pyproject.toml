@@ -35,6 +35,7 @@ ignore = ["B008"]
 "alembic/*" = ["E501", "I001"]
 "repolens/evals/*" = ["E501"]
 "repolens/devtools/*" = ["E501"]
+"repolens/services/connectors/*" = ["E501"]
 
 [tool.mypy]
 ignore_missing_imports = true
