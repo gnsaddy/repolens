@@ -180,3 +180,5 @@ export interface CiFailure { index: number; name: string; kind: string; message:
 export interface CiPreview { format: string; failures: CiFailure[] }
 export interface ConnectorField { key: string; label: string; type?: string; required: boolean; secret: boolean; placeholder?: string; help?: string; options?: string[] }
 export interface ConnectorInfo { kind: string; label: string; description: string; needs_secret: boolean; fields: ConnectorField[] }
+export interface DriftSymbol { id: string; name: string; qualname: string; path: string; type: string }
+export interface DriftAlertRow { id: string; status: string; repo_id: string; repo: string; doc_repo_id: string; doc_repo: string; doc_path: string; doc_title: string; symbols: DriftSymbol[]; from_sha: string; to_sha: string; created_at: string; updated_at: string }

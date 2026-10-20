@@ -106,6 +106,18 @@ def _git_files(path: str, sha: str, max_bytes: int) -> Iterator[tuple[str, str]]
         yield f, raw.decode("utf-8", errors="replace")
 
 
+def _flag_doc_drift(db: Session, repo: Repository, path: str, prev: str, new: str) -> None:
+    from . import drift
+
+    try:
+        with db.begin_nested():  # a failure here undoes only the drift work, never the index
+            n = drift.detect(db, repo, path, prev, new)
+        if n:
+            log.info("%s: %d documentation page(s) may be out of date", repo.name, n)
+    except Exception:  # an advisory feature must never fail indexing
+        log.exception("drift detection failed for %s", repo.name)
+
+
 def _prefetch(db: Session, repo: Repository, path: str, sha: str, max_bytes: int) -> None:
     try:
         n = gitops.prefetch_blobs(path, sha, lambda f: should_index(f, 0, max_bytes), _clone_auth(db, repo))
@@ -153,6 +165,8 @@ def index_repository(db: Session, repo_id: str, max_commits: int = 300) -> Index
         run.commits_indexed = _index_commits(db, repo, path, embedder, max_commits, run, ref=sha) if path else 0
         run.files_indexed = n_files
         graph = build_repo_graph(db, repo)
+        if path and repo.indexed_sha:
+            _flag_doc_drift(db, repo, path, repo.indexed_sha, sha)
         repo.indexed_sha = sha
         repo.file_count = n_files
         repo.chunk_count = kept + written

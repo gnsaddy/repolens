@@ -464,3 +464,24 @@ class WikiSource(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class DriftAlert(Base):
+    """Code that a document describes has changed since the document was written. One open alert per page and repo."""
+
+    __tablename__ = "drift_alerts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), index=True)  # code repo
+    doc_repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    doc_path: Mapped[str] = mapped_column(String(1000))
+    doc_title: Mapped[str] = mapped_column(String(500), default="")
+    symbols: Mapped[list] = mapped_column(JSON, default=list)  # [{id, name, qualname, path, type}]
+    from_sha: Mapped[str] = mapped_column(String(64), default="")
+    to_sha: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(12), default="open", index=True)  # open | dismissed | resolved
+    doc_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by: Mapped[str] = mapped_column(String(32), default="")

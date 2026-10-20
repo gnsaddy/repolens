@@ -1,15 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, BookOpen, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat } from "@/components/ui";
-import { api, type AskResult, type ConceptDetail, type ConceptRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
+import { api, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
 import Sources from "./wiki/Sources";
 
-const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["sources", "Sources", Database]] as const;
+const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["drift", "Drift", AlertTriangle], ["sources", "Sources", Database]] as const;
 type Tab = (typeof TABS)[number][0];
 type Open = (repoId: string, path: string, anchor?: string) => void;
 
@@ -19,6 +19,7 @@ export default function Wiki() {
   const [sp, setSp] = useSearchParams();
   const tab = (sp.get("tab") as Tab) || "browse";
   const overview = useQuery({ queryKey: ["wiki-overview"], queryFn: () => api<WikiOverview>("/wiki/overview"), refetchInterval: (q) => (q.state.data?.sources.some((s) => s.status === "indexing") ? 3000 : false) });
+  const drift = useQuery({ queryKey: ["drift-count"], queryFn: () => api<{ open: number }>("/wiki/drift/count"), refetchInterval: 60_000 });
   const go = (t: Tab, extra: Record<string, string> = {}) => setSp({ tab: t, ...extra });
   const open: Open = (repo, path, anchor) => setSp({ tab: "browse", repo, path, ...(anchor ? { a: anchor } : {}) });
   const o = overview.data;
@@ -37,12 +38,13 @@ export default function Wiki() {
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => go(k)} className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>
-            <Icon className="h-4 w-4" />{label}</button>))}
+            <Icon className="h-4 w-4" />{label}{k === "drift" && !!drift.data?.open && <span className="rounded-full bg-amber-100 px-1.5 text-xs text-amber-800">{drift.data.open}</span>}</button>))}
       </div>
       {tab === "browse" && <Browse sources={o?.sources ?? []} repo={sp.get("repo")} path={sp.get("path")} anchor={sp.get("a")} open={open} openConcept={(t) => go("concepts", { term: t })} onAdd={() => go("sources")} />}
       {tab === "ask" && <AskWiki open={open} />}
       {tab === "concepts" && <Concepts initial={sp.get("term")} open={open} />}
       {tab === "health" && <Health open={open} />}
+      {tab === "drift" && <Drift open={open} />}
       {tab === "sources" && <Sources overview={o} />}
     </div>
   );
@@ -232,6 +234,44 @@ function Health({ open }: { open: Open }) {
         <Section title="Possibly outdated references" count={s.outdated_references} hint="Docs name code that no longer exists.">
           <ul className="space-y-1 text-sm">{d.outdated_references.map((r, i) => <li key={i}><code className="text-xs">{r.term}</code> <button className="text-xs text-brand hover:underline" onClick={() => open(r.repo_id, r.path)}>{r.section || r.path}</button></li>)}</ul></Section>
       </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------ drift
+function Drift({ open }: { open: Open }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ask = useConfirm();
+  const [status, setStatus] = useState("open");
+  const list = useQuery({ queryKey: ["drift", status], queryFn: () => api<DriftAlertRow[]>(`/wiki/drift?status=${status}`) });
+  const dismiss = useMutation({
+    mutationFn: (id: string) => api(`/wiki/drift/${id}/dismiss`, { method: "POST" }),
+    onSuccess: () => { toast("Marked as reviewed"); qc.invalidateQueries({ queryKey: ["drift"] }); qc.invalidateQueries({ queryKey: ["drift-count"] }); },
+  });
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 text-sm">
+        <p className="text-muted">Pages that describe code which has changed since they were written. Edit the page and the alert closes by itself.</p>
+        <select aria-label="Show" className="ml-auto h-8 rounded-md border border-line bg-white px-2" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="open">Needs review</option><option value="dismissed">Reviewed, no change needed</option><option value="resolved">Updated</option></select>
+      </div>
+      {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "open" ? "Nothing to review. When a re-index finds changed code that a page mentions, it appears here." : "Nothing here."}</Empty> : (
+        <ul className="space-y-3">{list.data.map((a) => (
+          <li key={a.id}><Card className="p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="font-medium text-brand hover:underline" onClick={() => open(a.doc_repo_id, a.doc_path)}>{a.doc_title}</button>
+              <span className="text-xs text-muted">{a.doc_repo} · {a.doc_path}</span>
+              <span className="ml-auto text-xs text-muted">{a.repo} {a.from_sha}…{a.to_sha} · {timeAgo(a.updated_at)}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs"><span className="text-muted">Changed code it mentions:</span>
+              {a.symbols.map((s) => <Link key={s.id} to={`/knowledge?tab=graph&node=${s.id}`} className="rounded border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>)}</div>
+            {a.status === "open" && (
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => open(a.doc_repo_id, a.doc_path)}>Open page</Button>
+                <Button size="sm" variant="ghost" disabled={dismiss.isPending} onClick={async () => { if (await ask({ title: "No update needed?", message: "The alert is closed. It comes back only if the same code changes again.", confirmLabel: "Mark reviewed" })) dismiss.mutate(a.id); }}>Mark reviewed</Button>
+              </div>)}
+          </Card></li>))}</ul>)}
     </div>
   );
 }

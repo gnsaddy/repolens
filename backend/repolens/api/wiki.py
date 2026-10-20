@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import Principal, current_principal
-from ..models import ConfluenceConnection, Document, Repository, WikiSource
+from ..models import ConfluenceConnection, Document, DriftAlert, Repository, WikiSource
 from ..schemas import (
     ConfluenceConnectionIn,
     ConfluenceImportIn,
@@ -21,7 +21,7 @@ from ..schemas import (
     WikiAskIn,
 )
 from ..security import encrypt_secret, redact_secrets, redact_stored
-from ..services import connectors
+from ..services import connectors, drift
 from ..services import knowledge as kb
 from ..services import wiki as wk
 from ..services import wiki_import as wi
@@ -182,6 +182,62 @@ def _source_view(db: Session, s: WikiSource, repo: Repository) -> dict:
         "next_sync_at": s.next_sync_at,
         "label": connectors.get(s.kind).describe(s.config or {}) if s.kind in connectors.REGISTRY else s.url,
     }
+
+
+# ------------------------------------------------------------------------------------------------ drift
+def _drift_rows(db: Session, p: Principal, status: str) -> list[dict]:
+    scope = scope_for(db, p)
+    drift.refresh(db, p.org_id)
+    q = select(DriftAlert).where(DriftAlert.org_id == p.org_id).order_by(DriftAlert.updated_at.desc())
+    if status != "all":
+        q = q.where(DriftAlert.status == status)
+    names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == p.org_id))}
+    return [
+        {
+            "id": a.id,
+            "status": a.status,
+            "repo_id": a.repo_id,
+            "repo": names.get(a.repo_id, ""),
+            "doc_repo_id": a.doc_repo_id,
+            "doc_repo": names.get(a.doc_repo_id, ""),
+            "doc_path": a.doc_path,
+            "doc_title": a.doc_title,
+            "symbols": a.symbols,
+            "from_sha": a.from_sha[:10],
+            "to_sha": a.to_sha[:10],
+            "created_at": a.created_at,
+            "updated_at": a.updated_at,
+        }
+        for a in db.scalars(q.limit(300))
+        if scope.can(a.repo_id) and scope.can(a.doc_repo_id)
+    ]
+
+
+@router.get("/drift")
+def list_drift(
+    status: str = Query("open", pattern="^(open|dismissed|resolved|all)$"),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Pages that describe code which has changed since they were written."""
+    return _drift_rows(db, p, status)
+
+
+@router.get("/drift/count")
+def drift_count(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    return {"open": len(_drift_rows(db, p, "open"))}
+
+
+@router.post("/drift/{alert_id}/dismiss")
+def dismiss_drift(alert_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    a = db.get(DriftAlert, alert_id)
+    scope = scope_for(db, p)
+    if a is None or a.org_id != p.org_id or not scope.can(a.repo_id) or not scope.can(a.doc_repo_id):
+        raise HTTPException(404, "Alert not found")
+    authorize(db, p, "document.write", a.doc_path, op="dismiss-drift")
+    a.status, a.resolved_at, a.resolved_by = "dismissed", datetime.now(UTC), p.user_id
+    db.commit()
+    return {"status": a.status}
 
 
 # ------------------------------------------------------------------------------------------------ connectors

@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
 import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
 import { cn } from "./lib/utils";
 import { Spinner } from "./components/ui";
@@ -34,6 +36,7 @@ const nav = [
 function Shell() {
   const { user, loading, logout } = useAuth();
   const [palette, setPalette] = useState(false);
+  const drift = useQuery({ queryKey: ["drift-count"], enabled: !!user, queryFn: () => api<{ open: number }>("/wiki/drift/count"), refetchInterval: 60_000 });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPalette((v) => !v); } };
     window.addEventListener("keydown", onKey);
@@ -55,6 +58,7 @@ function Shell() {
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-white/10", isActive && "bg-brand text-white hover:bg-brand")}>
               <Icon className="h-4 w-4" />{label}
+              {to === "/wiki" && !!drift.data?.open && <span title="Pages that may be out of date" className="ml-auto rounded-full bg-amber-400 px-1.5 text-xs font-medium text-slate-900">{drift.data.open}</span>}
             </NavLink>
           ))}
         </nav>
