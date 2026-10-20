@@ -75,6 +75,15 @@ class RepoOut(ORM):
         return strip_credentials(v)
 
 
+class CiLogIn(BaseModel):
+    log: str = Field(min_length=1, max_length=2_000_000)
+
+
+class CiStartIn(CiLogIn):
+    repo_ids: list[str] = []
+    indexes: list[int] = Field(min_length=1, max_length=10)
+
+
 class InvestigationCreate(BaseModel):
     query: str = Field(min_length=5, max_length=20000)
     repo_ids: list[str] = []

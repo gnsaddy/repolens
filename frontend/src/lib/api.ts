@@ -176,3 +176,5 @@ export interface OwnerRow { author: string; share: number; commits: number; line
 export interface OwnershipArea { area: string; owners: OwnerRow[]; bus_factor: number; commits: number; last_activity: string; risk: "ok" | "single_owner" | "stale_owner" }
 export interface OwnershipOverview { repo_id: string; repo: string; summary: { people: number; areas: number; bus_factor: number; areas_at_risk: number }; areas: OwnershipArea[]; people: { author: string; share: number; commits: number; last_commit_at: string; areas: string[] }[] }
 export interface PathOwners { path: string; owners: OwnerRow[]; bus_factor: number }
+export interface CiFailure { index: number; name: string; kind: string; message: string; details: string; file: string; line: number; count: number }
+export interface CiPreview { format: string; failures: CiFailure[] }

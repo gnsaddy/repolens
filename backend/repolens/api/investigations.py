@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db, session_factory
 from ..deps import Principal, current_principal
 from ..models import Investigation, MemoryEntry, Repository
-from ..schemas import InvestigationCreate, InvestigationOut, InvestigationSummary, ReviewIn
+from ..schemas import CiLogIn, CiStartIn, InvestigationCreate, InvestigationOut, InvestigationSummary, ReviewIn
+from ..services import ci_logs
 from ..services.access import can_view_investigation, scope_for
 from ..services.investigations import create_investigation, submit
 from ..services.policy import authorize
@@ -44,6 +45,40 @@ def start(body: InvestigationCreate, p: Principal = Depends(current_principal), 
     submit(inv.id)
     db.refresh(inv)
     return inv
+
+
+@router.post("/ci/parse")
+def ci_parse(body: CiLogIn, p: Principal = Depends(current_principal)):
+    """Preview the failures found in a CI log (JUnit XML, pytest, Jest, Go test or plain stack traces)."""
+    try:
+        fmt, failures = ci_logs.parse_ci_log(body.log)
+    except ci_logs.CiLogError as e:
+        raise HTTPException(400, str(e)) from None
+    return {"format": fmt, "failures": [ci_logs.sanitize(f).as_dict(i) for i, f in enumerate(failures)]}
+
+
+@router.post("/ci/start", status_code=202)
+def ci_start(body: CiStartIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Start one investigation per selected failure. The log is parsed again on the server; indexes only select."""
+    authorize(db, p, "investigation.create", "ci", count=len(body.indexes))
+    repo_ids = validate_repo_ids(db, p, body.repo_ids)
+    try:
+        _, failures = ci_logs.parse_ci_log(body.log)
+    except ci_logs.CiLogError as e:
+        raise HTTPException(400, str(e)) from None
+    chosen = sorted(set(body.indexes))
+    if chosen[-1] >= len(failures) or chosen[0] < 0:
+        raise HTTPException(400, "Selected failure is not in the log")
+    started = []
+    for i in chosen:
+        f = ci_logs.sanitize(failures[i])
+        inv = create_investigation(
+            db, p.org_id, p.user_id, ci_logs.to_query(f), repo_ids, f"CI failure: {f.name}"[:300]
+        )
+        INVESTIGATIONS.labels("started").inc()
+        submit(inv.id)
+        started.append({"id": inv.id, "title": inv.title})
+    return {"started": started}
 
 
 @router.get("", response_model=list[InvestigationSummary])

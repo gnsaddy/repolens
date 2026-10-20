@@ -38,6 +38,10 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Investigations from CI failures
+
+Investigations > **From a CI log**: upload or paste a JUnit XML report, pytest, Jest or Go test output, or any log with stack traces. The failures are listed (duplicates merged, with their file and line), you choose up to ten, and each becomes its own investigation. Secrets in the log are redacted before storing or sending to a model, XML with a DOCTYPE is rejected, and logs over 2 MB are refused. The server parses the log again when you start, so the browser cannot inject a different query.
+
 ## Ownership: who to ask
 
 Ownership is derived from indexed commits: each author scores per file from the size of their changes (log-scaled) with a six-month half-life, so current maintainers outrank whoever wrote it years ago; bots are ignored. The **Ownership** page shows each top-level area's owner split, a bus factor (people holding 80% of the knowledge) and flags areas with a single owner or an owner inactive for a year. Any file or folder can be looked up, the file viewer shows who maintains the open file, and every root-cause report adds a "Who to ask" section for the files it points at. It is a hint from commit history, not a measure of anyone's work.
