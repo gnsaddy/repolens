@@ -161,6 +161,27 @@ class ConfluenceClient:
         d = self._get("/content", {"spaceKey": space_key, "title": title, "type": "page", "expand": EXPAND, "limit": 1})
         return (d.get("results") or [None])[0]
 
+    def add_comment(self, page_id: str, markdown: str) -> str:
+        """Post a footer comment on a page. Needs comment permission, not edit permission, and never changes the page."""
+        if not re.fullmatch(r"\d{1,20}", str(page_id)):
+            raise ConfluenceError("Invalid page id")
+        body = {
+            "type": "comment",
+            "container": {"id": str(page_id), "type": "page"},
+            "body": {"storage": {"value": markdown_to_storage(markdown), "representation": "storage"}},
+        }
+        try:
+            r = self.http.post("/rest/api/content", json=body)
+        except httpx.HTTPError as e:
+            raise ConfluenceError(f"Confluence unreachable: {type(e).__name__}") from e
+        if r.status_code in (401, 403):
+            raise ConfluenceError("The connected account is not allowed to comment on this page", r.status_code)
+        if r.status_code == 404:
+            raise ConfluenceError("The page no longer exists in Confluence", 404)
+        if r.status_code >= 400:
+            raise ConfluenceError(f"Confluence returned {r.status_code}", r.status_code)
+        return str(r.json().get("id", ""))
+
     def space(self, key: str) -> dict:
         return self._get(f"/space/{key}")
 
@@ -171,6 +192,74 @@ class ConfluenceClient:
         if webui:
             return base.rstrip("/") + webui
         return f"{self.root}/pages/viewpage.action?pageId={page.get('id', '')}"
+
+
+# ------------------------------------------------------------------------------------------------ markdown -> storage
+def _inline_html(text: str) -> str:
+    out = html.escape(text, quote=False)
+    out = re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
+    out = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", out)
+    out = re.sub(
+        r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+        lambda m: f'<a href="{html.escape(m.group(2), quote=True)}">{m.group(1)}</a>',
+        out,
+    )
+    return out
+
+
+def markdown_to_storage(md: str) -> str:
+    """A small, safe Markdown -> Confluence storage converter (headings, lists, code, quotes, paragraphs)."""
+    out: list[str] = []
+    para: list[str] = []
+    items: list[str] = []
+    code: list[str] | None = None
+
+    def flush() -> None:
+        nonlocal para, items
+        if para:
+            out.append("<p>" + _inline_html(" ".join(para)) + "</p>")
+            para = []
+        if items:
+            out.append("<ul>" + "".join(f"<li>{_inline_html(i)}</li>" for i in items) + "</ul>")
+            items = []
+
+    for line in md.splitlines():
+        if line.strip().startswith("```"):
+            if code is None:
+                flush()
+                code = []
+            else:
+                out.append(
+                    '<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA['
+                    + "\n".join(code).replace("]]>", "]] >")
+                    + "]]></ac:plain-text-body></ac:structured-macro>"
+                )
+                code = None
+            continue
+        if code is not None:
+            code.append(line)
+            continue
+        h = re.match(r"^(#{1,6})\s+(.*)", line)
+        b = re.match(r"^\s*[-*]\s+(.*)", line)
+        q = re.match(r"^>\s?(.*)", line)
+        if h:
+            flush()
+            out.append(f"<h{len(h.group(1))}>{_inline_html(h.group(2))}</h{len(h.group(1))}>")
+        elif b:
+            if para:
+                flush()
+            items.append(b.group(1))
+        elif q:
+            flush()
+            out.append("<blockquote><p>" + _inline_html(q.group(1)) + "</p></blockquote>")
+        elif not line.strip():
+            flush()
+        else:
+            if items:
+                flush()
+            para.append(line.strip())
+    flush()
+    return "".join(out)
 
 
 # ------------------------------------------------------------------------------------------------ storage -> markdown

@@ -283,6 +283,20 @@ class SlackExportIn(BaseModel):
     name: str = Field(default="", max_length=200, pattern=r"^[\w.\-: ]*$")
 
 
+class ProposalEdit(BaseModel):
+    proposed: str = Field(min_length=1, max_length=200_000)
+
+
+class ProposalDecision(BaseModel):
+    approve: bool
+    target: str = Field(default="auto", pattern="^(auto|local|confluence_comment)$")
+
+
+class RunbookIn(BaseModel):
+    investigation_id: str = Field(min_length=1, max_length=64)
+    collection_id: str = Field(default="", max_length=64)
+
+
 class WikiAskIn(BaseModel):
     query: str = Field(min_length=2, max_length=2000)
     repo_ids: list[str] = Field(default_factory=list, max_length=100)

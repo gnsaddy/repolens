@@ -38,6 +38,10 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Wiki proposals: edits you approve
+
+From a drift alert, **Draft an update** creates a proposal for that page; from a confirmed investigation, **Draft a runbook** creates a new runbook page (Symptoms, Diagnosis, Fix, Verification, Prevention, References). With an AI model connected the draft is written by the model from the page, the changed code and recent commits; implausible output (a page shrunk to a line) is discarded. Without one, an update only adds a clearly marked review note and a runbook is a structured template, and the proposal says so. Proposals show a colour diff, can be edited first, and are written only when a person approves. A page edited after the draft was written is refused. Approving writes to the collection and re-indexes; for pages synced from Confluence the only action is a **comment** on the Confluence page (admin only, needs comment permission), so the page itself is never overwritten. Pages inside a code repository cannot be written, so the proposal is for copying into a pull request.
+
 ## Documentation drift alerts
 
 After a repository is re-indexed, the lines that changed are mapped to the functions, classes and files they touch, and every page the knowledge graph links to them (a section mentioning the symbol) is flagged on **Wiki > Drift**, with a count badge in the sidebar. Pages changed in the same commit as the code are not flagged. One alert per page accumulates changed symbols across commits; it closes by itself when the page is edited, or you can mark it reviewed. Alerts are visible only to people who can see both the code repository and the page. Detection is a hint, not a proof: it only knows pages that name the code by identifier or file path.

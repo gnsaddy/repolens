@@ -75,6 +75,8 @@ class FakeConfluence:
         self.requests: list[tuple[str, str]] = []
         self.fail_next: list[int] = []
         self.denied_spaces: set[str] = set()
+        self.comments: list[dict] = []
+        self.deny_comments = False
         for pid, title, space, anc, body in SAMPLE:
             self.add(pid, title, space, anc, body)
 
@@ -104,6 +106,20 @@ class FakeConfluence:
     def delete(self, pid: str) -> None:
         self.pages.pop(pid, None)
 
+    def _post(self, rest: str, raw: bytes) -> tuple[int, dict | str, dict[str, str]]:
+        import json
+
+        if rest != "/content":
+            return 404, {"message": "no route"}, {}
+        if self.deny_comments:
+            return 403, {"message": "forbidden"}, {}
+        data = json.loads(raw or b"{}")
+        if data.get("type") != "comment" or (data.get("container") or {}).get("id") not in self.pages:
+            return 404, {"message": "no such page"}, {}
+        cid = str(900 + len(self.comments))
+        self.comments.append({"id": cid, "page": data["container"]["id"], "body": data["body"]["storage"]["value"]})
+        return 200, {"id": cid, "type": "comment"}, {}
+
     # -- HTTP ------------------------------------------------------------------------------------------------------
     def _authorised(self, headers: dict[str, str]) -> bool:
         auth = headers.get("authorization", "")
@@ -111,15 +127,19 @@ class FakeConfluence:
             return auth == "Basic " + base64.b64encode(f"{self.email}:{self.token}".encode()).decode()
         return auth == f"Bearer {self.token}"
 
-    def handle(self, method: str, url: str, headers: dict[str, str]) -> tuple[int, dict | str, dict[str, str]]:
+    def handle(
+        self, method: str, url: str, headers: dict[str, str], body: bytes = b""
+    ) -> tuple[int, dict | str, dict[str, str]]:
         u = urlparse(url)
         path = u.path
         self.requests.append((method, path + ("?" + u.query if u.query else "")))
         prefix = "/wiki/rest/api" if self.deployment == "cloud" else "/rest/api"
-        if method != "GET" or not path.startswith(prefix):
+        if method not in ("GET", "POST") or not path.startswith(prefix):
             return 404, "not found", {}
         if not self._authorised({k.lower(): v for k, v in headers.items()}):
             return 401, {"message": "Unauthorized"}, {}
+        if method == "POST":
+            return self._post(path[len(prefix) :], body)
         if self.fail_next:
             code = self.fail_next.pop(0)
             return code, {"message": "injected"}, {"Retry-After": "0"} if code == 429 else {}
@@ -175,8 +195,9 @@ def serve(port: int, fake: FakeConfluence) -> None:  # pragma: no cover - manual
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
     class H(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
-            code, body, extra = fake.handle("GET", self.path, dict(self.headers))
+        def _serve(self, method: str) -> None:
+            n = int(self.headers.get("Content-Length") or 0)
+            code, body, extra = fake.handle(method, self.path, dict(self.headers), self.rfile.read(n) if n else b"")
             raw = (json.dumps(body) if not isinstance(body, str) else body).encode()
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
@@ -185,6 +206,12 @@ def serve(port: int, fake: FakeConfluence) -> None:  # pragma: no cover - manual
             self.send_header("Content-Length", str(len(raw)))
             self.end_headers()
             self.wfile.write(raw)
+
+        def do_GET(self) -> None:  # noqa: N802
+            self._serve("GET")
+
+        def do_POST(self) -> None:  # noqa: N802
+            self._serve("POST")
 
         def log_message(self, *a: object) -> None:
             pass

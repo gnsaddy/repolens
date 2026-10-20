@@ -1,15 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, FileEdit, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat } from "@/components/ui";
-import { api, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
+import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
+import { api, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
 import Sources from "./wiki/Sources";
 
-const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["drift", "Drift", AlertTriangle], ["sources", "Sources", Database]] as const;
+const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["drift", "Drift", AlertTriangle], ["proposals", "Proposals", FileEdit], ["sources", "Sources", Database]] as const;
 type Tab = (typeof TABS)[number][0];
 type Open = (repoId: string, path: string, anchor?: string) => void;
 
@@ -44,7 +44,8 @@ export default function Wiki() {
       {tab === "ask" && <AskWiki open={open} />}
       {tab === "concepts" && <Concepts initial={sp.get("term")} open={open} />}
       {tab === "health" && <Health open={open} />}
-      {tab === "drift" && <Drift open={open} />}
+      {tab === "drift" && <Drift open={open} review={(id) => go("proposals", { id })} />}
+      {tab === "proposals" && <Proposals selectedId={sp.get("id")} open={open} />}
       {tab === "sources" && <Sources overview={o} />}
     </div>
   );
@@ -239,7 +240,7 @@ function Health({ open }: { open: Open }) {
 }
 
 // ------------------------------------------------------------------------------------------------ drift
-function Drift({ open }: { open: Open }) {
+function Drift({ open, review }: { open: Open; review: (proposalId: string) => void }) {
   const qc = useQueryClient();
   const toast = useToast();
   const ask = useConfirm();
@@ -248,6 +249,11 @@ function Drift({ open }: { open: Open }) {
   const dismiss = useMutation({
     mutationFn: (id: string) => api(`/wiki/drift/${id}/dismiss`, { method: "POST" }),
     onSuccess: () => { toast("Marked as reviewed"); qc.invalidateQueries({ queryKey: ["drift"] }); qc.invalidateQueries({ queryKey: ["drift-count"] }); },
+  });
+  const draft = useMutation({
+    mutationFn: (id: string) => api<ProposalDetail>(`/wiki/proposals/from-drift/${id}`, { method: "POST" }),
+    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ["proposals"] }); review(p.id); },
+    onError: (e) => toast((e as Error).message, "error"),
   });
   return (
     <div className="space-y-3">
@@ -268,10 +274,80 @@ function Drift({ open }: { open: Open }) {
               {a.symbols.map((s) => <Link key={s.id} to={`/knowledge?tab=graph&node=${s.id}`} className="rounded border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>)}</div>
             {a.status === "open" && (
               <div className="mt-3 flex gap-2">
+                <Button size="sm" disabled={draft.isPending} onClick={() => draft.mutate(a.id)}><FileEdit className="h-3.5 w-3.5" />Draft an update</Button>
                 <Button size="sm" variant="outline" onClick={() => open(a.doc_repo_id, a.doc_path)}>Open page</Button>
                 <Button size="sm" variant="ghost" disabled={dismiss.isPending} onClick={async () => { if (await ask({ title: "No update needed?", message: "The alert is closed. It comes back only if the same code changes again.", confirmLabel: "Mark reviewed" })) dismiss.mutate(a.id); }}>Mark reviewed</Button>
               </div>)}
           </Card></li>))}</ul>)}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------------------------ proposals
+function DiffView({ diff }: { diff: string }) {
+  if (!diff.trim()) return <p className="text-sm text-muted">No difference from the current page.</p>;
+  return (
+    <pre aria-label="Proposed changes" className="max-h-96 overflow-auto rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs leading-5">
+      {diff.split("\n").map((l, i) => (
+        <div key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "bg-emerald-100 text-emerald-900" : l.startsWith("-") && !l.startsWith("---") ? "bg-red-100 text-red-900" : l.startsWith("@@") ? "text-indigo-700" : "text-slate-600"}>{l || " "}</div>))}
+    </pre>
+  );
+}
+
+function Proposals({ selectedId, open }: { selectedId: string | null; open: Open }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ask = useConfirm();
+  const [status, setStatus] = useState("pending");
+  const [sel, setSel] = useState<string | null>(selectedId);
+  const [editing, setEditing] = useState<string | null>(null);
+  const list = useQuery({ queryKey: ["proposals", status], queryFn: () => api<ProposalRow[]>(`/wiki/proposals?status=${status}`) });
+  const detail = useQuery({ queryKey: ["proposal", sel], enabled: !!sel, retry: false, queryFn: () => api<ProposalDetail>(`/wiki/proposals/${sel}`) });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["proposals"] }); qc.invalidateQueries({ queryKey: ["proposal"] }); qc.invalidateQueries({ queryKey: ["drift"] }); qc.invalidateQueries({ queryKey: ["drift-count"] }); qc.invalidateQueries({ queryKey: ["wiki-overview"] }); qc.invalidateQueries({ queryKey: ["wiki-page"] }); };
+  const save = useMutation({ mutationFn: () => api(`/wiki/proposals/${sel}`, { method: "PUT", json: { proposed: editing } }), onSuccess: () => { setEditing(null); refresh(); } });
+  const decide = useMutation({
+    mutationFn: (v: { approve: boolean; target: string }) => api<ProposalDetail>(`/wiki/proposals/${sel}/decision`, { method: "POST", json: v }),
+    onSuccess: (p) => { toast(p.status === "applied" ? p.result : "Proposal rejected"); refresh(); },
+    onError: (e) => { toast((e as Error).message, "error"); refresh(); },
+  });
+  const d = detail.data;
+  return (
+    <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <Card className="max-h-[40rem] overflow-auto p-3">
+        <select aria-label="Show proposals" className="mb-2 h-8 w-full rounded-md border border-line bg-white px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="pending">Waiting for a decision</option><option value="applied">Applied</option><option value="rejected">Rejected</option><option value="failed">Could not be applied</option></select>
+        {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "pending" ? "No proposals. Draft one from a Drift alert, or from a confirmed investigation." : "Nothing here."}</Empty> : (
+          <ul className="space-y-1">{list.data.map((p) => (
+            <li key={p.id}><button onClick={() => { setSel(p.id); setEditing(null); }} className={cn("w-full rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50", sel === p.id && "bg-indigo-50")}>
+              <div className="flex items-center gap-2"><Badge tone={p.kind === "new" ? "green" : "blue"}>{p.kind === "new" ? "new page" : "update"}</Badge><span className="truncate font-medium">{p.title}</span></div>
+              <div className="mt-0.5 truncate text-xs text-muted">{p.source === "drift" ? "code changed" : p.source === "incident" ? "from an incident" : p.source} · {timeAgo(p.created_at)}</div></button></li>))}</ul>)}
+      </Card>
+      <div className="min-w-0">
+        {!sel ? <Empty>Select a proposal to review the change. Nothing is written until you approve it.</Empty> : detail.isLoading ? <Spinner /> : detail.error ? <ErrorNote error={detail.error} /> : d && (
+          <Card>
+            <CardTitle right={<Badge tone={d.status === "applied" ? "green" : d.status === "pending" ? "amber" : d.status === "failed" ? "red" : "gray"}>{d.status}</Badge>}>{d.title}</CardTitle>
+            <p className="text-sm">{d.rationale}</p>
+            <p className="mt-1 text-xs text-muted">{d.kind === "new" ? `New page ${d.doc_repo ? `in ${d.doc_repo}` : "in the Runbooks collection"}: ${d.doc_path}` : `${d.doc_repo} · ${d.doc_path}`} · drafted by {d.drafted_by === "llm" ? "an AI model" : d.drafted_by === "edited" ? "a person (edited)" : "a template"}</p>
+            {d.result && <p role="status" className={`mt-2 text-sm ${d.status === "applied" ? "text-emerald-700" : "text-red-600"}`}>{d.result}</p>}
+            <div className="mt-4">
+              {editing !== null ? (<>
+                <Textarea rows={16} aria-label="Edit proposed text" className="font-mono text-xs" value={editing} onChange={(e) => setEditing(e.target.value)} />
+                <div className="mt-2 flex gap-2"><Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>Save draft</Button><Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancel</Button></div>
+                <ErrorNote error={save.error} /></>
+              ) : d.kind === "update" ? <DiffView diff={d.diff} /> : <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs">{d.proposed}</pre>}
+            </div>
+            {d.status === "pending" && editing === null && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {d.apply_options.map((t) => (
+                  <Button key={t} disabled={decide.isPending} onClick={async () => { if (await ask({ title: t === "confluence_comment" ? "Post this as a Confluence comment?" : d.kind === "new" ? "Create this page?" : "Apply this change?", message: t === "confluence_comment" ? "The page itself is not changed. The suggestion is added as a comment for its owners to act on." : "The page is updated now and re-indexed.", confirmLabel: t === "confluence_comment" ? "Post comment" : "Approve" })) decide.mutate({ approve: true, target: t }); }}>
+                    <Check className="h-4 w-4" />{t === "confluence_comment" ? "Approve and comment in Confluence" : d.kind === "new" ? "Approve and create" : "Approve and apply"}</Button>))}
+                {!d.apply_options.length && <span className="text-xs text-muted">This page lives in a code repository: copy the proposed text into a pull request.</span>}
+                <Button variant="outline" onClick={() => setEditing(d.proposed)}>Edit first</Button>
+                <Button variant="ghost" disabled={decide.isPending} onClick={() => decide.mutate({ approve: false, target: "auto" })}>Reject</Button>
+                {d.doc_repo_id && d.kind === "update" && <Button variant="ghost" onClick={() => open(d.doc_repo_id, d.doc_path)}>Open page</Button>}
+              </div>)}
+          </Card>)}
+      </div>
     </div>
   );
 }

@@ -485,3 +485,30 @@ class DriftAlert(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     resolved_by: Mapped[str] = mapped_column(String(32), default="")
+
+
+class DocProposal(Base):
+    """A suggested wiki change (or new page) awaiting a human decision. Nothing is written before approval."""
+
+    __tablename__ = "doc_proposals"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(10), default="update")  # update | new
+    source: Mapped[str] = mapped_column(String(12), default="manual")  # drift | incident | manual
+    source_ref: Mapped[str] = mapped_column(String(32), default="")  # drift alert id / investigation id
+    doc_repo_id: Mapped[str] = mapped_column(
+        String(32), default="", index=True
+    )  # "" for a new page in a new collection
+    doc_path: Mapped[str] = mapped_column(String(1000), default="")
+    title: Mapped[str] = mapped_column(String(500), default="")
+    original: Mapped[str] = mapped_column(Text, default="")
+    proposed: Mapped[str] = mapped_column(Text, default="")
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    base_hash: Mapped[str] = mapped_column(String(64), default="")  # hash of the page when drafted: detects edits since
+    drafted_by: Mapped[str] = mapped_column(String(12), default="template")  # template | llm
+    status: Mapped[str] = mapped_column(String(12), default="pending", index=True)  # pending|applied|rejected|failed
+    result: Mapped[str] = mapped_column(Text, default="")  # where it was applied, or why it failed
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    decided_by: Mapped[str] = mapped_column(String(32), default="")
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

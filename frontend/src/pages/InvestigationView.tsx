@@ -3,9 +3,9 @@ import { useConfirm } from "@/components/feedback";
 import { CheckCircle2, CircleDot, FileText, FlaskConical, GitCommit, GitPullRequest, Network, ThumbsDown, ThumbsUp, Ticket } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, CodeBlock, ConfidenceBar, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
-import { api, type EvidenceItem, type Investigation } from "@/lib/api";
+import { api, type EvidenceItem, type Investigation, type ProposalDetail } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -22,6 +22,11 @@ export default function InvestigationView() {
     queryKey: ["investigation", id],
     queryFn: () => api<Investigation>(`/investigations/${id}`),
     refetchInterval: (q) => (q.state.data && ["completed", "failed"].includes(q.state.data.status) ? false : 1500),
+  });
+  const nav = useNavigate();
+  const runbook = useMutation({
+    mutationFn: () => api<ProposalDetail>("/wiki/proposals/from-incident", { method: "POST", json: { investigation_id: id } }),
+    onSuccess: (p) => nav(`/wiki?tab=proposals&id=${p.id}`),
   });
   const review = useMutation({
     mutationFn: (outcome: "confirmed" | "rejected") => api<Investigation>(`/investigations/${id}/review`, { method: "POST", json: { outcome } }),
@@ -84,6 +89,12 @@ export default function InvestigationView() {
                 <span className="text-xs text-muted">Was this the real root cause?</span>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("confirmed")}><ThumbsUp className="h-3.5 w-3.5" />Confirm</Button>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("rejected")}><ThumbsDown className="h-3.5 w-3.5" />Reject</Button>
+              </div>)}
+            {canWrite(user) && inv.status === "completed" && inv.root_cause_status === "confirmed" && (
+              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+                <span className="text-xs text-muted">Confirmed. Capture it so the next person finds the answer fast.</span>
+                <Button size="sm" variant="outline" disabled={runbook.isPending} onClick={() => runbook.mutate()}><FileText className="h-3.5 w-3.5" />Draft a runbook</Button>
+                <ErrorNote error={runbook.error} />
               </div>)}
           </Card>
           <div className="space-y-4">

@@ -6,7 +6,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from .api import auth, github, investigations, jira, knowledge, ownership, repos, risk, settings, usage, webhooks, wiki
+from .api import (
+    auth,
+    github,
+    investigations,
+    jira,
+    knowledge,
+    ownership,
+    proposals,
+    repos,
+    risk,
+    settings,
+    usage,
+    webhooks,
+    wiki,
+)
 from .config import get_settings
 from .db import create_all, get_engine
 from .telemetry import setup_logging, setup_telemetry
@@ -93,6 +107,7 @@ def create_app() -> FastAPI:
         investigations.router,
         knowledge.router,
         ownership.router,
+        proposals.router,
         github.router,
         risk.router,
         settings.router,

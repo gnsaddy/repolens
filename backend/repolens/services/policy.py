@@ -28,6 +28,9 @@ ACTION_MIN_ROLE = {
     "repo.access.manage": "admin",
     "wiki.configure": "admin",
     "wiki.import": "admin",
+    "wiki.propose": "member",
+    "wiki.decide": "member",
+    "wiki.publish": "admin",
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}
 

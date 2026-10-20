@@ -110,7 +110,7 @@ def test_unrecognised_urls_are_rejected_with_a_helpful_message(bad):
 # ------------------------------------------------------------------ client
 def make_transport(fake):
     def handler(r: httpx.Request) -> httpx.Response:
-        status, body, headers = fake.handle(r.method, str(r.url), dict(r.headers))
+        status, body, headers = fake.handle(r.method, str(r.url), dict(r.headers), r.content)
         if isinstance(body, str):
             return httpx.Response(status, text=body, headers=headers)
         return httpx.Response(status, json=body, headers=headers)
