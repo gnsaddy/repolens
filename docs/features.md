@@ -38,6 +38,14 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Single sign-on and SCIM provisioning
+
+**Settings > Single sign-on** connects any OpenID Connect provider (Okta, Microsoft Entra ID, Google Workspace, Keycloak...): issuer URL, client id/secret, allowed e-mail domains, and the role for new users (viewer or member; SSO never grants admin). The sign-in page shows "Continue with single sign-on" once the typed e-mail's domain has SSO. It uses the authorization-code flow with PKCE; state, nonce and verifier are kept on the server, single use and expire after 10 minutes; ID tokens are verified against the provider's published keys with an algorithm allow-list, plus issuer, audience, expiry and nonce; only verified e-mail addresses in the allowed domains sign in; a user is never moved between organisations and a domain can belong to only one. The browser receives a one-time code, never a token in a URL. Set `REPOLENS_PUBLIC_URL` behind a proxy so the redirect URI shown in Settings is the one you register.
+
+**SCIM 2.0** (`/scim/v2`, Users, filter by userName/externalId, PATCH, DELETE) lets the provider create, update and deactivate accounts with a per-organisation bearer token (shown once, only its hash is stored, rotatable). Deactivation ends sessions immediately and blocks sign-in; history is kept. Role values from the provider are honoured (including admin, since the provider is the source of truth for provisioning).
+
+Not tested against a real Okta/Entra tenant: the flows are covered by a fake provider that enforces PKCE, signatures and nonces.
+
 ## Wiki proposals: edits you approve
 
 From a drift alert, **Draft an update** creates a proposal for that page; from a confirmed investigation, **Draft a runbook** creates a new runbook page (Symptoms, Diagnosis, Fix, Verification, Prevention, References). With an AI model connected the draft is written by the model from the page, the changed code and recent commits; implausible output (a page shrunk to a line) is discarded. Without one, an update only adds a clearly marked review note and a runbook is a structured template, and the proposal says so. Proposals show a colour diff, can be edited first, and are written only when a person approves. A page edited after the draft was written is refused. Approving writes to the collection and re-indexes; for pages synced from Confluence the only action is a **comment** on the Confluence page (admin only, needs comment permission), so the page itself is never overwritten. Pages inside a code repository cannot be written, so the proposal is for copying into a pull request.

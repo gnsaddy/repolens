@@ -25,6 +25,8 @@ class UserOut(ORM):
     name: str
     role: str
     org_id: str
+    active: bool = True
+    auth_source: str = "password"
 
 
 class TokenOut(BaseModel):

@@ -19,6 +19,7 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
 - Jira tokens are Fernet-encrypted at rest and never returned by the API; the Jira URL must be https and not a
   private address outside `dev` (SSRF guard).
 - Confluence: API token / PAT Fernet-encrypted, never returned; base URL goes through the same SSRF guard; imported pages are redacted for secrets before indexing, default to `restricted` visibility, and only admins can connect or import. Web-URL import accepts public https hosts only (redirects re-checked, 1 MB cap). Wiki Markdown strips `javascript:`/`data:` links.
+- Single sign-on (OIDC, authorization code + PKCE): server-side single-use state/nonce/verifier, signature and claim verification with an algorithm allow-list, verified e-mail and domain allow-list, no cross-organisation linking, no admin from SSO, one-time exchange code instead of tokens in URLs. SCIM tokens are stored as hashes; deactivated users lose access immediately.
 - GitHub OAuth device flow: device codes never leave the server, flows are bound to the admin and organisation that
   started them and expire; tokens are encrypted at rest and never returned.
 - Secrets are redacted from text before it reaches an LLM prompt.

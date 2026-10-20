@@ -30,7 +30,7 @@ def current_principal(
     except jwt.PyJWTError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token") from None
     user = db.get(User, data["sub"])
-    if user is None:
+    if user is None or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user")
     # Role comes from the database so demotions take effect immediately.
     return Principal(user.id, user.org_id, user.role, user.email)

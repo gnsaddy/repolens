@@ -9,7 +9,10 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     port: 5173,
-    proxy: { "/api": process.env.VITE_API_PROXY ?? "http://localhost:8000" },
+    proxy: {
+      "/api": process.env.VITE_API_PROXY ?? "http://localhost:8000",
+      "/scim": process.env.VITE_API_PROXY ?? "http://localhost:8000",
+    },
   },
   test: {
     environment: "happy-dom",

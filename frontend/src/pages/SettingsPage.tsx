@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useConfirm } from "@/components/feedback";
+import { useConfirm, useToast } from "@/components/feedback";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
 import GithubConnect from "@/components/GithubConnect";
-import { api, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
+import { api, type LLMSettings, type ModelInfo, type RetrievalStatus, type ScimStatus, type SsoSettings } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { timeAgo } from "@/lib/utils";
 
 const PROVIDERS = [
   ["heuristic", "Offline (no model calls)"],
@@ -72,6 +73,7 @@ export default function SettingsPage() {
           </form>
         </Card>
         <RetrievalCard />
+        {admin && <SsoCard />}
         <GithubConnect admin={admin} />
         <Card className="lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <CardTitle>What uses the model</CardTitle>
@@ -100,6 +102,56 @@ function RetrievalCard() {
           <dd className="text-xs text-muted">{data.rerank.provider === "none" ? "Enable with REPOLENS_RERANK_PROVIDER" : `re-scores the top ${data.rerank.depth} results of every search`}</dd></div>
       </dl>
       <p className="mt-3 text-xs text-muted">Set with environment variables on the server: REPOLENS_EMBEDDING_* and REPOLENS_RERANK_*. See docs/features.md.</p>
+    </Card>
+  );
+}
+
+function SsoCard() {
+  const qc = useQueryClient();
+  const ask = useConfirm();
+  const toast = useToast();
+  const sso = useQuery({ queryKey: ["sso"], queryFn: () => api<SsoSettings>("/settings/sso") });
+  const scim = useQuery({ queryKey: ["scim"], queryFn: () => api<ScimStatus>("/settings/scim") });
+  const [f, setF] = useState({ issuer: "", client_id: "", client_secret: "", allowed_domains: "", default_role: "viewer", auto_provision: true, enabled: true });
+  const [newToken, setNewToken] = useState("");
+  useEffect(() => {
+    const d = sso.data;
+    if (d?.configured) setF({ issuer: d.issuer ?? "", client_id: d.client_id ?? "", client_secret: "", allowed_domains: (d.allowed_domains ?? []).join(", "), default_role: d.default_role ?? "viewer", auto_provision: d.auto_provision ?? true, enabled: d.enabled ?? true });
+  }, [sso.data]);
+  const save = useMutation({ mutationFn: () => api<SsoSettings>("/settings/sso", { method: "PUT", json: f }), onSuccess: (d) => { qc.setQueryData(["sso"], d); setF((x) => ({ ...x, client_secret: "" })); toast("Single sign-on saved"); } });
+  const remove = useMutation({ mutationFn: () => api("/settings/sso", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["sso"] }); toast("Single sign-on removed"); } });
+  const mint = useMutation({ mutationFn: () => api<{ token: string }>("/settings/scim/token", { method: "POST" }), onSuccess: (r) => { setNewToken(r.token); qc.invalidateQueries({ queryKey: ["scim"] }); } });
+  const revoke = useMutation({ mutationFn: () => api("/settings/scim", { method: "DELETE" }), onSuccess: () => { setNewToken(""); qc.invalidateQueries({ queryKey: ["scim"] }); toast("SCIM token revoked"); } });
+  const d = sso.data;
+  return (
+    <Card>
+      <CardTitle right={d?.configured ? <Badge tone={d.enabled ? "green" : "gray"}>{d.enabled ? "enabled" : "disabled"}</Badge> : undefined}>Single sign-on and provisioning</CardTitle>
+      <p className="mb-3 text-xs text-muted">Let people sign in with your identity provider (Okta, Microsoft Entra ID, Google Workspace and any OpenID Connect provider). SSO never grants admin: new users start as viewer or member.</p>
+      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
+        <div className="sm:col-span-2"><Label>Issuer URL</Label><Input aria-label="Issuer URL" value={f.issuer} onChange={(e) => setF({ ...f, issuer: e.target.value })} placeholder="https://login.microsoftonline.com/<tenant>/v2.0" /></div>
+        <div><Label>Client id</Label><Input aria-label="Client id" value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} /></div>
+        <div><Label>Client secret</Label><Input aria-label="Client secret" type="password" autoComplete="off" value={f.client_secret} onChange={(e) => setF({ ...f, client_secret: e.target.value })} placeholder={d?.has_secret ? "•••••••• (unchanged)" : ""} /></div>
+        <div className="sm:col-span-2"><Label>Allowed e-mail domains</Label><Input aria-label="Allowed e-mail domains" value={f.allowed_domains} onChange={(e) => setF({ ...f, allowed_domains: e.target.value })} placeholder="acme.com, acme.io" />
+          <p className="mt-1 text-xs text-muted">Only these domains can sign in this way, and a domain can belong to one organisation.</p></div>
+        <div><Label>New users get the role</Label><select aria-label="Default role" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.default_role} onChange={(e) => setF({ ...f, default_role: e.target.value })}><option value="viewer">Viewer</option><option value="member">Member</option></select></div>
+        <div className="flex items-end gap-4 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={f.auto_provision} onChange={(e) => setF({ ...f, auto_provision: e.target.checked })} />Create accounts on first sign-in</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} />Enabled</label></div>
+        {d && <p className="text-xs text-muted sm:col-span-2">Register this redirect URI with your provider: <code className="select-all rounded bg-slate-100 px-1">{d.redirect_uri}</code></p>}
+        <div className="flex gap-2 sm:col-span-2"><Button disabled={save.isPending || !f.issuer || !f.client_id || !f.allowed_domains || (!d?.has_secret && !f.client_secret)}>Save</Button>
+          {d?.configured && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove single sign-on?", message: "People who signed in this way keep their accounts but can no longer use SSO.", confirmLabel: "Remove", danger: true })) remove.mutate(); }}>Remove</Button>}</div>
+        <div className="sm:col-span-2"><ErrorNote error={save.error} /></div>
+      </form>
+      <div className="mt-5 border-t border-line pt-4">
+        <h4 className="mb-1 text-sm font-semibold">Automatic provisioning (SCIM)</h4>
+        <p className="mb-2 text-xs text-muted">Your identity provider creates, updates and deactivates users here. Deactivating a user ends their sessions immediately. Base URL: <code className="select-all rounded bg-slate-100 px-1">{window.location.origin}/scim/v2</code></p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" disabled={mint.isPending} onClick={async () => { if (!scim.data?.configured || await ask({ title: "Replace the SCIM token?", message: "The current token stops working immediately. Update it in your identity provider.", confirmLabel: "Generate new token" })) mint.mutate(); }}>{scim.data?.configured ? "Rotate token" : "Generate token"}</Button>
+          {scim.data?.configured && <Button variant="ghost" size="sm" onClick={async () => { if (await ask({ title: "Revoke the SCIM token?", message: "Provisioning stops until you generate a new one.", confirmLabel: "Revoke", danger: true })) revoke.mutate(); }}>Revoke</Button>}
+          {scim.data?.configured && <span className="text-xs text-muted">{scim.data.last_used_at ? `last used ${timeAgo(scim.data.last_used_at)}` : "not used yet"}</span>}
+        </div>
+        {newToken && <p role="status" className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">Copy this token now, it is not shown again: <code className="select-all break-all font-mono">{newToken}</code></p>}
+      </div>
     </Card>
   );
 }

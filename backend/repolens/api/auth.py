@@ -35,7 +35,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
 def login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == body.email.lower()))
     ok = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
-    if not user or not ok:
+    if not user or not ok or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     return TokenOut(access_token=create_token(user.id, user.org_id, user.role), user=UserOut.model_validate(user))
 

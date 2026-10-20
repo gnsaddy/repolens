@@ -7,7 +7,7 @@ import { useAuth } from "./lib/auth";
 import { cn } from "./lib/utils";
 import { Spinner } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
-import Login from "./pages/Login";
+import Login, { SsoComplete } from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Repositories from "./pages/Repositories";
 import Knowledge from "./pages/Knowledge";
@@ -86,6 +86,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/sso-complete" element={<SsoComplete />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="investigations" element={<Investigations />} />

@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-change-me"
     jwt_ttl_minutes: int = 60 * 12
     allow_registration: bool = True
+    # Externally visible base URL (https://repolens.example.com), used for the SSO redirect URI.
+    public_url: str = ""
     # Secrets at rest (Fernet key, urlsafe base64 32 bytes). Derived from jwt_secret when empty (dev only).
     secret_key: str = ""
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])

@@ -49,6 +49,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(200))
     role: Mapped[str] = mapped_column(String(20), default="member")  # admin | member | viewer
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)  # false = deprovisioned: cannot sign in or use a token
+    auth_source: Mapped[str] = mapped_column(String(10), default="password")  # password | sso | scim
+    external_id: Mapped[str] = mapped_column(String(200), default="")  # the identity provider's subject / SCIM id
 
 
 class Repository(Base):
@@ -512,3 +515,43 @@ class DocProposal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     decided_by: Mapped[str] = mapped_column(String(32), default="")
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SsoConfig(Base):
+    """OpenID Connect single sign-on for one organisation (authorization code flow with PKCE)."""
+
+    __tablename__ = "sso_configs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), unique=True)
+    issuer: Mapped[str] = mapped_column(String(500))
+    client_id: Mapped[str] = mapped_column(String(300))
+    client_secret_encrypted: Mapped[str] = mapped_column(Text, default="")  # never returned by the API
+    allowed_domains: Mapped[list] = mapped_column(JSON, default=list)  # e-mail domains that may sign in this way
+    default_role: Mapped[str] = mapped_column(String(20), default="viewer")
+    auto_provision: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class SsoFlow(Base):
+    """One in-progress sign-in: state, nonce and PKCE verifier live here, never in the browser. Single use."""
+
+    __tablename__ = "sso_flows"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # the OAuth `state`
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    nonce: Mapped[str] = mapped_column(String(64))
+    code_verifier: Mapped[str] = mapped_column(String(128))
+    login_code: Mapped[str] = mapped_column(String(64), default="", index=True)  # one-time code handed to the SPA
+    user_id: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ScimToken(Base):
+    """Bearer token the identity provider uses to provision users. Only a hash is stored."""
+
+    __tablename__ = "scim_tokens"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

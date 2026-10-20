@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { Activity } from "lucide-react";
 import { Button, Card, ErrorNote, Input, Label } from "@/components/ui";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function Login() {
@@ -10,6 +11,18 @@ export default function Login() {
   const [f, setF] = useState({ email: "", password: "", org: "", name: "" });
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [sp] = useSearchParams();
+  const ssoError = sp.get("sso_error");
+  const [sso, setSso] = useState<{ organization: string } | null>(null);
+  useEffect(() => {
+    setSso(null);
+    if (mode !== "login" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return;
+    const t = setTimeout(() => {
+      api<{ sso: boolean; organization?: string }>(`/auth/sso/discover?email=${encodeURIComponent(f.email)}`)
+        .then((r) => setSso(r.sso ? { organization: r.organization ?? "" } : null)).catch(() => setSso(null));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [f.email, mode]);
   if (user) return <Navigate to="/" replace />;
 
   async function submit(e: FormEvent) {
@@ -33,11 +46,33 @@ export default function Login() {
           <label className="block"><Label>Email</Label><Input type="email" required autoComplete="username" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
           <label className="block"><Label>Password</Label><Input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></label>
           <ErrorNote error={err} />
+          {ssoError && <p role="alert" className="text-sm text-red-600">{ssoError}</p>}
+          {sso && <Button type="button" variant="outline" className="w-full" onClick={() => { window.location.href = `/api/auth/sso/start?email=${encodeURIComponent(f.email)}`; }}>Continue with single sign-on{sso.organization ? ` (${sso.organization})` : ""}</Button>}
           <Button className="w-full" disabled={busy}>{mode === "login" ? "Sign in" : "Create account"}</Button>
         </form>
         <button className="mt-4 text-xs text-brand hover:underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}
         </button>
+      </Card>
+    </div>
+  );
+}
+
+/** Landing page after the identity provider: trades the one-time code for a session. */
+export function SsoComplete() {
+  const { completeSso } = useAuth();
+  const nav = useNavigate();
+  const [sp] = useSearchParams();
+  const [err, setErr] = useState<unknown>(null);
+  useEffect(() => {
+    const code = sp.get("code");
+    if (!code) { setErr(new Error("Missing sign-in code")); return; }
+    completeSso(code).then(() => nav("/", { replace: true })).catch(setErr);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="grid min-h-screen place-items-center bg-sidebar p-4">
+      <Card className="w-full max-w-sm text-center">
+        {err ? (<><p role="alert" className="mb-3 text-sm text-red-600">{(err as Error).message}</p><a className="text-sm text-brand hover:underline" href="/login">Back to sign in</a></>) : <p className="text-sm text-muted">Signing you in…</p>}
       </Card>
     </div>
   );
