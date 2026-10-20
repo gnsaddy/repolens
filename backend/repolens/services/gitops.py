@@ -130,6 +130,8 @@ def prefetch_blobs(path: str, ref: str, wanted, auth_header: str | None = None) 
     for i in range(0, len(missing), 2000):
         _git(
             path,
+            "-c",
+            "fetch.negotiationAlgorithm=noop",  # without this, asking for thousands of objects stalls in negotiation
             "fetch",
             "--quiet",
             "--no-tags",
