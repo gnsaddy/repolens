@@ -6,7 +6,7 @@ Repository intelligence and evidence-backed root-cause analysis. See [`idea.md`]
 **Stack:** FastAPI · LangGraph · PostgreSQL + pgvector · Tree-sitter · Vite + React + TypeScript + Tailwind ·
 OpenTelemetry/Prometheus · Docker · Kubernetes · GitHub Actions.
 
-**Screens:** Dashboard, **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
+**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
 Investigation View (root cause, confidence, timeline, code/commit/doc/test/PR evidence, report, human review), **Change
 Risk** (score a commit, branch or PR with signals, blast radius and tests to run), Token Usage & Cost, Jira, Settings (LLM
 provider + key, GitHub sign-in).
@@ -18,7 +18,7 @@ benchmark in [`evals/`](evals/README.md).
 
 ## DeepMind Wiki
 
-Open **DeepMind Wiki** in the sidebar to add READMEs, text files, web URLs or a Confluence space (Sources tab), then browse, ask, explore concepts and check documentation health. See [docs/features.md](docs/features.md#deepmind-wiki). To try Confluence without an instance: `python -m repolens.devtools.fake_confluence --port 8099 --token demo-token --email demo@example.com` (loopback URLs are accepted only when `REPOLENS_ENV=dev`).
+Open **DeepMind Wiki** in the sidebar to add READMEs, text files, web URLs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint (Sources tab, optionally re-synced on a schedule), then browse, ask, explore concepts, check documentation health, review drift alerts and approve suggested edits. See [docs/features.md](docs/features.md#deepmind-wiki). To try Confluence without an instance: `python -m repolens.devtools.fake_confluence --port 8099 --token demo-token --email demo@example.com` (loopback URLs are accepted only when `REPOLENS_ENV=dev`).
 
 ## Run it (Docker)
 
