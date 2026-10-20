@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useAuth } from "./lib/auth";
 import { cn } from "./lib/utils";
 import { Spinner } from "./components/ui";
@@ -15,6 +15,7 @@ import Investigations from "./pages/Investigations";
 import InvestigationView from "./pages/InvestigationView";
 const TokenUsage = lazy(() => import("./pages/TokenUsage"));
 import Wiki from "./pages/Wiki";
+import Ownership from "./pages/Ownership";
 import JiraPage from "./pages/JiraPage";
 
 const nav = [
@@ -23,6 +24,7 @@ const nav = [
   { to: "/knowledge", label: "Knowledge", icon: Network },
   { to: "/wiki", label: "DeepMind Wiki", icon: Library },
   { to: "/risk", label: "Change Risk", icon: ShieldAlert },
+  { to: "/ownership", label: "Ownership", icon: Users },
   { to: "/repositories", label: "Repositories", icon: FolderGit2 },
   { to: "/jira", label: "Jira", icon: Ticket },
   { to: "/usage", label: "Token Usage", icon: BarChart3 },
@@ -87,6 +89,7 @@ export default function App() {
         <Route path="knowledge" element={<Knowledge />} />
         <Route path="wiki" element={<Wiki />} />
         <Route path="risk" element={<Risk />} />
+        <Route path="ownership" element={<Ownership />} />
         <Route path="repositories" element={<Repositories />} />
         <Route path="jira" element={<JiraPage />} />
         <Route path="settings" element={<SettingsPage />} />

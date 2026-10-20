@@ -846,6 +846,7 @@ def render_report(ctx: Ctx, state: State) -> str:
             elif e["type"] == "test":
                 lines.append(f"- Covered by test file `{e['file']}` (static analysis)")
         lines.append("")
+    lines += _who_to_ask(ctx, hyps)
     if n.get("suggested_fix"):
         lines += ["### Recommended next steps", n["suggested_fix"], ""]
     lines += [
@@ -861,6 +862,26 @@ def render_report(ctx: Ctx, state: State) -> str:
         "*AI-generated findings require engineering verification.*",
     ]
     return "\n".join(lines)
+
+
+def _who_to_ask(ctx: Ctx, hyps: list[dict]) -> list[str]:
+    """People who maintain the files the top hypothesis points at (from commit history; a hint, not a verdict)."""
+    if not hyps:
+        return []
+    from ..services import ownership
+
+    by_repo: dict[str, list[str]] = {}
+    for e in hyps[0]["evidence"]:
+        if e["type"] == "code" and e.get("repo_id") and ctx.scope.can(e["repo_id"]):
+            by_repo.setdefault(e["repo_id"], []).append(e["file"])
+    rows: list[str] = []
+    for repo_id, files in by_repo.items():
+        for o in ownership.experts(ctx.db, repo_id, files, limit=3):
+            rows.append(
+                f"- **{o['author']}** — {o['share']:.0%} of recent changes to "
+                + ", ".join(f"`{f}`" for f in o["files"][:3])
+            )
+    return ["### Who to ask", *rows, "", "*From commit history; a hint, not a verdict.*", ""] if rows else []
 
 
 def _usage_line(ctx: Ctx) -> str:

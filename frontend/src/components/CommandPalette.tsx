@@ -13,6 +13,7 @@ export const PAGES = [
   { label: "DeepMind Wiki: add content", to: "/wiki?tab=sources", hint: "README, text, URL, Confluence" },
   { label: "DeepMind Wiki: health", to: "/wiki?tab=health", hint: "orphans, broken links, stale pages" },
   { label: "Change risk", to: "/risk", hint: "score a commit or branch" },
+  { label: "Ownership", to: "/ownership", hint: "who maintains what, who to ask" },
   { label: "Repositories", to: "/repositories", hint: "add a repository, choose branches" },
   { label: "Jira", to: "/jira" },
   { label: "Token usage", to: "/usage", hint: "cost and budgets" },

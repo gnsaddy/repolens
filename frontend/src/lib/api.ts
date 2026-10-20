@@ -172,3 +172,7 @@ export interface StorageInfo { ttl_days: number; total_bytes: number; checkouts:
 export interface CleanupResult { removed: { path: string; repos: string[]; bytes: number }[]; freed_bytes: number; dry_run: boolean }
 export interface HeatResult { metric: string; label: string; max: number; values: Record<string, number>; raw: Record<string, number> }
 export interface RetrievalStatus { embedding: { provider: string; model: string; dimensions: number; offline: boolean }; rerank: { provider: string; model: string; configured: boolean; depth: number } }
+export interface OwnerRow { author: string; share: number; commits: number; lines: number; last_commit_at: string; files?: string[] }
+export interface OwnershipArea { area: string; owners: OwnerRow[]; bus_factor: number; commits: number; last_activity: string; risk: "ok" | "single_owner" | "stale_owner" }
+export interface OwnershipOverview { repo_id: string; repo: string; summary: { people: number; areas: number; bus_factor: number; areas_at_risk: number }; areas: OwnershipArea[]; people: { author: string; share: number; commits: number; last_commit_at: string; areas: string[] }[] }
+export interface PathOwners { path: string; owners: OwnerRow[]; bus_factor: number }

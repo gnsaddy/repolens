@@ -4,7 +4,7 @@ import { File, GitPullRequest, Lock, RefreshCw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, statusTone } from "@/components/ui";
 import StoragePanel from "@/components/StoragePanel";
-import { api, type BranchList, type GithubConn, type IndexRunRow, type PullRow, type FileView, type Repo, type SearchHit } from "@/lib/api";
+import { api, type BranchList, type GithubConn, type IndexRunRow, type PullRow, type FileView, type PathOwners, type Repo, type SearchHit } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import AccessPanel from "@/components/AccessPanel";
 import { timeAgo } from "@/lib/utils";
@@ -34,6 +34,7 @@ export default function Repositories() {
   const repo = repos.data?.find((r) => r.id === sel);
   const tree = useQuery({ queryKey: ["tree", sel], enabled: !!sel && repo?.status === "ready", queryFn: () => api<{ path: string; lines: number; language: string }[]>(`/repositories/${sel}/tree`) });
   const fileQ = useQuery({ queryKey: ["file", sel, file?.path], enabled: !!sel && !!file, queryFn: () => api<FileView>(`/repositories/${sel}/file?path=${encodeURIComponent(file!.path)}`) });
+  const owners = useQuery({ queryKey: ["owners", sel, file?.path], enabled: !!sel && !!file && repo?.source !== "docs", queryFn: () => api<PathOwners>(`/ownership/path?repo_id=${sel}&path=${encodeURIComponent(file!.path)}`) });
   const commits = useQuery({ queryKey: ["commits", sel], enabled: !!sel && repo?.status === "ready", queryFn: () => api<{ sha: string; author: string; committed_at: string; message: string }[]>(`/repositories/${sel}/commits?limit=8`) });
   const gh = useQuery({ queryKey: ["github-conn"], queryFn: () => api<GithubConn>("/github/connection") });
   const runs = useQuery({ queryKey: ["runs", sel], enabled: !!sel && repo?.source !== "docs", queryFn: () => api<IndexRunRow[]>(`/repositories/${sel}/runs`), refetchInterval: 4000 });
@@ -123,6 +124,7 @@ export default function Repositories() {
               <div className="min-w-0 space-y-4">
                 {file && (<Card>
                   <CardTitle>{file.path}</CardTitle>
+                  {!!owners.data?.owners.length && <p className="-mt-2 mb-3 text-xs text-muted">Maintained by {owners.data.owners.map((o) => `${o.author} (${Math.round(o.share * 100)}%)`).join(", ")}</p>}
                   {fileQ.error ? <ErrorNote error={fileQ.error} /> : fileQ.data && (<div className="max-h-[32rem] overflow-auto"><CodeBlock code={fileQ.data.content} highlight={file.line} /></div>)}
                 </Card>)}
                 {repo.source !== "docs" && (

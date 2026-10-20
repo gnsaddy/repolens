@@ -129,6 +129,7 @@ def test_investigation_finds_regression_commit(client, auth, demo_repo):
     assert "Not yet confirmed" in inv["report_md"] and bad_sha[:10] in inv["report_md"]
     assert [s["step"] for s in inv["timeline"]][:3] == ["planner", "gather", "rank"]
     assert "No hosted model was called" in inv["report_md"]  # offline: never fabricates token usage
+    assert "### Who to ask" in inv["report_md"] and "a hint, not a verdict" in inv["report_md"]
 
 
 def test_investigation_with_no_relevant_code(client, auth, demo_repo):
