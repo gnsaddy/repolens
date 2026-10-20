@@ -111,7 +111,8 @@ start_postgres() {
   if ! docker ps -a --format '{{.Names}}' | grep -qx "$PG_NAME"; then
     port_in_use "$PG_PORT" && die "port $PG_PORT is in use (set PG_PORT=...)"
     docker run -d --name "$PG_NAME" -e POSTGRES_PASSWORD=repolens -e POSTGRES_USER=repolens -e POSTGRES_DB=repolens \
-      -p "127.0.0.1:$PG_PORT:5432" -v "$PG_VOLUME:/var/lib/postgresql/data" pgvector/pgvector:pg16 >/dev/null
+      -p "127.0.0.1:$PG_PORT:5432" -v "$PG_VOLUME:/var/lib/postgresql/data" pgvector/pgvector:pg16 \
+      -c fsync=off -c synchronous_commit=off -c full_page_writes=off >/dev/null  # dev database: speed over crash safety
   else
     docker start "$PG_NAME" >/dev/null
   fi
