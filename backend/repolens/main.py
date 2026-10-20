@@ -53,6 +53,7 @@ async def _source_scheduler(minutes: float = 5.0) -> None:
                 db.commit()
                 wi.schedule_source_sync(sid)
 
+    await asyncio.sleep(60)  # let the app finish starting before the first check
     while True:
         try:
             await asyncio.to_thread(tick)

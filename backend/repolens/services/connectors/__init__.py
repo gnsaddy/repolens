@@ -97,4 +97,4 @@ def get(kind: str) -> Connector:
 
 
 def load_all() -> None:
-    from . import jira_source, slack  # noqa: F401  (each registers itself)
+    from . import gdocs, jira_source, notion, sharepoint, slack  # noqa: F401  (each registers itself)
