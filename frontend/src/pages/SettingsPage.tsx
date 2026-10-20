@@ -4,7 +4,7 @@ import { KeyRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
 import GithubConnect from "@/components/GithubConnect";
-import { api, type LLMSettings, type ModelInfo } from "@/lib/api";
+import { api, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 const PROVIDERS = [
@@ -71,6 +71,7 @@ export default function SettingsPage() {
             {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
           </form>
         </Card>
+        <RetrievalCard />
         <GithubConnect admin={admin} />
         <Card className="lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <CardTitle>What uses the model</CardTitle>
@@ -83,5 +84,22 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function RetrievalCard() {
+  const { data } = useQuery({ queryKey: ["retrieval-status"], queryFn: () => api<RetrievalStatus>("/settings/retrieval") });
+  if (!data) return null;
+  return (
+    <Card>
+      <CardTitle>Search quality</CardTitle>
+      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt className="text-xs text-muted">Embeddings</dt><dd className="font-medium">{data.embedding.model} <Badge tone={data.embedding.offline ? "gray" : "brand"}>{data.embedding.offline ? "offline" : data.embedding.provider}</Badge></dd>
+          <dd className="text-xs text-muted">{data.embedding.dimensions} dimensions{data.embedding.offline ? " · works without internet, weaker on natural language" : ""}</dd></div>
+        <div><dt className="text-xs text-muted">Reranker</dt><dd className="font-medium">{data.rerank.provider === "none" ? "Off" : data.rerank.model} {!data.rerank.configured && <Badge tone="amber">no endpoint set</Badge>}</dd>
+          <dd className="text-xs text-muted">{data.rerank.provider === "none" ? "Enable with REPOLENS_RERANK_PROVIDER" : `re-scores the top ${data.rerank.depth} results of every search`}</dd></div>
+      </dl>
+      <p className="mt-3 text-xs text-muted">Set with environment variables on the server: REPOLENS_EMBEDDING_* and REPOLENS_RERANK_*. See docs/features.md.</p>
+    </Card>
   );
 }

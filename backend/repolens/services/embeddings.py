@@ -88,7 +88,11 @@ class Embedder:
             r = httpx.post(
                 f"{s.embedding_base_url.rstrip('/')}/embeddings",
                 headers={"Authorization": f"Bearer {s.embedding_api_key}"},
-                json={"model": s.embedding_model, "input": batch, "dimensions": self.dim},
+                json={
+                    "model": s.embedding_model,
+                    "input": batch,
+                    **({"dimensions": self.dim} if s.embedding_send_dimensions else {}),
+                },
                 timeout=60,
             )
             r.raise_for_status()

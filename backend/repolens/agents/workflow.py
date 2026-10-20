@@ -69,6 +69,7 @@ class Features:
     blame: bool = True
     graph: bool = True
     memory: bool = True
+    rerank: str | None = None  # None = server setting; "none" | "lexical" | "api"
 
 
 @dataclass
@@ -138,6 +139,7 @@ def build_graph(ctx: Ctx):
             k=12 + 6 * loops,
             embedder=ctx.embedder,
             mode=ctx.features.search_mode,
+            rerank=ctx.features.rerank,
         )
         names = _repo_names(ctx, state["repo_ids"])
         code_hits = []

@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_base_url: str = "https://api.openai.com/v1"
     embedding_api_key: str = ""
+    embedding_send_dimensions: bool = True  # some providers (e.g. Voyage) reject the OpenAI `dimensions` field
+    # Second-stage reranking of search results: "none" | "lexical" (offline) | "api" (Cohere/Jina/Voyage-style /rerank)
+    rerank_provider: str = "lexical"
+    rerank_base_url: str = ""
+    rerank_model: str = "rerank-v3.5"
+    rerank_api_key: str = ""
+    rerank_timeout_s: float = 10.0
+    rerank_depth: int = 30  # candidates re-scored per query
     # Vector hits below this cosine similarity are ignored (raise to ~0.3 for hosted embedding models)
     vector_min_similarity: float = 0.15
     # LLM: "heuristic" (offline, no external calls), "anthropic", "openai" (OpenAI-compatible)

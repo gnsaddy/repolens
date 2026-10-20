@@ -171,3 +171,4 @@ export interface CheckoutRow { path: string; repos: string[]; exists: boolean; b
 export interface StorageInfo { ttl_days: number; total_bytes: number; checkouts: CheckoutRow[] }
 export interface CleanupResult { removed: { path: string; repos: string[]; bytes: number }[]; freed_bytes: number; dry_run: boolean }
 export interface HeatResult { metric: string; label: string; max: number; values: Record<string, number>; raw: Record<string, number> }
+export interface RetrievalStatus { embedding: { provider: string; model: string; dimensions: number; offline: boolean }; rerank: { provider: string; model: string; configured: boolean; depth: number } }

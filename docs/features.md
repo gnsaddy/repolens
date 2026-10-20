@@ -38,6 +38,12 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Search quality: embeddings and reranking
+
+- **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.
+- **Reranking:** after hybrid search fuses vectors and keywords, the top `RERANK_DEPTH` (30) candidates are re-scored. `lexical` (default) is offline: BM25 over the candidates, query-term proximity and identifier matches, blended with the fused score. `api` calls any Cohere/Jina/Voyage-style `/rerank` endpoint (`RERANK_BASE_URL`, `RERANK_MODEL`, `RERANK_API_KEY`) and falls back to the fused order if the service is down. `none` turns it off.
+- Settings shows what is active (read-only). The benchmark has configurations with and without the reranker; see `evals/README.md` for what it does and does not show.
+
 ## Branches, clones and disk
 
 - **Branches:** when adding a repository, "Choose branches" lists the remote's branches (`git ls-remote`, no clone). Each selected branch becomes its own index (`name`, `name@branch`) with its own graph, risk scores and investigations, while all of them share a single clone. Up to `REPOLENS_MAX_BRANCHES` (8).

@@ -81,7 +81,30 @@ CONFIGS = [
         Features(history=True, graph=True, memory=True),
         memory_pass=True,
     ),
+    Config(
+        "hybrid_rerank",
+        "8. Hybrid RAG + reranker (offline lexical cross-scoring)",
+        "retrieval",
+        Features(search_mode="hybrid", rerank="lexical", history=False, graph=False, memory=False),
+    ),
+    Config(
+        "full_rerank",
+        "9. Full investigation + reranker",
+        "workflow",
+        Features(history=True, graph=True, memory=True, rerank="lexical"),
+        memory_pass=True,
+    ),
 ]
+
+
+def _pin_ablation_defaults() -> None:
+    """Ablation configs are explicit: unless a config asks for a reranker, it runs without one, whatever the server default."""
+    for c in CONFIGS:
+        if c.features.rerank is None:
+            c.features.rerank = "none"
+
+
+_pin_ablation_defaults()
 
 
 @dataclass
@@ -128,7 +151,7 @@ def _dedupe(rows: list[tuple[str, str, str, str | None]]) -> list[tuple[str, str
 
 
 def _retrieval_rows(db: Session, org_id: str, query: str, repo_ids: list[str], f: Features) -> tuple[list, list]:
-    hits = search_chunks(db, org_id, query, repo_ids or None, k=DEPTH, mode=f.search_mode)
+    hits = search_chunks(db, org_id, query, repo_ids or None, k=DEPTH, mode=f.search_mode, rerank=f.rerank)
     if f.stack_frames:  # stack-trace frames are resolved to chunks exactly as the investigator does
         from ..services.retrieval import extract_stack_refs
 

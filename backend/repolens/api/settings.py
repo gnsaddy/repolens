@@ -53,6 +53,30 @@ def _view(db: Session, org_id: str) -> dict:
     }
 
 
+@router.get("/retrieval")
+def retrieval_status(p: Principal = Depends(current_principal)):
+    """Read-only view of how search is configured on this server (set with REPOLENS_* environment variables)."""
+    s = get_settings()
+    return {
+        "embedding": {
+            "provider": s.embedding_provider,
+            "model": "local-hash-v1" if s.embedding_provider == "hash" else s.embedding_model,
+            "dimensions": s.embedding_dim,
+            "offline": s.embedding_provider == "hash",
+        },
+        "rerank": {
+            "provider": s.rerank_provider,
+            "model": s.rerank_model
+            if s.rerank_provider == "api"
+            else "built-in lexical cross-scoring"
+            if s.rerank_provider == "lexical"
+            else "",
+            "configured": s.rerank_provider != "api" or bool(s.rerank_base_url),
+            "depth": s.rerank_depth,
+        },
+    }
+
+
 @router.get("/llm")
 def get_llm(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     return _view(db, p.org_id)

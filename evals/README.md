@@ -26,7 +26,8 @@ Ground truth: gold commit, file, symbol and changed lines. Cases 11–20 repeat 
 
 1. Keyword search · 2. Semantic RAG (vector only) · 3. Hybrid RAG (vector + keyword + stack frames) ·
 4. + Git history (diffs and changed lines) · 5. + git blame of the failing line · 6. + dependency graph (instead of
-history) · 7. Full investigation (history + blame + graph) + local memory.
+history) · 7. Full investigation (history + blame + graph) + local memory · 8. Hybrid RAG + reranker · 9. Full investigation + reranker.
+Configurations 1–7 explicitly run without a reranker so they stay comparable whatever the server default is.
 
 ## Headline results (20 cases per seed; repository known; Top-1 = right file *and* function)
 
@@ -39,10 +40,17 @@ history) · 7. Full investigation (history + blame + graph) + local memory.
 | 5. + git blame of the failing line | 70% [48–85] | 75% [53–89] |
 | 6. + dependency graph (no history) | 15% [5–36] | 10% [3–30] |
 | 7. Full + memory | 70% [48–85] | 75% [53–89] |
+| 8. Hybrid RAG + reranker | 25% [11–47] | 30% [15–52] |
+| 9. Full + reranker | 75% [53–89] | 80% [58–92] |
 
 Brackets are 95% Wilson intervals. The held-out seed was run once, after the code was frozen.
 
 **What this says**
+* **The offline reranker helps ranking quality, not (yet) top-1.** Hybrid + reranker leaves top-1 at 25% / 30% (inside
+  the confidence interval of the 25% baseline) but raises Top-3 (50→65% on seed 7, unchanged at 60% on seed 123), Recall@10
+  (70→85%, 75→90%) and MRR (0.42→0.46, 0.45→0.49). With git history on top, MRR goes 0.75→0.81 and 0.79→0.85, and
+  Top-3 75/80%→90%. Gains are consistent across both seeds but small samples: treat them as "probably helps", not
+  proven. A hosted cross-encoder (`REPOLENS_RERANK_PROVIDER=api`) was not evaluated.
 * **Git history is the component that matters**: it turns “the right file” (hybrid 35–40%) into “the right function and
   the commit that broke it” (70–75% top-1, 15–18/20 commit attribution). Citations always matched the source text.
 * **Git blame is neutral here.** Blaming whole functions *hurt* (the original author of most lines is rarely the

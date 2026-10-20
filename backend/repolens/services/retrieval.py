@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import Change, CodeChunk, MemoryEntry
 from .embeddings import Embedder, cosine, tokenize
+from .rerank import rerank as rerank_scores
 
 STOP = set(
     """a an the and or of to in on for with is are was were be been it this that at by from as not no but if
@@ -84,6 +85,7 @@ def search_chunks(
     embedder: Embedder | None = None,
     languages: list[str] | None = None,
     mode: str = "hybrid",
+    rerank: str | None = None,
 ) -> list[Hit]:
     embedder = embedder or Embedder()
     terms = query_terms(query)
@@ -156,8 +158,21 @@ def search_chunks(
         if term_set & path_tokens:
             scores[cid] += 0.2 / RRF_K
         h.score = scores[cid]
-    ranked = sorted(hits.values(), key=lambda h: (-h.score, _pos(h.chunk)))[:k]
-    return ranked
+    provider = get_settings().rerank_provider if rerank is None else rerank
+    ranked = sorted(hits.values(), key=lambda h: (-h.score, _pos(h.chunk)))
+    if provider != "none" and len(ranked) > 1:
+        head = ranked[: max(get_settings().rerank_depth, k)]
+        new = rerank_scores(
+            provider,
+            query,
+            terms,
+            [(h.chunk.content, f"{h.chunk.file_path} {h.chunk.parent_symbol} {h.chunk.symbol_name}") for h in head],
+            [h.score for h in head],
+        )
+        for h, s in zip(head, new, strict=True):
+            h.score = s
+        ranked = sorted(head, key=lambda h: (-h.score, _pos(h.chunk)))
+    return ranked[:k]
 
 
 def search_changes(
