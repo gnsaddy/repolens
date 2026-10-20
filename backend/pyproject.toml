@@ -1,0 +1,41 @@
+[project]
+name = "repolens"
+version = "0.1.0"
+description = "RepoLens AI - repository intelligence and RCA platform"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi", "uvicorn[standard]", "sqlalchemy>=2", "alembic", "psycopg[binary]", "pgvector", "numpy",
+  "pydantic-settings", "pyjwt[crypto]", "bcrypt", "httpx", "langgraph", "anthropic",
+  "tree-sitter", "tree-sitter-python", "tree-sitter-javascript", "tree-sitter-typescript",
+  "tree-sitter-go", "tree-sitter-java",
+  "opentelemetry-api", "opentelemetry-sdk", "opentelemetry-instrumentation-fastapi",
+  "opentelemetry-exporter-otlp-proto-http", "prometheus-client", "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "ruff", "mypy"]
+
+[tool.setuptools.packages.find]
+include = ["repolens*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"alembic/*" = ["E501", "I001"]
+"repolens/evals/*" = ["E501"]
+"repolens/devtools/*" = ["E501"]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = false
