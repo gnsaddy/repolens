@@ -218,3 +218,180 @@ def test_gemini_errors_are_explained_without_leaking_the_key(client, auth, monke
     )
     t = client.post("/api/settings/llm/test", headers=auth).json()
     assert t["ok"] is False and key not in json.dumps(t)
+
+
+def test_model_listing_for_gemini_filters_to_chat_models_and_keeps_the_key_out_of_the_url(client, auth, monkeypatch):
+    import httpx
+
+    key = "AIzaSyTestKey0123456789abcdefghijk"
+    calls = []
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        calls.append((str(r.url), r.headers.get("x-goog-api-key")))
+        if r.url.params.get("pageToken") == "p2":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {
+                            "name": "models/gemini-2.5-pro",
+                            "displayName": "Gemini 2.5 Pro",
+                            "supportedGenerationMethods": ["generateContent"],
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "models": [
+                    {
+                        "name": "models/gemini-2.5-flash",
+                        "displayName": "Gemini 2.5 Flash",
+                        "supportedGenerationMethods": ["generateContent", "countTokens"],
+                    },
+                    {"name": "models/text-embedding-004", "supportedGenerationMethods": ["embedContent"]},
+                    {"name": "models/gemini-old", "supportedGenerationMethods": ["generateContent"]},
+                ],
+                "nextPageToken": "p2",
+            },
+        )
+
+    monkeypatch.setattr(llm, "_models_transport", httpx.MockTransport(handler))
+    assert client.get("/api/settings/llm/models", headers=auth).status_code == 400  # offline: nothing to list
+    client.put(
+        "/api/settings/llm", headers=auth, json={"provider": "gemini", "model": "gemini-2.5-flash", "api_key": key}
+    )
+    d = client.get("/api/settings/llm/models", headers=auth).json()
+    assert [m["id"] for m in d["models"]] == [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-old",
+    ]  # embedding models are dropped, pages are followed
+    assert (
+        d["current"] == "gemini-2.5-flash"
+        and d["current_found"] is True
+        and d["models"][0]["name"] == "Gemini 2.5 Flash"
+    )
+    assert all(c[1] == key and key not in c[0] for c in calls)
+    client.put("/api/settings/llm", headers=auth, json={"provider": "gemini", "model": "gemini-9-ultra"})
+    assert (
+        client.get("/api/settings/llm/models", headers=auth).json()["current_found"] is False
+    )  # the saved model is not on the list
+    member = client.post(
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+    )
+    assert member.status_code == 201
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+        "access_token"
+    ]
+    assert client.get("/api/settings/llm/models", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403
+
+
+def test_model_listing_for_anthropic_and_openai_compatible_and_errors(client, auth, monkeypatch):
+    import httpx
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        if r.url.host == "api.anthropic.com":
+            assert r.headers["x-api-key"] and r.headers["anthropic-version"]
+            return httpx.Response(
+                200, json={"data": [{"id": "claude-sonnet-5-5", "display_name": "Claude Sonnet 5.5"}]}
+            )
+        if r.url.path == "/v1/models" and r.url.host == "llm.example.com":
+            return httpx.Response(200, json={"data": [{"id": "zeta"}, {"id": "alpha"}]})
+        return httpx.Response(500, text="boom")
+
+    monkeypatch.setattr(llm, "_models_transport", httpx.MockTransport(handler))
+    client.put(
+        "/api/settings/llm", headers=auth, json={"provider": "anthropic", "model": "claude-sonnet-5-5", "api_key": KEY}
+    )
+    assert client.get("/api/settings/llm/models", headers=auth).json()["models"] == [
+        {"id": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5"}
+    ]
+    client.put(
+        "/api/settings/llm",
+        headers=auth,
+        json={
+            "provider": "openai",
+            "model": "alpha",
+            "api_key": "sk-test-0123456789",
+            "base_url": "https://llm.example.com/v1",
+        },
+    )
+    assert [m["id"] for m in client.get("/api/settings/llm/models", headers=auth).json()["models"]] == ["alpha", "zeta"]
+    client.put(
+        "/api/settings/llm",
+        headers=auth,
+        json={
+            "provider": "openai",
+            "model": "alpha",
+            "api_key": "sk-test-0123456789",
+            "base_url": "https://other.example.com/v1",
+        },
+    )
+    r = client.get("/api/settings/llm/models", headers=auth)
+    assert r.status_code == 502 and "returned 500" in r.json()["detail"] and "sk-test" not in r.text
+
+
+def test_chat_404_and_other_errors_explain_themselves(client, auth, monkeypatch):
+    import httpx
+
+    key = "AIzaSyTestKey0123456789abcdefghijk"
+    mode = {"status": 404}
+    monkeypatch.setattr(
+        llm,
+        "_openai_transport",
+        httpx.MockTransport(
+            lambda r: httpx.Response(
+                mode["status"],
+                json=[{"error": {"message": f"models/gemini-x is not found for API version v1beta {key}"}}],
+            )
+        ),
+    )
+    client.put("/api/settings/llm", headers=auth, json={"provider": "gemini", "model": "gemini-x", "api_key": key})
+    t = client.post("/api/settings/llm/test", headers=auth).json()
+    assert (
+        t["ok"] is False
+        and "'gemini-x' was not found" in t["error"]
+        and "pick a model from the list" in t["error"]
+        and key not in t["error"]
+    )
+    mode["status"] = 429
+    t = client.post("/api/settings/llm/test", headers=auth).json()
+    assert (
+        t["ok"] is False
+        and "returned 429" in t["error"]
+        and key not in t["error"]
+        and "HTTPStatusError" not in t["error"]
+    )
+
+
+def test_provider_error_bodies_that_echo_the_key_are_scrubbed_in_model_listing_too(client, auth, monkeypatch):
+    import httpx
+
+    key = "totally-custom-format-key-0123456789"
+    monkeypatch.setattr(
+        llm,
+        "_models_transport",
+        httpx.MockTransport(lambda r: httpx.Response(400, json={"error": {"message": f"bad key {key}"}})),
+    )
+    client.put(
+        "/api/settings/llm",
+        headers=auth,
+        json={"provider": "openai", "model": "m", "api_key": key, "base_url": "https://llm.example.com/v1"},
+    )
+    r = client.get("/api/settings/llm/models", headers=auth)
+    assert r.status_code == 502 and key not in r.text  # an unfamiliar key shape is still removed, by exact match
+
+
+def test_redact_secrets_knows_google_atlassian_and_github_token_shapes():
+    from repolens.security import redact_secrets
+
+    text = (
+        "a AIzaSyTestKey0123456789abcdefghijk b ATATT3xFfGF0abcdefghijklmnop c github_pat_"
+        + "a" * 30
+        + " d xoxb-123456789012-abcdef"
+    )
+    out = redact_secrets(text)
+    for frag in ("AIzaxxxx", "ATATT3x", "github_pat_a", "xoxb-1234"):
+        assert frag not in out

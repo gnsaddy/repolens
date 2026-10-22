@@ -6,7 +6,7 @@ import { ConnectionCard, StatusPill, TINTS, selectCls } from "@/components/Conne
 import { useConfirm } from "@/components/feedback";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
 import { Badge, Button, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
-import { api, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
+import { api, type LLMSettings, type ModelInfo, type ModelList, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,12 @@ export default function SettingsPage() {
   const save = useMutation({ mutationFn: () => api<LLMSettings>("/settings/llm", { method: "PUT", json: body() }),
     onSuccess: (d) => { qc.setQueryData(["llm-settings"], d); setF((x) => ({ ...x, api_key: "" })); test.reset(); } });
   const reset = useMutation({ mutationFn: () => api<LLMSettings>("/settings/llm", { method: "DELETE" }), onSuccess: (d) => qc.setQueryData(["llm-settings"], d) });
-  const test = useMutation({ mutationFn: () => api<{ ok: boolean; error?: string; model?: string; latency_ms?: number; input_tokens?: number }>("/settings/llm/test", { method: "POST" }) });
+  const models = useMutation({ mutationFn: () => api<ModelList>("/settings/llm/models") });
+  const [modelFilter, setModelFilter] = useState("");
+  const test = useMutation({
+    mutationFn: () => api<{ ok: boolean; error?: string; model?: string; latency_ms?: number; input_tokens?: number }>("/settings/llm/test", { method: "POST" }),
+    onSettled: () => { setModelFilter(""); if (["gemini", "anthropic", "openai"].includes(data?.provider ?? "")) models.mutate(); }, // show what the key can use, whether or not the chosen model worked
+  });
   const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
   const catalog = useQuery({ queryKey: ["gh-models"], enabled: admin && f.provider === "github-models" && !!data?.has_key, retry: false,
     queryFn: () => api<ModelInfo[]>("/settings/llm/github-models/catalog") });
@@ -87,6 +92,22 @@ export default function SettingsPage() {
                     {data?.source === "org" && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove the stored key?", message: "The organisation reverts to the server defaults.", confirmLabel: "Remove key", danger: true })) reset.mutate(); }}>Reset</Button>}
                   </div>) : <p className="text-sm text-muted">Only workspace admins can change these settings.</p>}
                 {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
+                {models.isPending && <p className="text-sm text-muted">Loading the models your key can use…</p>}
+                {models.error && <p role="alert" className="text-sm text-red-600">Could not list models: {(models.error as Error).message}</p>}
+                {models.data && (
+                  <div aria-label="Available models" className="rounded-xl border border-line bg-slate-50/60 p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{models.data.models.length} models available</span>
+                      {!models.data.current_found && <Badge tone="amber">“{models.data.current}” is not on this list</Badge>}
+                      <Input aria-label="Filter models" placeholder="Filter…" className="ml-auto h-8 w-40" value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} />
+                    </div>
+                    <ul className="flex max-h-44 flex-wrap gap-1.5 overflow-auto">
+                      {models.data.models.filter((m) => `${m.id} ${m.name}`.toLowerCase().includes(modelFilter.toLowerCase())).map((m) => (
+                        <li key={m.id}><button type="button" title={m.name || m.id} onClick={() => setF({ ...f, model: m.id })} aria-pressed={f.model === m.id}
+                          className={cn("rounded-full border px-2.5 py-1 text-xs", f.model === m.id ? "border-brand bg-indigo-50 font-medium text-brand" : "border-line bg-white hover:border-brand")}>{m.id}</button></li>))}
+                    </ul>
+                    <p className="mt-2 text-xs text-muted">Click a model to use it, then press Save and Test connection again.</p>
+                  </div>)}
               </form>
             </ConnectionCard>
             <RetrievalCard />

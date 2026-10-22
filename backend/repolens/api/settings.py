@@ -12,7 +12,7 @@ from ..models import LLMSetting
 from ..schemas import LLMSettingIn
 from ..security import encrypt_secret, redact_secrets
 from ..services.jira import JiraError, validate_base_url
-from ..services.llm import CHAT_PROVIDERS, LLMClient, LLMUnavailable, github_token, resolve_config
+from ..services.llm import CHAT_PROVIDERS, LLMClient, LLMUnavailable, github_token, list_models, resolve_config
 from ..services.policy import authorize
 from ..services.usage import BudgetExceeded
 
@@ -123,6 +123,31 @@ def reset_llm(p: Principal = Depends(current_principal), db: Session = Depends(g
     return _view(db, p.org_id)
 
 
+def _scrub(text: str, key: str) -> str:
+    """Remove secrets by pattern, and the exact key whatever it looks like, from text a provider echoed back."""
+    out = redact_secrets(text)
+    return out.replace(key, "[REDACTED]") if len(key) >= 8 else out
+
+
+@router.get("/llm/models")
+def llm_models(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Models the saved key can use (Gemini, Anthropic and OpenAI-compatible services)."""
+    authorize(db, p, "llm.test", "models")
+    cfg = resolve_config(db, p.org_id)
+    if cfg.provider not in ("gemini", "anthropic", "openai"):
+        raise HTTPException(400, "Listing models is available for Gemini, Anthropic and OpenAI-compatible providers")
+    try:
+        models = list_models(cfg)
+    except RuntimeError as e:
+        raise HTTPException(502, _scrub(str(e), cfg.api_key)) from None
+    return {
+        "provider": cfg.provider,
+        "current": cfg.model,
+        "current_found": any(m["id"] == cfg.model for m in models),
+        "models": models,
+    }
+
+
 @router.post("/llm/test")
 def test_llm(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "llm.test", "ping")
@@ -135,7 +160,8 @@ def test_llm(p: Principal = Depends(current_principal), db: Session = Depends(ge
     except (BudgetExceeded, LLMUnavailable) as e:
         return {"ok": False, "error": str(e)}
     except Exception as e:  # provider errors must not leak keys
-        return {"ok": False, "error": redact_secrets(f"{type(e).__name__}: {e}")[:300]}
+        text = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {e}"
+        return {"ok": False, "error": _scrub(text, client.cfg.api_key)[:300]}
     return {
         "ok": True,
         "model": client.model,

@@ -113,7 +113,13 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
         raise RuntimeError(
             f"The model service rejected the credentials ({r.status_code}). Check the key or token and its permissions."
         )
-    r.raise_for_status()
+    if r.status_code == 404:
+        raise RuntimeError(
+            f"{httpx.URL(cfg.base_url).host} says the model '{cfg.model}' was not found (404). "
+            "Use Test connection and pick a model from the list it shows."
+        )
+    if r.status_code >= 400:
+        raise RuntimeError(f"{httpx.URL(cfg.base_url).host} returned {r.status_code}: {_error_text(r)}")
     try:
         d = r.json()
     except ValueError:
@@ -136,6 +142,79 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
     return LLMResult(
         d["choices"][0]["message"]["content"], u.get("prompt_tokens", 0), u.get("completion_tokens", 0), cached
     )
+
+
+def _error_text(r: httpx.Response) -> str:
+    """The provider's own error message (never the key), shortened."""
+    try:
+        d = r.json()
+        d = d[0] if isinstance(d, list) and d else d
+        msg = (d.get("error") or {}).get("message") if isinstance(d, dict) else None
+        return str(msg or d)[:200]
+    except ValueError:
+        return r.text[:200].strip() or "no details"
+
+
+# Overridable in tests.
+_models_transport: httpx.BaseTransport | None = None
+GEMINI_NATIVE = "https://generativelanguage.googleapis.com/v1beta"
+
+
+def list_models(cfg: LLMConfig) -> list[dict]:
+    """Models the configured key can use: [{id, name}]. Raises RuntimeError with a safe message."""
+    if not cfg.api_key:
+        raise RuntimeError("Save an API key first")
+    with httpx.Client(timeout=30, transport=_models_transport, follow_redirects=False) as hc:
+        try:
+            if (
+                cfg.provider == "gemini"
+            ):  # the native listing says which models can chat; the key goes in a header, not the URL
+                out: list[dict] = []
+                token = ""
+                for _ in range(5):
+                    r = hc.get(
+                        f"{GEMINI_NATIVE}/models",
+                        headers={"x-goog-api-key": cfg.api_key},
+                        params={"pageSize": 200, **({"pageToken": token} if token else {})},
+                    )
+                    _check(r, "Google")
+                    d = r.json()
+                    out += [
+                        {"id": m["name"].removeprefix("models/"), "name": m.get("displayName", "")}
+                        for m in d.get("models", [])
+                        if "generateContent" in m.get("supportedGenerationMethods", []) and m.get("name")
+                    ]
+                    token = d.get("nextPageToken", "")
+                    if not token:
+                        break
+                return sorted(out, key=lambda m: m["id"])
+            if cfg.provider == "anthropic":
+                r = hc.get(
+                    "https://api.anthropic.com/v1/models",
+                    headers={"x-api-key": cfg.api_key, "anthropic-version": "2023-06-01"},
+                    params={"limit": 100},
+                )
+                _check(r, "Anthropic")
+                return [{"id": m["id"], "name": m.get("display_name", "")} for m in r.json().get("data", [])]
+            if cfg.provider == "openai":
+                r = hc.get(f"{cfg.base_url.rstrip('/')}/models", headers={"Authorization": f"Bearer {cfg.api_key}"})
+                _check(r, httpx.URL(cfg.base_url).host)
+                return sorted(
+                    ({"id": m["id"], "name": ""} for m in r.json().get("data", []) if m.get("id")),
+                    key=lambda m: m["id"],
+                )
+        except httpx.HTTPError as e:
+            raise RuntimeError(f"The model service is unreachable ({type(e).__name__})") from None
+        except (ValueError, KeyError):
+            raise RuntimeError("The model service returned a list in an unexpected format") from None
+    raise RuntimeError("Listing models is not available for this provider")
+
+
+def _check(r: httpx.Response, who: str) -> None:
+    if r.status_code in (401, 403):
+        raise RuntimeError(f"{who} rejected the key ({r.status_code}). Check it and its permissions.")
+    if r.status_code >= 400:
+        raise RuntimeError(f"{who} returned {r.status_code} when listing models: {_error_text(r)}")
 
 
 class LLMClient:

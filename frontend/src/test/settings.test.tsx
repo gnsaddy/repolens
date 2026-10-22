@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -132,5 +132,32 @@ describe("GitHub connect", () => {
     mount("member", (u) => (u.endsWith("/github/connection") ? json({ connected: true, api_base: "x", auth_method: "oauth", login: "o" }) : undefined));
     expect(await screen.findByText(/OAuth · @o/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Configure GitHub|Disconnect GitHub|Connect GitHub/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Model list after Test connection", () => {
+  it("shows the models the key can use when the chosen model fails, flags the missing one, filters, and picks one", async () => {
+    localStorage.setItem("repolens.token", "tok");
+    let listed = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role: "admin", org_id: "o" });
+      if (u.endsWith("/settings/llm")) return json({ ...base, provider: "gemini", model: "gemini-9-ultra", has_key: true, source: "org", offline: false, presets: { anthropic: [], openai: [], gemini: [] } });
+      if (u.endsWith("/settings/llm/test")) return json({ ok: false, error: "generativelanguage.googleapis.com says the model 'gemini-9-ultra' was not found (404). Use Test connection and pick a model from the list it shows." });
+      if (u.endsWith("/settings/llm/models")) { listed++; return json({ provider: "gemini", current: "gemini-9-ultra", current_found: false, models: [{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" }, { id: "gemini-lite", name: "" }] }); }
+      return json({}, 404);
+    });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={["/settings?tab=ai"]}><SettingsPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
+    await screen.findByText("AI enabled");
+    expect(listed).toBe(0); // nothing is listed until the connection is tested
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText(/was not found \(404\)/)).toBeInTheDocument();
+    const panel = await screen.findByLabelText("Available models");
+    expect(within(panel).getByText("3 models available")).toBeInTheDocument();
+    expect(within(panel).getByText(/“gemini-9-ultra” is not on this list/)).toBeInTheDocument();
+    await userEvent.type(within(panel).getByLabelText("Filter models"), "pro");
+    expect(within(panel).queryByRole("button", { name: "gemini-2.5-flash" })).toBeNull();
+    await userEvent.click(within(panel).getByRole("button", { name: "gemini-2.5-pro" }));
+    expect(screen.getByLabelText(/^Model/)).toHaveValue("gemini-2.5-pro"); // picking fills the Model field
   });
 });

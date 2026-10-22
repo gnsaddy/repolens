@@ -192,3 +192,4 @@ export interface GhPull { number: number; title: string; state: string; draft: b
 export interface GhIssue { number: number; title: string; state: string; comments: number; author: string; labels: string[]; url: string; updated_at: string | null }
 export interface GhBranch { name: string; protected: boolean; default?: boolean }
 export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null; workspaces?: string | null; account?: string | null }
+export interface ModelList { provider: string; current: string; current_found: boolean; models: { id: string; name: string }[] }
