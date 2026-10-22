@@ -29,7 +29,7 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Evidence of five kinds: code, commits (with changed lines), docs, tests, callers, PRs — every citation re-checked against the index
 * ✅ Hypotheses with a heuristic confidence (capped at 92%, labelled as not a probability); root cause stays *unconfirmed* until a human reviews it
 * ✅ Human review → verified incident memory; cached synthesis; budget-aware LLM fallback
-* ⚠️ Narrative synthesis with Anthropic / OpenAI-compatible / GitHub Models (tested with mocks)
+* ⚠️ Narrative synthesis with Anthropic / OpenAI-compatible (tested with mocks); the GitHub Models provider is retired by GitHub (30 July 2026)
 * ❌ Separate Blue/Red/Judge/Oracle-as-agent roles, fix generation, adversarial review, sandboxed test execution
 
 ## Change-risk scoring (Oracle)
@@ -101,7 +101,7 @@ Caveat: the Confluence flow is tested against an in-repo fake server (`python -m
 ## Integrations
 * ⚠️ Jira Cloud (email + API token) and Data Center (PAT): read issues/JQL, investigate tickets, publish an approved RCA comment (ADF); SSRF-guarded
 * ⚠️ Jira field updates / transitions ❌
-* ⚠️ GitHub OAuth device-flow sign-in (own OAuth App) and GitHub Models provider
+* ⚠️ GitHub OAuth device-flow sign-in (own OAuth App) (GitHub Models, which it used to unlock, was retired by GitHub on 30 July 2026)
 * ✅ Anthropic by API key (Claude subscription sign-in is not available to third-party apps); ❌ Copilot (no public API)
 
 ## Usage, cost and memory
