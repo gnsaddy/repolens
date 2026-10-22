@@ -90,7 +90,11 @@ describe("Settings: integrations", () => {
     expect(within(screen.getByRole("dialog")).getByLabelText("Confluence base URL")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     await userEvent.click(screen.getByRole("button", { name: "Connect Bitbucket" }));
-    expect(within(screen.getByRole("dialog")).getByLabelText("Bitbucket token")).toHaveAttribute("type", "password");
+    const bb = within(screen.getByRole("dialog"));
+    expect(bb.getByLabelText("Bitbucket token")).toHaveAttribute("type", "password");
+    expect(bb.getByLabelText("Bitbucket username")).toBeInTheDocument(); // an Atlassian API token needs the email
+    await userEvent.selectOptions(bb.getByLabelText("Bitbucket credential type"), "access");
+    expect(bb.queryByLabelText("Bitbucket username")).toBeNull(); // access tokens have no username
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     await userEvent.click(screen.getByRole("button", { name: "Connect GitHub" }));
     expect(within(screen.getByRole("dialog")).getByLabelText(/Personal access token/)).toBeInTheDocument();
@@ -117,9 +121,22 @@ describe("Settings: integrations", () => {
   it("keeps the language model and search quality on their own tab", async () => {
     setup(none, "admin", "/settings?tab=ai");
     expect(await screen.findByText("Language model")).toBeInTheDocument();
-    expect(screen.getByText("Search quality")).toBeInTheDocument();
+    expect(await screen.findByText("Search quality")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Connected" })).toBeNull();
     await userEvent.click(screen.getByRole("tab", { name: /Integrations/ }));
     expect(await screen.findByRole("heading", { name: "Connected" })).toBeInTheDocument();
+  });
+});
+
+describe("Bitbucket credential types", () => {
+  it("sends the email with an Atlassian API token and nothing as a username for an access token", async () => {
+    const calls = setup(none);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Bitbucket" }));
+    const d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText("Bitbucket username"), "me@example.com");
+    await userEvent.type(d.getByLabelText("Bitbucket token"), "ATATT3xFfGF0abc123");
+    await userEvent.click(d.getByRole("button", { name: "Save connection" }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/bitbucket/connection") && c.method === "PUT")).toBe(true));
+    expect(calls.find((c) => c.method === "PUT")!.body).toEqual({ deployment: "cloud", base_url: "", username: "me@example.com", token: "ATATT3xFfGF0abc123" });
   });
 });

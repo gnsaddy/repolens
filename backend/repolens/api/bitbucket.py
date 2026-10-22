@@ -60,6 +60,13 @@ def put_connection(
 ):
     authorize(db, p, "github.configure", f"bitbucket-{body.deployment}")
     base = ""
+    token = body.token.strip()
+    if body.deployment == "cloud" and not body.username.strip() and token.startswith("ATATT"):
+        # Atlassian API tokens only work with Basic auth (email + token); sent alone as a Bearer token they are refused
+        raise HTTPException(
+            400,
+            "That is an Atlassian API token. Enter your Atlassian email as the username (API tokens are used with your email).",
+        )
     if body.deployment == "server":
         try:
             base = validate_base_url(body.base_url)

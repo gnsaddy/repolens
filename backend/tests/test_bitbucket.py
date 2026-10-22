@@ -324,3 +324,28 @@ def test_cloud_test_button_tolerates_tokens_without_the_profile_scope_and_explai
     monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(401)))
     msg = client.post("/api/bitbucket/test", headers=auth).json()
     assert msg["ok"] is False and "Atlassian email" in msg["error"] and "app-password" not in msg["error"]
+
+
+def test_atlassian_api_tokens_need_the_email_and_clone_with_their_own_git_user(client, auth, bb, session):
+    r = client.put(
+        "/api/bitbucket/connection",
+        headers=auth,
+        json={"deployment": "cloud", "username": "", "token": "ATATT3xFfGF0abc123"},
+    )
+    assert r.status_code == 400 and "Atlassian email" in r.json()["detail"]
+    ok = client.put(
+        "/api/bitbucket/connection",
+        headers=auth,
+        json={"deployment": "cloud", "username": "me@example.com", "token": "ATATT3xFfGF0abc123"},
+    )
+    assert ok.status_code == 200
+    client.post("/api/bitbucket/test", headers=auth)
+    assert (
+        bb["calls"][-1][1] == "Basic " + base64.b64encode(b"me@example.com:ATATT3xFfGF0abc123").decode()
+    )  # REST: email + token
+    org = session.query(Organization).first().id
+    git = indexer.clone_auth_for(session, org, "https://bitbucket.org/acme/orders.git")
+    assert git == "Authorization: Basic " + base64.b64encode(b"x-bitbucket-api-token-auth:ATATT3xFfGF0abc123").decode()
+    assert (
+        clone_header("cloud", "tok", "ana") == "Authorization: Basic " + base64.b64encode(b"ana:tok").decode()
+    )  # app passwords keep their user

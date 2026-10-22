@@ -241,5 +241,6 @@ def clone_header(deployment: str, token: str, username: str = "") -> str:
     """git http.extraHeader value: Basic for Cloud (app password, or x-token-auth for access tokens), Bearer for Server."""
     if deployment == "server":
         return f"Authorization: Bearer {token}"
-    user = username or "x-token-auth"
+    # Git over https: access tokens use x-token-auth, Atlassian API tokens (used with an email on the REST API) use their own user
+    user = "x-bitbucket-api-token-auth" if "@" in username else (username or "x-token-auth")
     return "Authorization: Basic " + base64.b64encode(f"{user}:{token}".encode()).decode()
