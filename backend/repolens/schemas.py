@@ -187,6 +187,13 @@ class KnowledgeQuery(BaseModel):
     kinds: list[str] = Field(default_factory=list)
 
 
+class LLMCheckIn(BaseModel):
+    provider: str = Field(pattern="^(anthropic|openai|gemini)$")
+    api_key: str = Field(default="", max_length=500)  # blank = use the stored key of the same provider
+    base_url: str = Field(default="", max_length=500)
+    model: str = Field(default="", max_length=100, pattern=r"^[\w.:/\-]*$")  # blank = just list the models
+
+
 class LLMSettingIn(BaseModel):
     provider: str = Field(pattern="^(heuristic|anthropic|openai|github-models|gemini)$")
     model: str = Field(default="", max_length=100, pattern=r"^[\w.:/\-]*$")

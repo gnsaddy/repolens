@@ -1,52 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Plug, SearchCheck, ShieldCheck, Brain } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Brain, Plug, SearchCheck, ShieldCheck } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { ConnectionCard, StatusPill, TINTS, selectCls } from "@/components/ConnectionCard";
-import { useConfirm } from "@/components/feedback";
+import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
-import { Badge, Button, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
-import { api, type LLMSettings, type ModelInfo, type ModelList, type RetrievalStatus } from "@/lib/api";
+import LanguageModelCard from "@/components/LanguageModelCard";
+import { Badge, PageHeader } from "@/components/ui";
+import { api, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-
-const PROVIDERS = [
-  ["heuristic", "Offline (no model calls)"],
-  ["anthropic", "Anthropic Claude"],
-  ["gemini", "Google Gemini"],
-  ["openai", "OpenAI-compatible (OpenAI, Azure, vLLM, Ollama…)"],
-  ["github-models", "GitHub Models (retired 30 July 2026)"],
-] as const;
 
 const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain]] as const;
 
 export default function SettingsPage() {
-  const ask = useConfirm();
   const { user } = useAuth();
   const admin = user?.role === "admin";
-  const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["llm-settings"], queryFn: () => api<LLMSettings>("/settings/llm") });
-  const [f, setF] = useState({ provider: "heuristic", model: "", base_url: "", api_key: "", input_price: "", output_price: "" });
-  useEffect(() => {
-    if (data) setF({ provider: data.provider, model: data.model, base_url: data.base_url, api_key: "", input_price: data.input_price?.toString() ?? "", output_price: data.output_price?.toString() ?? "" });
-  }, [data]);
-
-  const body = () => ({ provider: f.provider, model: f.model, base_url: f.base_url, api_key: f.api_key,
-    input_price: f.input_price === "" ? null : Number(f.input_price), output_price: f.output_price === "" ? null : Number(f.output_price) });
-  const save = useMutation({ mutationFn: () => api<LLMSettings>("/settings/llm", { method: "PUT", json: body() }),
-    onSuccess: (d) => { qc.setQueryData(["llm-settings"], d); setF((x) => ({ ...x, api_key: "" })); test.reset(); } });
-  const reset = useMutation({ mutationFn: () => api<LLMSettings>("/settings/llm", { method: "DELETE" }), onSuccess: (d) => qc.setQueryData(["llm-settings"], d) });
-  const models = useMutation({ mutationFn: () => api<ModelList>("/settings/llm/models") });
-  const [modelFilter, setModelFilter] = useState("");
-  const test = useMutation({
-    mutationFn: () => api<{ ok: boolean; error?: string; model?: string; latency_ms?: number; input_tokens?: number }>("/settings/llm/test", { method: "POST" }),
-    onSettled: () => { setModelFilter(""); if (["gemini", "anthropic", "openai"].includes(data?.provider ?? "")) models.mutate(); }, // show what the key can use, whether or not the chosen model worked
-  });
-  const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
-  const catalog = useQuery({ queryKey: ["gh-models"], enabled: admin && f.provider === "github-models" && !!data?.has_key, retry: false,
-    queryFn: () => api<ModelInfo[]>("/settings/llm/github-models/catalog") });
-  const presets = f.provider === "github-models" && catalog.data?.length ? catalog.data.map((m) => m.id) : (data?.presets[f.provider] ?? []);
-  const online = f.provider !== "heuristic";
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("tab") === "ai" ? "ai" : "integrations";
 
@@ -61,55 +28,7 @@ export default function SettingsPage() {
       <div className="max-w-4xl">
         {tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
           <div className="space-y-4">
-            <ConnectionCard icon={KeyRound} tint="violet" title="Language model"
-              status={data ? <div className="flex items-center gap-1.5"><StatusPill on={!data.offline} onLabel="AI enabled" offLabel="offline mode" /><Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></div> : undefined}
-              description="Choose a provider and paste a key. It is encrypted at rest and never shown again.">
-              <form onSubmit={submit} className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block"><Label>Provider</Label>
-                    <select disabled={!admin} className={selectCls} value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: PROVIDERS.some(([p]) => p === e.target.value) ? (data?.presets[e.target.value]?.[0] ?? "") : "" })}>
-                      {PROVIDERS.filter(([v]) => v !== "github-models" || data?.provider === "github-models").map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-                  {online && <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : f.provider === "gemini" ? "gemini-2.5-flash" : "claude-sonnet-5-5"} />
-                    <datalist id="model-presets">{presets.map((m) => <option key={m} value={m} />)}</datalist></label>}
-                </div>
-                {f.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">GitHub retired GitHub Models on 30 July 2026, so its API no longer answers for anyone, whatever token you use. Pick another provider: Anthropic, an OpenAI-compatible service (Ollama, Gemini, Groq, OpenRouter, Azure AI Foundry) or offline mode. Your GitHub token still works for pull requests and private repositories.</p>}
-                {online && (<>
-                  {f.provider === "openai" && <label className="block"><Label>Base URL</Label><Input disabled={!admin} value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://api.openai.com/v1" /></label>}
-                  <label className="block"><Label>{f.provider === "github-models" ? "GitHub token (optional)" : "API key"} {data?.has_key && <span className="text-emerald-700">({data.uses_github_token ? "using your connected GitHub account" : "stored — leave blank to keep"})</span>}</Label>
-                    <Input disabled={!admin} type="password" autoComplete="off" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={data?.has_key ? "••••••••••••" : "Paste your API key"} />
-                    <span className="mt-1 block text-xs text-muted">{f.provider === "github-models" ? "Leave blank to use the GitHub connection below. Press “Test connection” to confirm the account can call GitHub Models." : f.provider === "gemini" ? "Create a key at aistudio.google.com/apikey. It has a free tier with rate limits, and Google may use free-tier requests to improve its products, so avoid it for private code. The key is sent only to Google and stored encrypted." : f.provider === "anthropic" ? "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console." : "Encrypted at rest. Never shown again and never sent to the browser."}</span></label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block"><Label>Input price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.input_price} onChange={(e) => setF({ ...f, input_price: e.target.value })} /></label>
-                    <label className="block"><Label>Output price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.output_price} onChange={(e) => setF({ ...f, output_price: e.target.value })} /></label>
-                  </div>
-                  <p className="text-xs text-muted">Prices drive the cost figures on the Token Usage page. Leave empty to report $0 (unpriced).</p>
-                </>)}
-                <ErrorNote error={save.error ?? reset.error} />
-                {admin ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button disabled={save.isPending}>Save</Button>
-                    <Button type="button" variant="outline" disabled={test.isPending || !data || data.offline} onClick={() => test.mutate()}>Test connection</Button>
-                    {data?.source === "org" && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove the stored key?", message: "The organisation reverts to the server defaults.", confirmLabel: "Remove key", danger: true })) reset.mutate(); }}>Reset</Button>}
-                  </div>) : <p className="text-sm text-muted">Only workspace admins can change these settings.</p>}
-                {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
-                {models.isPending && <p className="text-sm text-muted">Loading the models your key can use…</p>}
-                {models.error && <p role="alert" className="text-sm text-red-600">Could not list models: {(models.error as Error).message}</p>}
-                {models.data && (
-                  <div aria-label="Available models" className="rounded-xl border border-line bg-slate-50/60 p-3">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">{models.data.models.length} models available</span>
-                      {!models.data.current_found && <Badge tone="amber">“{models.data.current}” is not on this list</Badge>}
-                      <Input aria-label="Filter models" placeholder="Filter…" className="ml-auto h-8 w-40" value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} />
-                    </div>
-                    <ul className="flex max-h-44 flex-wrap gap-1.5 overflow-auto">
-                      {models.data.models.filter((m) => `${m.id} ${m.name}`.toLowerCase().includes(modelFilter.toLowerCase())).map((m) => (
-                        <li key={m.id}><button type="button" title={m.name || m.id} onClick={() => setF({ ...f, model: m.id })} aria-pressed={f.model === m.id}
-                          className={cn("rounded-full border px-2.5 py-1 text-xs", f.model === m.id ? "border-brand bg-indigo-50 font-medium text-brand" : "border-line bg-white hover:border-brand")}>{m.id}</button></li>))}
-                    </ul>
-                    <p className="mt-2 text-xs text-muted">Click a model to use it, then press Save and Test connection again.</p>
-                  </div>)}
-              </form>
-            </ConnectionCard>
+            <LanguageModelCard admin={admin} />
             <RetrievalCard />
           </div>)}
       </div>

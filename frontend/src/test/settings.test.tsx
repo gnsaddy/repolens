@@ -10,58 +10,139 @@ import SettingsPage from "@/pages/SettingsPage";
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
 const base = { provider: "heuristic", model: "claude-sonnet-5-5", base_url: "", has_key: false, source: "env", input_price: null, output_price: null, offline: true, presets: { anthropic: ["claude-sonnet-5-5", "claude-haiku-5-5"], openai: [], gemini: ["gemini-2.5-flash", "gemini-2.5-pro"] }, embedding_provider: "hash" };
 
-function setup(role: string, onPut?: (b: unknown) => void) {
-  localStorage.setItem("repolens.token", "tok");
-  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-    const u = String(input);
-    if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role, org_id: "o" });
-    if (u.endsWith("/settings/llm") && init?.method === "PUT") { const b = JSON.parse(init.body as string); onPut?.(b); return json({ ...base, provider: b.provider, model: b.model, has_key: true, source: "org", offline: false }); }
-    if (u.endsWith("/settings/llm")) return json(base);
-    return json({}, 404);
-  });
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><AuthProvider><MemoryRouter initialEntries={["/settings?tab=ai"]}><SettingsPage /></MemoryRouter></AuthProvider></QueryClientProvider>);
-}
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
-describe("SettingsPage", () => {
-  it("offers Google Gemini with its model suggestions and key guidance, and sends the key only on save", async () => {
-    let sent: Record<string, unknown> | undefined;
-    setup("admin", (b) => { sent = b as Record<string, unknown>; });
-    await screen.findByText("offline mode");
-    await userEvent.selectOptions(screen.getByLabelText("Provider"), "gemini");
-    expect(screen.getByLabelText(/^Model/)).toHaveValue("gemini-2.5-flash");
-    expect(screen.getByText(/aistudio.google.com\/apikey/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Base URL")).toBeNull(); // the Google endpoint is fixed
-    await userEvent.type(screen.getByLabelText(/API key/), "AIzaSyTestKey0123");
-    await userEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
-    await waitFor(() => expect(sent).toMatchObject({ provider: "gemini", model: "gemini-2.5-flash", api_key: "AIzaSyTestKey0123" }));
+interface Flow { llm: Record<string, unknown>; calls: { url: string; method?: string; body?: Record<string, unknown> }[] }
+function llmSetup(role = "admin", llm: Record<string, unknown> = base, checks: (body: Record<string, unknown>) => unknown = () => ({ ok: false, error: "unexpected" })): Flow {
+  localStorage.setItem("repolens.token", "tok");
+  const flow: Flow = { llm: { ...llm }, calls: [] };
+  vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    const u = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    if (init?.method && init.method !== "GET") flow.calls.push({ url: u, method: init.method, body });
+    if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role, org_id: "o" });
+    if (u.endsWith("/settings/llm") && init?.method === "PUT") { flow.llm = { ...base, ...body, has_key: true, source: "org", offline: false }; return json(flow.llm); }
+    if (u.endsWith("/settings/llm") && init?.method === "DELETE") { flow.llm = { ...base }; return json(flow.llm); }
+    if (u.endsWith("/settings/llm")) return json(flow.llm);
+    if (u.endsWith("/settings/llm/check")) return json(checks(body));
+    if (u.endsWith("/settings/llm/test")) return json({ ok: true, model: flow.llm.model, latency_ms: 812, input_tokens: 10 });
+    if (u.endsWith("/settings/retrieval")) return json({ embedding: { provider: "hash", model: "x", dimensions: 1, offline: true }, rerank: { provider: "lexical", model: "m", configured: true, depth: 30 } });
+    return json({}, 404);
+  });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={["/settings?tab=ai"]}><SettingsPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
+  return flow;
+}
+const MODELS = [{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" }, { id: "gemini-3.5-flash-lite", name: "" }];
+const geminiChecks = (b: Record<string, unknown>) => (b.model ? (b.model === "gemini-2.5-pro" ? { ok: false, error: "That model is not available to this key" } : { ok: true, model: b.model, latency_ms: 640, input_tokens: 9 }) : { ok: true, models: MODELS });
+
+describe("Language model", () => {
+  it("starts offline with a Connect button and no model selection", async () => {
+    llmSetup();
+    expect(await screen.findByText("Not connected: answers and reports use the built-in rules.")).toBeInTheDocument();
+    expect(screen.getByText("Offline")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Model/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Connect a language model" }));
+    const d = within(screen.getByRole("dialog"));
+    expect(d.getByLabelText("Provider")).toHaveValue("gemini");
+    expect(d.queryByLabelText("Model name")).toBeNull(); // models only appear after the key is tested
+    expect(d.queryByLabelText("Available models")).toBeNull();
+    expect(d.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(d.getByRole("button", { name: "Test connection" })).toBeDisabled(); // no key yet
   });
 
-  it("lets an admin pick a provider, paste a key and save; the key field is cleared afterwards", async () => {
-    let sent: Record<string, unknown> | undefined;
-    setup("admin", (b) => { sent = b as Record<string, unknown>; });
-    await screen.findByText("offline mode");
-    await userEvent.selectOptions(screen.getByLabelText("Provider"), "anthropic");
-    expect(screen.getByLabelText(/^Model/)).toHaveValue("claude-sonnet-5-5"); // preset filled in
-    const key = screen.getByLabelText(/API key/);
-    expect(key).toHaveAttribute("type", "password");
-    await userEvent.type(key, "sk-ant-secret-123456");
-    await userEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
-    await waitFor(() => expect(sent).toMatchObject({ provider: "anthropic", model: "claude-sonnet-5-5", api_key: "sk-ant-secret-123456" }));
-    expect(await screen.findByText("AI enabled")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText(/API key/)).toHaveValue(""));
-    expect(screen.getByText(/stored — leave blank to keep/)).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("sk-ant-secret-123456");
+  it("test key -> pick a model -> test it -> save; nothing is saved before the last step, and the key never comes back", async () => {
+    const flow = llmSetup("admin", base, geminiChecks);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect a language model" }));
+    const d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText(/API key/), "AIzaSecretKey0123456789");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Key accepted. 3 models available.")).toBeInTheDocument();
+    const list = within(await d.findByLabelText("Available models"));
+    await userEvent.type(list.getByLabelText("Filter models"), "flash");
+    expect(list.queryByRole("button", { name: "gemini-2.5-pro" })).toBeNull();
+    // a model that fails its test keeps Save disabled and explains why
+    await userEvent.clear(list.getByLabelText("Filter models"));
+    await userEvent.click(list.getByRole("button", { name: "gemini-2.5-pro" }));
+    await userEvent.click(d.getByRole("button", { name: "Test gemini-2.5-pro" }));
+    expect(await d.findByText("That model is not available to this key")).toBeInTheDocument();
+    expect(d.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.click(list.getByRole("button", { name: "gemini-3.5-flash-lite" }));
+    await userEvent.click(d.getByRole("button", { name: "Test gemini-3.5-flash-lite" }));
+    expect(await d.findByText(/Works — replied in 640 ms/)).toBeInTheDocument();
+    expect(flow.calls.some((c) => c.method === "PUT")).toBe(false); // still nothing saved
+    await userEvent.click(d.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(flow.calls.some((c) => c.method === "PUT")).toBe(true));
+    expect(flow.calls.find((c) => c.method === "PUT")!.body).toMatchObject({ provider: "gemini", model: "gemini-3.5-flash-lite", api_key: "AIzaSecretKey0123456789" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // the connected summary names the model in use
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    expect(screen.getByText("gemini-3.5-flash-lite")).toBeInTheDocument();
+    expect(screen.getByText("Google Gemini")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("AIzaSecretKey0123456789");
+  });
+
+  it("a rejected key shows the reason and never lists models", async () => {
+    llmSetup("admin", base, () => ({ ok: false, error: "Google rejected the key (400). Check it and its permissions." }));
+    await userEvent.click(await screen.findByRole("button", { name: "Connect a language model" }));
+    const d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText(/API key/), "bad-key-123456");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByRole("alert")).toHaveTextContent("rejected the key");
+    expect(d.queryByLabelText("Available models")).toBeNull();
+  });
+
+  it("editing the key or provider after a test sends you back to step one", async () => {
+    llmSetup("admin", base, geminiChecks);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect a language model" }));
+    const d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText(/API key/), "AIzaSecretKey0123456789");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    await d.findByLabelText("Available models");
+    await userEvent.type(d.getByLabelText(/API key/), "x");
+    expect(d.queryByLabelText("Available models")).toBeNull();
+  });
+
+  it("a service that cannot list models lets you type the model name", async () => {
+    llmSetup("admin", base, (b) => (b.model ? { ok: true, model: b.model, latency_ms: 300, input_tokens: 5 } : { ok: true, models: [] }));
+    await userEvent.click(await screen.findByRole("button", { name: "Connect a language model" }));
+    const d = within(screen.getByRole("dialog"));
+    await userEvent.selectOptions(d.getByLabelText("Provider"), "openai");
+    await userEvent.type(d.getByLabelText("Base URL"), "https://llm.example.com/v1");
+    await userEvent.type(d.getByLabelText(/API key/), "sk-test-0123456789");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    await userEvent.type(await d.findByLabelText("Model name"), "my-model");
+    await userEvent.click(d.getByRole("button", { name: "Test my-model" }));
+    expect(await d.findByText(/Works/)).toBeInTheDocument();
+    expect(d.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("when connected: shows provider, model in use and key source; Test, Change model and Disconnect work", async () => {
+    const flow = llmSetup("admin", { ...base, provider: "gemini", model: "gemini-2.5-flash", has_key: true, source: "org", offline: false }, geminiChecks);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    expect(screen.getByText("gemini-2.5-flash")).toBeInTheDocument();
+    expect(screen.getByText("workspace setting")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(await screen.findByText("Replied in 812 ms (10 input tokens)")).toBeInTheDocument();
+    // changing the model re-uses the stored key: no need to paste it again
+    await userEvent.click(screen.getByRole("button", { name: "Change model" }));
+    const d = within(screen.getByRole("dialog"));
+    expect(d.getByText(/stored — leave blank to keep/)).toBeInTheDocument();
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    await userEvent.click(await d.findByRole("button", { name: "gemini-2.5-flash" }));
+    await userEvent.click(d.getByRole("button", { name: "Test gemini-2.5-flash" }));
+    await d.findByText(/Works/);
+    await userEvent.click(d.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(flow.calls.some((c) => c.method === "PUT" && c.body?.api_key === "")).toBe(true)); // a blank key means "keep the stored one"
+    await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText("Offline")).toBeInTheDocument();
   });
 
   it("is read-only for non-admins", async () => {
-    setup("member");
-    await screen.findByText("offline mode");
-    expect(screen.getByLabelText("Provider")).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
-    expect(screen.getByText(/Only workspace admins/)).toBeInTheDocument();
+    llmSetup("member");
+    expect(await screen.findByText(/Only workspace admins can connect a language model/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Connect a language model|Change model|Disconnect/ })).toBeNull();
   });
 });
 
@@ -135,29 +216,3 @@ describe("GitHub connect", () => {
   });
 });
 
-describe("Model list after Test connection", () => {
-  it("shows the models the key can use when the chosen model fails, flags the missing one, filters, and picks one", async () => {
-    localStorage.setItem("repolens.token", "tok");
-    let listed = 0;
-    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
-      const u = String(input);
-      if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role: "admin", org_id: "o" });
-      if (u.endsWith("/settings/llm")) return json({ ...base, provider: "gemini", model: "gemini-9-ultra", has_key: true, source: "org", offline: false, presets: { anthropic: [], openai: [], gemini: [] } });
-      if (u.endsWith("/settings/llm/test")) return json({ ok: false, error: "generativelanguage.googleapis.com says the model 'gemini-9-ultra' was not found (404). Use Test connection and pick a model from the list it shows." });
-      if (u.endsWith("/settings/llm/models")) { listed++; return json({ provider: "gemini", current: "gemini-9-ultra", current_found: false, models: [{ id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" }, { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" }, { id: "gemini-lite", name: "" }] }); }
-      return json({}, 404);
-    });
-    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={["/settings?tab=ai"]}><SettingsPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
-    await screen.findByText("AI enabled");
-    expect(listed).toBe(0); // nothing is listed until the connection is tested
-    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
-    expect(await screen.findByText(/was not found \(404\)/)).toBeInTheDocument();
-    const panel = await screen.findByLabelText("Available models");
-    expect(within(panel).getByText("3 models available")).toBeInTheDocument();
-    expect(within(panel).getByText(/“gemini-9-ultra” is not on this list/)).toBeInTheDocument();
-    await userEvent.type(within(panel).getByLabelText("Filter models"), "pro");
-    expect(within(panel).queryByRole("button", { name: "gemini-2.5-flash" })).toBeNull();
-    await userEvent.click(within(panel).getByRole("button", { name: "gemini-2.5-pro" }));
-    expect(screen.getByLabelText(/^Model/)).toHaveValue("gemini-2.5-pro"); // picking fills the Model field
-  });
-});

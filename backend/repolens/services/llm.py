@@ -144,6 +144,14 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
     )
 
 
+def ping(cfg: LLMConfig) -> dict:
+    """One tiny chat call with an explicit config (used to try credentials before they are saved)."""
+    started = time.time()
+    call = _anthropic_call if cfg.provider == "anthropic" else _openai_call
+    res = call("Reply with the single word OK.", "ping", 16, cfg)
+    return {"model": cfg.model, "latency_ms": int((time.time() - started) * 1000), "input_tokens": res.input_tokens}
+
+
 def _error_text(r: httpx.Response) -> str:
     """The provider's own error message (never the key), shortened."""
     try:

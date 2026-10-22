@@ -9,10 +9,20 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import LLMSetting
-from ..schemas import LLMSettingIn
+from ..schemas import LLMCheckIn, LLMSettingIn
 from ..security import encrypt_secret, redact_secrets
 from ..services.jira import JiraError, validate_base_url
-from ..services.llm import CHAT_PROVIDERS, LLMClient, LLMUnavailable, github_token, list_models, resolve_config
+from ..services.llm import (
+    CHAT_PROVIDERS,
+    GEMINI_URL,
+    LLMClient,
+    LLMConfig,
+    LLMUnavailable,
+    github_token,
+    list_models,
+    ping,
+    resolve_config,
+)
 from ..services.policy import authorize
 from ..services.usage import BudgetExceeded
 
@@ -127,6 +137,33 @@ def _scrub(text: str, key: str) -> str:
     """Remove secrets by pattern, and the exact key whatever it looks like, from text a provider echoed back."""
     out = redact_secrets(text)
     return out.replace(key, "[REDACTED]") if len(key) >= 8 else out
+
+
+@router.post("/llm/check")
+def check_llm(body: LLMCheckIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Try a provider and key before saving anything. Without a model it lists the models the key can use;
+    with a model it sends one tiny test message."""
+    authorize(db, p, "llm.test", f"check-{body.provider}")
+    stored = resolve_config(db, p.org_id)
+    key = body.api_key.strip() or (stored.api_key if stored.provider == body.provider else "")
+    if not key:
+        return {"ok": False, "error": "Paste an API key first"}
+    base = {"gemini": GEMINI_URL, "anthropic": "", "openai": body.base_url.strip() or "https://api.openai.com/v1"}[
+        body.provider
+    ]
+    if body.provider == "openai":
+        try:
+            validate_base_url(base)
+        except JiraError as e:
+            return {"ok": False, "error": str(e).replace("Jira URL", "Base URL")}
+    cfg = LLMConfig(body.provider, body.model, base, key, "org")
+    try:
+        if body.model:
+            return {"ok": True, **ping(cfg)}
+        return {"ok": True, "models": list_models(cfg)}
+    except Exception as e:  # provider errors must never leak the key
+        text = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {e}"
+        return {"ok": False, "error": _scrub(text, key)[:300]}
 
 
 @router.get("/llm/models")
