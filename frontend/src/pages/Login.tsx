@@ -34,7 +34,16 @@ export default function Login() {
     } catch (x) { setErr(x); } finally { setBusy(false); }
   }
   return (
-    <div className="grid min-h-screen place-items-center bg-sidebar p-4">
+    <div className="grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <aside className="hidden flex-col justify-center gap-6 p-14 text-slate-300 lg:flex" aria-label="About RepoLens AI">
+        <div className="flex items-center gap-2 text-white"><Activity className="h-6 w-6 text-indigo-400" /><span className="text-xl font-semibold">RepoLens AI</span></div>
+        <h2 className="max-w-md text-3xl font-semibold leading-tight text-white">Answers from your docs, pull requests and code, with the cost kept low.</h2>
+        <ul className="max-w-md space-y-3 text-sm">
+          {[["DeepMind Wiki", "One connected knowledge base over READMEs, Confluence and your code."], ["Root-cause investigations", "From a Jira ticket or CI failure to a cited, reviewable report."], ["Fewer tokens", "Cheap models for easy work, shared context and remembered answers."]].map(([t, d]) => (
+            <li key={t}><b className="text-white">{t}.</b> {d}</li>))}
+        </ul>
+      </aside>
+      <div className="grid place-items-center p-4">
       <Card className="w-full max-w-sm">
         <div className="mb-5 flex items-center gap-2"><Activity className="h-5 w-5 text-brand" /><span className="font-semibold">RepoLens AI</span></div>
         <h1 className="mb-4 text-lg font-semibold">{mode === "login" ? "Sign in" : "Create your workspace"}</h1>
@@ -54,6 +63,7 @@ export default function Login() {
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}
         </button>
       </Card>
+      </div>
     </div>
   );
 }

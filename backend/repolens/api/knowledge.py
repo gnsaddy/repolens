@@ -277,6 +277,15 @@ def graph_node(
     }
 
 
+@router.get("/graph/nodes/{node_id}/brief")
+def graph_brief(node_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """What to know before touching this symbol: callers, dependencies, docs, history and warnings."""
+    n = _node(db, p, node_id)
+    names = _names(db, p)
+    conns = kb._connections(db, p.org_id, n, names, limit=60, scope=scope_for(db, p))
+    return g.brief(n, conns, names.get(n.repo_id, ""))
+
+
 _FIX_RE = re.compile(r"\b(fix(es|ed)?|bug|hotfix|revert|regression|crash|patch)\b", re.I)
 HEAT_LABELS = {
     "churn": "Lines changed recently",

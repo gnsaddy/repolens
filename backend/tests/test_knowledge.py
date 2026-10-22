@@ -320,3 +320,15 @@ def test_extractive_answer_strips_markdown_links():
     from repolens.services.knowledge import _first_sentences
 
     assert _first_sentences("See [the guide](../a.md#x) for details. Next.") == "See the guide for details. Next."
+
+
+def test_node_brief_reads_like_a_senior_engineers_notes(client, auth, indexed):
+    nodes = client.get("/api/graph/nodes", headers=auth, params={"q": "get_profile", "type": "function"}).json()
+    gp = next(n for n in nodes if n["qualname"] == "UserProfileService.get_profile")
+    b = client.get(f"/api/graph/nodes/{gp['id']}/brief", headers=auth).json()
+    assert b["summary"].startswith("Function UserProfileService.get_profile in src/user_profile.py")
+    assert any(c["name"] == "handle_profile_request" for c in b["callers"]) and b["callers_total"] >= 1
+    assert any(d["name"] == "find_by_id" or "find_by_id" in (d["qualname"] or "") for d in b["dependencies"])
+    assert b["documented_in"] and b["cross_repo"] is False
+    other = register(client, "y@other.io", "Other")
+    assert client.get(f"/api/graph/nodes/{gp['id']}/brief", headers=other).status_code == 404

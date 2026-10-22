@@ -667,3 +667,51 @@ def find_path(
         cur = p
     path.append((src, None))
     return list(reversed(path))
+
+
+def brief(node: KGNode, conns: list[dict], repo_name: str = "") -> dict:
+    """A senior engineer's read of one node: how it is used, what it depends on, where it is documented, risk."""
+
+    def pick(rel: str, direction: str, types: tuple[str, ...] | None = None) -> list[dict]:
+        return [
+            c["node"]
+            for c in conns
+            if c["rel"] == rel and c["direction"] == direction and (types is None or c["node"]["type"] in types)
+        ]
+
+    callers = pick("CALLS", "in")
+    calls = pick("CALLS", "out")
+    docs = [c["node"] for c in conns if c["node"]["type"] in ("doc", "section")]
+    history = [c["node"] for c in conns if c["node"]["type"] in ("pr", "commit")]
+    repos = {x["repo"] for x in callers if x.get("repo")}
+    cross = sorted(repos - {repo_name}) if repos else []
+    short = lambda xs: [{k: x.get(k) for k in ("id", "name", "qualname", "type", "path", "repo")} for x in xs[:6]]  # noqa: E731
+    public = not node.name.startswith("_")
+    notes: list[str] = []
+    if len(callers) >= 5:
+        notes.append(f"Widely used: {len(callers)}+ callers, so a change here has a wide blast radius.")
+    if cross:
+        notes.append("Called from other repositories: coordinate changes with their owners.")
+    if public and node.type in ("function", "method", "class") and not docs:
+        notes.append("Public and not described in any document.")
+    if node.type in ("function", "method", "class") and not callers:
+        notes.append("Nothing calls it in the indexed code: it may be an entry point, or dead code.")
+    if history:
+        notes.append(f"Touched by {len(history)} recent pull request(s) or commit(s): read them before changing it.")
+    kind = {"function": "Function", "method": "Method", "class": "Class", "file": "File", "doc": "Document"}.get(
+        node.type, node.type.title()
+    )
+    where = f"{node.path}:{node.start_line}" if node.path and node.start_line else node.path
+    return {
+        "summary": f"{kind} {node.qualname or node.name} in {where}."
+        + (f" Called by {len(callers)} place(s)" if callers else "")
+        + (f" and depends on {len(calls)} other symbol(s)." if callers and calls else "." if callers else "")
+        + (f" Described in {len(docs)} document section(s)." if docs else ""),
+        "callers": short(callers),
+        "dependencies": short(calls),
+        "documented_in": short(docs),
+        "history": short(history),
+        "callers_total": len(callers),
+        "cross_repo": bool(cross),
+        "notes": notes,
+    }

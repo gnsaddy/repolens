@@ -110,6 +110,7 @@ describe("Knowledge page", () => {
       if (u.endsWith("/repositories")) return json([]);
       if (u.includes("/graph/stats")) return json({ nodes: { function: 1, section: 1, file: 1 }, edges: [{ rel: "MENTIONS", provenance: "doc_mention", count: 1 }], total_nodes: 3, total_edges: 2 });
       if (u.includes("/graph/overview")) return json({ nodes, edges: [edge("e1", "n2", "n1", "MENTIONS"), edge("e2", "n1", "n3")] });
+      if (u.includes("/graph/nodes/n1/brief")) return json({ summary: "Function get_profile in src/user_profile.py:9. Called by 2 place(s).", callers: [{ id: "c1", name: "handle", qualname: "handle_profile_request", type: "function", path: "src/api.py", repo: "svc" }], dependencies: [], documented_in: [], history: [], callers_total: 2, cross_repo: false, notes: ["Public and not described in any document."] });
       if (u.includes("/graph/nodes/n1")) return json({ node: nodes[0], content: "def get_profile(): pass", nodes, edges: [], connections: [{ rel: "MENTIONS", direction: "in", label: "mentioned in", provenance: "doc_mention", weight: 0.9, evidence: "", node: nodes[1] }] });
       return json({}, 404);
     });
@@ -119,6 +120,10 @@ describe("Knowledge page", () => {
     await userEvent.click(n);
     expect(await screen.findByText("mentioned in")).toBeInTheDocument();
     expect(screen.getByText("Connections (1)")).toBeInTheDocument();
+    const brief = await screen.findByLabelText("Before you change this");
+    expect(brief).toHaveTextContent("Called by 2 place(s)");
+    expect(brief).toHaveTextContent("Public and not described in any document.");
+    expect(brief).toHaveTextContent("Used by: handle_profile_request");
   });
 
   it("uploads selected files to the collection", async () => {

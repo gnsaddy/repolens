@@ -6,7 +6,7 @@ import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
 import SimilarAnswers from "@/components/SimilarAnswers";
-import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeDetail, type Repo } from "@/lib/api";
+import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +125,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
   const typesKey = types.join();
   const stats = useQuery({ queryKey: ["graph-stats", repoId], queryFn: () => api<GraphStats>(`/graph/stats${repoId ? `?repo_id=${repoId}` : ""}`) });
   const overview = useQuery({ queryKey: ["graph-overview", repoId, typesKey], queryFn: () => api<GraphData>(`/graph/overview?types=${types.join(",")}&limit=120${repoId ? `&repo_id=${repoId}` : ""}`) });
+  const brief = useQuery({ queryKey: ["graph-brief", selected], enabled: !!selected, retry: false, queryFn: () => api<NodeBrief>(`/graph/nodes/${selected}/brief`) });
   const detail = useQuery({ queryKey: ["graph-node", selected], enabled: !!selected, queryFn: () => api<NodeDetail>(`/graph/nodes/${selected}?depth=1`) });
   const found = useQuery({ queryKey: ["graph-find", query], enabled: query.length > 1, queryFn: () => api<GraphNode[]>(`/graph/nodes?q=${encodeURIComponent(query)}&limit=8`) });
 
@@ -204,6 +205,14 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
           {!selected ? <Empty>Select a node to see what it connects to.</Empty> : !detail.data ? <Spinner /> : (<>
             <div className="mb-1 flex items-center gap-2"><Badge tone="gray">{detail.data.node.type}</Badge><span className="text-xs text-muted">{detail.data.node.repo}</span></div>
             <h3 className="break-words text-sm font-semibold">{detail.data.node.qualname || detail.data.node.name}</h3>
+            {brief.data?.summary && (
+              <div aria-label="Before you change this" className="mb-3 rounded-lg bg-indigo-50 p-2.5 text-xs">
+                <div className="mb-1 font-medium text-indigo-900">Before you change this</div>
+                <p className="text-indigo-900">{brief.data.summary}</p>
+                {!!brief.data.notes.length && <ul className="mt-1.5 space-y-1">{brief.data.notes.map((n) => <li key={n} className="text-amber-800">• {n}</li>)}</ul>}
+                {!!brief.data.callers.length && <p className="mt-1.5 text-indigo-900"><b>Used by:</b> {brief.data.callers.map((c) => c.qualname || c.name).join(", ")}{brief.data.callers_total > brief.data.callers.length ? "…" : ""}</p>}
+                {!!brief.data.dependencies.length && <p className="mt-1 text-indigo-900"><b>Depends on:</b> {brief.data.dependencies.map((c) => c.qualname || c.name).join(", ")}</p>}
+              </div>)}
             {detail.data.node.path && <div className="mb-2 text-xs text-muted">{detail.data.node.path}{detail.data.node.start_line ? `:${detail.data.node.start_line}–${detail.data.node.end_line}` : ""}</div>}
             <div className="mb-3 flex gap-2"><Button size="sm" variant="outline" onClick={expand}>Expand neighbours</Button>
               {pathTarget && <Badge tone="amber">path → {pathTarget.name}</Badge>}</div>

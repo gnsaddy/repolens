@@ -231,3 +231,6 @@ export interface MetricsOverview {
   memory: { enabled: boolean; entries: number; hits: number; tokens_saved: number; stored: number };
   team: { users: number; active_sessions: number; active_users_period: number };
 }
+
+export interface BriefRef { id: string; name: string; qualname: string; type: string; path: string; repo: string }
+export interface NodeBrief { summary: string; callers: BriefRef[]; dependencies: BriefRef[]; documented_in: BriefRef[]; history: BriefRef[]; callers_total: number; cross_repo: boolean; notes: string[] }
