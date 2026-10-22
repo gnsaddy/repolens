@@ -1,14 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, GitFork, KeyRound, Library, Plug, SearchCheck, ShieldCheck, Ticket } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { KeyRound, Plug, SearchCheck, ShieldCheck, Brain } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ConnectionCard, StatusPill, TINTS, selectCls } from "@/components/ConnectionCard";
-import BitbucketConnect from "@/components/connections/BitbucketConnect";
-import ConfluenceConnect from "@/components/connections/ConfluenceConnect";
-import JiraConnect from "@/components/connections/JiraConnect";
 import { useConfirm } from "@/components/feedback";
-import GithubConnect from "@/components/GithubConnect";
+import IntegrationsPanel from "@/components/IntegrationsPanel";
 import { Badge, Button, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
-import { api, type BitbucketConn, type ConfluenceConn, type GithubConn, type JiraConnection, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
+import { api, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -19,20 +17,7 @@ const PROVIDERS = [
   ["github-models", "GitHub Models (retired 30 July 2026)"],
 ] as const;
 
-const SECTIONS = [
-  { id: "ai", label: "AI model", hint: "Answers and root-cause write-ups", icon: Brain },
-  { id: "code", label: "Code hosting", hint: "GitHub, Bitbucket", icon: GitFork },
-  { id: "knowledge", label: "Knowledge sources", hint: "Jira, Confluence", icon: Plug },
-] as const;
-
-function Section({ id, title, subtitle, children }: { id: string; title: string; subtitle: string; children: ReactNode }) {
-  return (
-    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-6 space-y-3">
-      <div><h2 id={`${id}-h`} className="text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted">{subtitle}</p></div>
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
+const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain]] as const;
 
 export default function SettingsPage() {
   const ask = useConfirm();
@@ -56,36 +41,20 @@ export default function SettingsPage() {
     queryFn: () => api<ModelInfo[]>("/settings/llm/github-models/catalog") });
   const presets = f.provider === "github-models" && catalog.data?.length ? catalog.data.map((m) => m.id) : (data?.presets[f.provider] ?? []);
   const online = f.provider !== "heuristic";
-
-  // Connection states for the summary strip (the cards own their own queries; these share the same cache keys).
-  const gh = useQuery({ queryKey: ["github-conn"], queryFn: () => api<GithubConn>("/github/connection") });
-  const bb = useQuery({ queryKey: ["bitbucket-conn"], queryFn: () => api<BitbucketConn>("/bitbucket/connection") });
-  const jira = useQuery({ queryKey: ["jira-conn"], queryFn: () => api<JiraConnection | null>("/jira/connection") });
-  const conf = useQuery({ queryKey: ["confluence-conn"], queryFn: () => api<ConfluenceConn>("/wiki/confluence/connection") });
-  const summary = [
-    { label: "AI model", on: !!data && !data.offline, href: "#ai", icon: Brain },
-    { label: "GitHub", on: !!gh.data?.connected, href: "#code", icon: GitFork },
-    { label: "Bitbucket", on: !!bb.data?.connected, href: "#code", icon: GitFork },
-    { label: "Jira", on: !!jira.data, href: "#knowledge", icon: Ticket },
-    { label: "Confluence", on: !!conf.data?.connected, href: "#knowledge", icon: Library },
-  ];
+  const [sp, setSp] = useSearchParams();
+  const tab = sp.get("tab") === "ai" ? "ai" : "integrations";
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Connect a language model and the tools your team already uses. Retrieval, the graph and ranking always run locally." />
-      <div className="mb-6 flex flex-wrap gap-2" aria-label="Connection summary">
-        {summary.map((s) => (
-          <a key={s.label} href={s.href} className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors hover:border-brand", s.on ? "border-emerald-200 bg-emerald-50/60 text-emerald-800" : "border-line bg-white text-muted")}>
-            <span className={cn("h-2 w-2 rounded-full", s.on ? "bg-emerald-500" : "bg-slate-300")} aria-hidden />{s.label}<span className="sr-only">{s.on ? " connected" : " not connected"}</span></a>))}
+      <PageHeader title="Settings" subtitle="Connect the tools your team already uses, and a language model if you want AI-written answers." />
+      <div role="tablist" aria-label="Settings sections" className="mb-6 flex gap-1 border-b border-line">
+        {TABS.map(([k, label, Icon]) => (
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setSp(k === "integrations" ? {} : { tab: k })}
+            className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
-      <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav aria-label="Settings sections" className="hidden lg:block">
-          <ul className="sticky top-6 space-y-1">{SECTIONS.map((s) => (
-            <li key={s.id}><a href={`#${s.id}`} className="flex items-start gap-3 rounded-xl px-3 py-2.5 hover:bg-white hover:shadow-sm">
-              <s.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted" /><span><span className="block text-sm font-medium">{s.label}</span><span className="block text-xs text-muted">{s.hint}</span></span></a></li>))}</ul>
-        </nav>
-        <div className="max-w-3xl space-y-10">
-          <Section id="ai" title="AI model" subtitle="Optional. Everything works offline; a model makes answers and reports read better.">
+      <div className="max-w-4xl">
+        {tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
+          <div className="space-y-4">
             <ConnectionCard icon={KeyRound} tint="violet" title="Language model"
               status={data ? <div className="flex items-center gap-1.5"><StatusPill on={!data.offline} onLabel="AI enabled" offLabel="offline mode" /><Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></div> : undefined}
               description="Choose a provider and paste a key. It is encrypted at rest and never shown again.">
@@ -120,16 +89,7 @@ export default function SettingsPage() {
               </form>
             </ConnectionCard>
             <RetrievalCard />
-          </Section>
-          <Section id="code" title="Code hosting" subtitle="Browse and add repositories, import pull requests, clone private code.">
-            <GithubConnect admin={admin} />
-            <BitbucketConnect admin={admin} />
-          </Section>
-          <Section id="knowledge" title="Knowledge sources" subtitle="Tickets and documentation that become searchable history and wiki pages.">
-            <JiraConnect admin={admin} />
-            <ConfluenceConnect admin={admin} />
-          </Section>
-        </div>
+          </div>)}
       </div>
     </div>
   );

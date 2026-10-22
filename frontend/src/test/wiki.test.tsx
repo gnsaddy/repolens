@@ -50,8 +50,8 @@ describe("Wiki", () => {
     mock();
     renderWiki("/wiki?tab=sources");
     expect(await screen.findByText("Add README / text files")).toBeInTheDocument();
-    const link = await screen.findByRole("link", { name: "Settings → Knowledge sources" });
-    expect(link).toHaveAttribute("href", "/settings#knowledge");
+    const link = await screen.findByRole("link", { name: "Settings → Integrations" });
+    expect(link).toHaveAttribute("href", "/settings");
     expect(screen.queryByLabelText("Token")).toBeNull(); // credentials are entered in Settings only
   });
   it("switches tabs", async () => {

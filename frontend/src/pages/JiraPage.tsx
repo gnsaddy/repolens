@@ -30,10 +30,10 @@ export default function JiraPage() {
         <Card className="mx-auto max-w-xl text-center">
           <h2 className="text-base font-semibold">Connect Jira first</h2>
           <p className="mt-1 text-sm text-muted">Add your Jira site and an API token in Settings, then come back to browse bugs, investigate them and publish approved reports.</p>
-          <Link to="/settings#knowledge" className="mt-4 inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Open Settings</Link>
+          <Link to="/settings" className="mt-4 inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Open Settings</Link>
         </Card>
       ) : (<div className="space-y-4">
-        <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{conn.data?.base_url}</span>. <Link to="/settings#knowledge" className="text-brand hover:underline">Manage connection</Link></p>
+        <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{conn.data?.base_url}</span>. <Link to="/settings" className="text-brand hover:underline">Manage connection</Link></p>
         <Card>
           <CardTitle>Issues</CardTitle>
           {!conn.data ? <Empty>Configure the connection to browse issues.</Empty> : (<>

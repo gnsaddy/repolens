@@ -133,11 +133,11 @@ function ConfluenceForm({ onDone }: { onDone: () => void }) {
     <Card>
       <CardTitle right={c?.connected ? <Badge tone="green">connected</Badge> : <Badge>not connected</Badge>}>Confluence</CardTitle>
       {conn.isLoading ? <Spinner /> : c?.connected ? (<>
-        <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{c.base_url}</span>. <Link to="/settings#knowledge" className="text-brand hover:underline">Manage connection</Link></p>
+        <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{c.base_url}</span>. <Link to="/settings" className="text-brand hover:underline">Manage connection</Link></p>
         <ConfluenceImport onDone={onDone} />
         <ConfluenceBrowser onDone={onDone} />
       </>) : (
-        <p className="text-sm text-muted">Connect Confluence in <Link to="/settings#knowledge" className="text-brand hover:underline">Settings → Knowledge sources</Link> with an API token, then import spaces and pages here.</p>)}
+        <p className="text-sm text-muted">Connect Confluence in <Link to="/settings" className="text-brand hover:underline">Settings → Integrations</Link> with an API token, then import spaces and pages here.</p>)}
     </Card>
   );
 }

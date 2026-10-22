@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
 import SettingsPage from "@/pages/SettingsPage";
 
@@ -19,7 +20,7 @@ function setup(role: string, onPut?: (b: unknown) => void) {
     return json({}, 404);
   });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><AuthProvider><MemoryRouter><SettingsPage /></MemoryRouter></AuthProvider></QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}><AuthProvider><MemoryRouter initialEntries={["/settings?tab=ai"]}><SettingsPage /></MemoryRouter></AuthProvider></QueryClientProvider>);
 }
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
@@ -61,8 +62,10 @@ describe("GitHub connect", () => {
       return routes(u, init) ?? json({}, 404);
     });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    return render(<QueryClientProvider client={qc}><AuthProvider><MemoryRouter><SettingsPage /></MemoryRouter></AuthProvider></QueryClientProvider>);
+    return render(<QueryClientProvider client={qc}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={["/settings"]}><SettingsPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
   }
+  const openGithub = async () => { await userEvent.click(await screen.findByRole("button", { name: "Connect GitHub" })); };
+  const deviceFlow = async () => { await userEvent.click(await screen.findByRole("button", { name: /Or sign in with GitHub/ })); };
 
   it("runs the device flow: shows the code, polls, then shows the connected account", async () => {
     let connected = false;
@@ -74,12 +77,14 @@ describe("GitHub connect", () => {
       if (u.endsWith("/github/oauth/device/poll")) { polls++; if (polls < 2) return json({ status: "pending", interval: 0 }); connected = true; return json({ status: "success" }); }
       return undefined;
     });
+    await openGithub();
+    await deviceFlow();
     await userEvent.click(await screen.findByRole("button", { name: "Connect with GitHub" }));
     expect(await screen.findByLabelText("Device code")).toHaveTextContent("ABCD-1234");
     expect(screen.getByRole("link", { name: /github.com\/login\/device/ })).toHaveAttribute("href", "https://github.com/login/device");
     expect(started).toEqual({ client_id: "Iv1.abc", scope: "repo read:user" });
-    expect(await screen.findByText(/OAuth · @octo-admin/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Device code")).not.toBeInTheDocument();
+    expect(await screen.findByText(/OAuth · @octo-admin/)).toBeInTheDocument(); // moved to the Connected list
+    expect(screen.queryByLabelText("Device code")).not.toBeInTheDocument(); // the card closed itself
     expect(polls).toBe(2);
   });
 
@@ -90,6 +95,8 @@ describe("GitHub connect", () => {
       if (u.endsWith("/device/poll")) return json({ status: "denied" });
       return undefined;
     });
+    await openGithub();
+    await deviceFlow();
     await userEvent.click(await screen.findByRole("button", { name: "Connect with GitHub" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("denied");
   });
@@ -101,16 +108,16 @@ describe("GitHub connect", () => {
       if (u.endsWith("/github/connection")) return json({ connected: false, api_base: null });
       return undefined;
     });
-    await userEvent.click(await screen.findByText("Use a personal access token instead"));
+    await openGithub();
     await userEvent.type(screen.getByLabelText(/Personal access token/), "github_pat_secret_value");
     await userEvent.click(screen.getByRole("button", { name: "Save token" }));
     await waitFor(() => expect(sent).toEqual({ token: "github_pat_secret_value", api_base: "https://api.github.com" }));
-    await waitFor(() => expect(screen.getByLabelText(/Personal access token/)).toHaveValue(""));
+    await waitFor(() => expect(screen.queryByLabelText(/Personal access token/)).toBeNull()); // the card closed; the token is not kept in the page
   });
 
   it("disables the connect flow for non-admins", async () => {
     mount("member", (u) => (u.endsWith("/github/connection") ? json({ connected: true, api_base: "x", auth_method: "oauth", login: "o" }) : undefined));
-    expect(await screen.findByText("GitHub is connected.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Connect with GitHub/ })).not.toBeInTheDocument();
+    expect(await screen.findByText(/OAuth · @o/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Configure GitHub|Disconnect GitHub|Connect GitHub/ })).not.toBeInTheDocument();
   });
 });
