@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader } from "@/components/ui";
+import JiraIssuePanel from "@/components/JiraIssuePanel";
 import { api, type JiraConnection, type JiraIssue } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 
@@ -14,6 +15,7 @@ export default function JiraPage() {
   const [type, setType] = useState("Bug");
   const [text, setText] = useState("");
   const [advanced, setAdvanced] = useState(false);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [custom, setCustom] = useState<string | null>(null);
   const built = [proj && `project = "${proj}"`, status === "open" ? "statusCategory != Done" : status === "done" ? "statusCategory = Done" : "", type && `issuetype = "${type}"`, text.trim() && `text ~ "${text.trim().replace(/["\\]/g, " ")}"`].filter(Boolean).join(" AND ") + " ORDER BY updated DESC";
   const jql = custom ?? built;
@@ -25,7 +27,7 @@ export default function JiraPage() {
 
   return (
     <div>
-      <PageHeader title="Jira Integration" subtitle="Fetch bug tickets, investigate them, and publish approved RCA reports back as comments." />
+      <PageHeader title="Jira Integration" subtitle="Read tickets and their comments, analyse them, investigate the cause in your code and docs, and publish approved reports back." />
       {!conn.isLoading && !conn.data ? (
         <Card className="mx-auto max-w-xl text-center">
           <h2 className="text-base font-semibold">Connect Jira first</h2>
@@ -54,13 +56,14 @@ export default function JiraPage() {
             {!issues.data?.length ? <Empty>{issues.isLoading ? "Loading…" : "No issues."}</Empty> : (
               <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Key</th><th className="font-medium">Summary</th><th className="font-medium">Status</th><th /></tr></thead>
                 <tbody>{issues.data.map((i) => (
-                  <tr key={i.key} className="border-t border-line"><td className="py-2"><a className="text-brand hover:underline" href={i.url} target="_blank" rel="noreferrer">{i.key}</a></td>
-                    <td className="max-w-xs truncate">{i.summary}</td><td><Badge>{i.status}</Badge></td>
-                    <td className="text-right">{i.investigation_id ? <Link className="text-xs text-brand hover:underline" to={`/investigations/${i.investigation_id}`}>View RCA</Link> :
+                  <tr key={i.key} className="border-t border-line"><td className="py-2 font-medium">{i.key}</td>
+                    <td className="max-w-xs truncate"><button className="text-left hover:text-brand hover:underline" onClick={() => setOpenKey(i.key)} title="Read the ticket and analyse it">{i.summary}</button></td><td><Badge>{i.status}</Badge></td>
+                    <td className="space-x-2 text-right"><Button size="sm" variant="ghost" onClick={() => setOpenKey(i.key)}>Open</Button>{i.investigation_id ? <Link className="text-xs text-brand hover:underline" to={`/investigations/${i.investigation_id}`}>View RCA</Link> :
                       canWrite(user) && <Button size="sm" variant="outline" disabled={investigate.isPending} onClick={() => investigate.mutate(i.key)}>Investigate</Button>}</td></tr>))}</tbody></table>)}
           </>)}
         </Card>
       </div>)}
+      {openKey && <JiraIssuePanel issueKey={openKey} canInvestigate={canWrite(user)} onClose={() => setOpenKey(null)} />}
     </div>
   );
 }

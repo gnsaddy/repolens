@@ -2,7 +2,7 @@
 
 import ipaddress
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import httpx
@@ -111,6 +111,11 @@ class JiraIssue:
     labels: list[str]
     components: list[str]
     url: str
+    reporter: str = ""
+    assignee: str = ""
+    created: str = ""
+    updated: str = ""
+    comment_items: list[dict] = field(default_factory=list)  # [{author, created, body}] in order
 
     def investigation_query(self) -> str:
         parts = [self.summary, self.description, *self.comments[-5:]]
@@ -163,9 +168,18 @@ class JiraClient:
         desc = f.get("description")
         desc = adf_to_text(desc) if isinstance(desc, dict) else (desc or "")
         comments = []
+        items = []
         for c in (f.get("comment") or {}).get("comments", []):
             body = c.get("body")
-            comments.append(adf_to_text(body).strip() if isinstance(body, dict) else (body or ""))
+            text = adf_to_text(body).strip() if isinstance(body, dict) else (body or "")
+            comments.append(text)
+            items.append(
+                {
+                    "author": (c.get("author") or {}).get("displayName", ""),
+                    "created": c.get("created", ""),
+                    "body": text,
+                }
+            )
         return JiraIssue(
             key=d["key"],
             summary=f.get("summary", ""),
@@ -177,6 +191,11 @@ class JiraClient:
             labels=f.get("labels", []),
             components=[c["name"] for c in f.get("components", [])],
             url=f"{self.base}/browse/{d['key']}",
+            reporter=(f.get("reporter") or {}).get("displayName", ""),
+            assignee=(f.get("assignee") or {}).get("displayName", ""),
+            created=f.get("created", ""),
+            updated=f.get("updated", ""),
+            comment_items=items,
         )
 
     def get_issue(self, key: str) -> JiraIssue:
@@ -185,7 +204,9 @@ class JiraClient:
         return self._issue_from(self._req("GET", f"/issue/{key}", params={"fields": "*all"}))
 
     def search(self, jql: str, limit: int = 25) -> list[JiraIssue]:
-        fields = "summary,description,status,issuetype,priority,labels,components,comment"
+        fields = (
+            "summary,description,status,issuetype,priority,labels,components,comment,reporter,assignee,created,updated"
+        )
         if self.deployment == "cloud":
             d = self._req("GET", "/search/jql", params={"jql": jql, "maxResults": limit, "fields": fields})
         else:

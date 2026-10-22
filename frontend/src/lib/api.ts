@@ -208,3 +208,14 @@ export interface AtlasSymbol { node_id: string; name: string; type: string; path
 export interface AtlasModule { module: string; files: number; functions: number; classes: number; languages: string[]; documented: number; coverage: number | null; top_symbols: AtlasSymbol[] }
 export interface Atlas { modules: AtlasModule[]; summary: { modules: number; files: number; public_symbols: number; documented: number; coverage: number | null } }
 export interface SimilarAnswer { id: string; asked: string; similarity: number; answer: string; sources: string[]; age_hours: number; hits: number }
+
+export interface JiraComment { author: string; created: string; body: string }
+export interface JiraDetail { key: string; summary: string; description: string; status: string; type: string; priority: string; labels: string[]; components: string[]; reporter: string; assignee: string; created: string; updated: string; url: string; comments: JiraComment[]; investigation_id: string | null }
+export interface JiraClaim { by: string; text: string; comment: number }
+export interface JiraAnalysis {
+  key: string; headline: string; status: string; priority: string; reporter: string; assignee: string; participants: string[]; age_days: number | null; updated_days: number | null;
+  signals: { errors: string[]; frames: { file: string; line: number; symbol: string; innermost?: boolean }[]; files: string[]; symbols: string[]; pull_requests: string[]; related_issues: string[] };
+  discussion: { comments: number; cause: JiraClaim[]; tried: JiraClaim[]; workarounds: JiraClaim[]; fixes: JiraClaim[]; open_questions: JiraClaim[] };
+  timeline: { author: string; created: string; kind: string; excerpt: string }[]; flags: string[]; search_terms: string[]; next_steps: string[];
+  related: { repo: string; repo_id: string; file: string; kind: string; title: string; start_line: number; node_id: string | null }[];
+}

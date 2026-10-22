@@ -9,6 +9,8 @@ from ..deps import Principal, current_principal
 from ..models import Investigation, JiraConnection, JiraIssueLink, JiraPublishEvent
 from ..schemas import JiraConnectionIn, JiraConnectionOut, JiraInvestigateIn, JiraPublishIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
+from ..services import jira_analysis as ja
+from ..services import knowledge as kb
 from ..services.access import can_view_investigation, scope_for
 from ..services.investigations import create_investigation, submit
 from ..services.jira import JiraClient, JiraError, validate_base_url
@@ -141,6 +143,63 @@ def issues(
     ]
 
 
+@router.get("/issues/{key}")
+def issue_detail(key: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """The full ticket: description and every comment, for reading inside RepoLens."""
+    authorize(db, p, "jira.read", key)
+    try:
+        i = _client(_conn(db, p)).get_issue(key)
+    except JiraError as e:
+        raise HTTPException(502, redact_secrets(str(e))) from e
+    link = db.scalar(select(JiraIssueLink).where(JiraIssueLink.org_id == p.org_id, JiraIssueLink.issue_key == key))
+    inv = db.get(Investigation, link.investigation_id) if link else None
+    visible = inv is not None and can_view_investigation(scope_for(db, p), inv, p.user_id)
+    return {
+        "key": i.key,
+        "summary": i.summary,
+        "description": i.description,
+        "status": i.status,
+        "type": i.issue_type,
+        "priority": i.priority,
+        "labels": i.labels,
+        "components": i.components,
+        "reporter": i.reporter,
+        "assignee": i.assignee,
+        "created": i.created,
+        "updated": i.updated,
+        "url": i.url,
+        "comments": i.comment_items,
+        "investigation_id": link.investigation_id if visible and link else None,
+    }
+
+
+@router.post("/issues/{key}/analyze")
+def analyze_issue(key: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Read the ticket and its comments: signals, what was tried, open questions, and what in the wiki/code relates."""
+    authorize(db, p, "jira.read", key, op="analyze")
+    try:
+        issue = _client(_conn(db, p)).get_issue(key)
+    except JiraError as e:
+        raise HTTPException(502, redact_secrets(str(e))) from e
+    digest = ja.analyze(issue)
+    scope = scope_for(db, p)
+    related = []
+    if digest["search_terms"]:
+        for r in kb.search(db, p.org_id, " ".join(digest["search_terms"][:8]), scope.ids_or_none(), k=6, scope=scope):
+            related.append(
+                {
+                    "repo": r["repo"],
+                    "repo_id": r["repo_id"],
+                    "file": r["file"],
+                    "kind": r["kind"],
+                    "title": r["title"],
+                    "start_line": r["start_line"],
+                    "node_id": r["node_id"],
+                }
+            )
+    return {**digest, "related": related}
+
+
 @router.post("/investigate", status_code=202)
 def investigate(body: JiraInvestigateIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "investigation.create", body.issue_key, source="jira")
@@ -153,7 +212,7 @@ def investigate(body: JiraInvestigateIn, p: Principal = Depends(current_principa
         db,
         p.org_id,
         p.user_id,
-        issue.investigation_query(),
+        ja.investigation_query(issue, ja.analyze(issue)),
         repo_ids,
         title=f"{issue.key}: {issue.summary}",
         jira_issue_key=issue.key,
