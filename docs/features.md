@@ -102,6 +102,12 @@ An entry is only reused while the repositories and wiki pages it was based on ar
 - **Edit and create pages** in documentation collections without leaving the wiki (`PUT /api/wiki/page`). Saving redacts secrets, re-indexes and relinks the page to code. Pages synced from Confluence stay read-only here.
 - **Code atlas** (a tab per code repository): modules with file, class and function counts, their most connected symbols, and how much of each is explained by the wiki, so undocumented areas are easy to spot.
 
+### Asked before, and fewer tokens per answer
+
+When you ask, RepoLens first shows **Asked before**: earlier answers to similar questions (embedding similarity or the same content words, so re-wordings match). This is free and instant, and the model's answer follows. A close enough match (92% similar, or 80% of content words) is reused as the answer. Answers whose sources changed are never suggested.
+
+To cut tokens further, the context sent to a model is condensed to the lines that match the question, repeated passages are dropped, and savings mode uses a smaller budget. A light model answers first; if its answer cites nothing and does not say the sources lack the answer, one stronger model retries.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.

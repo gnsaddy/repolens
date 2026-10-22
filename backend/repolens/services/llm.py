@@ -238,7 +238,7 @@ class LLMClient:
         self.db, self.org_id, self.workflow, self.workflow_id = db, org_id, workflow, workflow_id
         self.jira_issue_key = jira_issue_key
         self._routes = llm_router.all_routes(db, org_id)
-        self._savings = llm_router.savings_mode(db, org_id)
+        self.savings = llm_router.savings_mode(db, org_id)
         default = next((r for r in self._routes if r.tier == "standard"), self._routes[0] if self._routes else None)
         self.cfg = default.cfg if default else resolve_config(db, org_id)
         self.provider, self.model = self.cfg.provider, self.cfg.model
@@ -264,7 +264,7 @@ class LLMClient:
             low = usage.budget_low(self.db, self.org_id)
         except Exception:  # an advisory signal must never block a call
             low = False
-        return llm_router.decide(self._routes, task, self._savings, low)
+        return llm_router.decide(self._routes, task, self.savings, low)
 
     def _call(self, route, agent: str, system: str, prompt: str, max_tokens: int) -> LLMResult:
         cfg = route.cfg

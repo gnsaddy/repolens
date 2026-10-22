@@ -3,7 +3,8 @@ import { AlertTriangle, BookOpen, Check, FileEdit, Map as MapIcon, ChevronDown, 
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
-import { api, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
+import SimilarAnswers from "@/components/SimilarAnswers";
+import { api, type SimilarAnswer, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
@@ -160,13 +161,15 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
 function AskWiki({ open }: { open: Open }) {
   const [q, setQ] = useState("");
   const ask = useMutation({ mutationFn: () => api<AskResult>("/wiki/ask", { method: "POST", json: { query: q } }) });
-  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) ask.mutate(); };
+  const similar = useMutation({ mutationFn: () => api<SimilarAnswer[]>("/wiki/similar", { method: "POST", json: { query: q } }) });
+  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { similar.reset(); similar.mutate(); ask.mutate(); } };
   const a = ask.data;
   return (
     <div className="space-y-4">
       <form onSubmit={submit} className="flex gap-2"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the wiki — e.g. What do we do when the profile endpoint returns 500?" aria-label="Question" />
         <Button disabled={ask.isPending}><Sparkles className="h-4 w-4" />Ask</Button></form>
       <ErrorNote error={ask.error} />
+      <SimilarAnswers items={similar.data} />
       {a && (<>
         <Card><CardTitle right={<Badge tone={a.mode === "llm" ? "brand" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>}>Answer</CardTitle>
           <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
@@ -348,10 +351,10 @@ function Proposals({ selectedId, open }: { selectedId: string | null; open: Open
             </div>
             {d.status === "pending" && editing === null && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {d.apply_options.map((t) => (
+                {(d.apply_options ?? []).map((t) => (
                   <Button key={t} disabled={decide.isPending} onClick={async () => { if (await ask({ title: t === "confluence_comment" ? "Post this as a Confluence comment?" : d.kind === "new" ? "Create this page?" : "Apply this change?", message: t === "confluence_comment" ? "The page itself is not changed. The suggestion is added as a comment for its owners to act on." : "The page is updated now and re-indexed.", confirmLabel: t === "confluence_comment" ? "Post comment" : "Approve" })) decide.mutate({ approve: true, target: t }); }}>
                     <Check className="h-4 w-4" />{t === "confluence_comment" ? "Approve and comment in Confluence" : d.kind === "new" ? "Approve and create" : "Approve and apply"}</Button>))}
-                {!d.apply_options.length && <span className="text-xs text-muted">This page lives in a code repository: copy the proposed text into a pull request.</span>}
+                {!(d.apply_options ?? []).length && <span className="text-xs text-muted">This page lives in a code repository: copy the proposed text into a pull request.</span>}
                 <Button variant="outline" onClick={() => setEditing(d.proposed)}>Edit first</Button>
                 <Button variant="ghost" disabled={decide.isPending} onClick={() => decide.mutate({ approve: false, target: "auto" })}>Reject</Button>
                 {d.doc_repo_id && d.kind === "update" && <Button variant="ghost" onClick={() => open(d.doc_repo_id, d.doc_path)}>Open page</Button>}

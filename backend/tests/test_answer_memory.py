@@ -110,3 +110,70 @@ def test_clear_and_disable_and_admin_only(client, auth, session, monkeypatch):
         monkeypatch.delenv("REPOLENS_ANSWER_MEMORY_ENABLED")
         get_settings.cache_clear()
     assert json.dumps(client.get("/api/settings/memory", headers=auth).json())
+
+
+def test_similar_questions_are_suggested_before_the_model_answers(client, auth, session, monkeypatch):
+    calls = setup_llm(client, auth, monkeypatch)
+    seed_doc(client, auth)
+    ask(client, auth, "How many times does the payment service retry failed requests?")
+    r = client.post(
+        "/api/wiki/similar",
+        headers=auth,
+        json={"query": "how often are failed payment requests retried by the service"},
+    )
+    s = r.json()
+    assert (
+        r.status_code == 200
+        and s
+        and s[0]["asked"].startswith("How many times")
+        and "retries three times" in s[0]["answer"]
+    )
+    assert s[0]["similarity"] >= 0.5 and len(calls) == 1  # suggesting costs no tokens
+    assert (
+        client.post("/api/wiki/similar", headers=auth, json={"query": "kubernetes ingress certificate rotation"}).json()
+        == []
+    )
+    assert (
+        client.post(
+            "/api/knowledge/similar", headers=auth, json={"query": "payment service retry failed requests"}
+        ).json()
+        == []
+    )  # kind=docs vs all sources are separate
+    assert (
+        client.post(
+            "/api/wiki/similar", headers=register(client, "q@other.io", "Q"), json={"query": "payment service retry"}
+        ).json()
+        == []
+    )
+
+
+def test_word_overlap_catches_rewordings_the_embedding_misses(client, auth, session, monkeypatch):
+    calls = setup_llm(client, auth, monkeypatch)
+    seed_doc(client, auth)
+    ask(client, auth, "How many times does the payment service retry failed requests?")
+    hit = ask(client, auth, "Retry failed requests: how many times, payment service?")
+    assert hit.get("memory") and len(calls) == 1
+
+
+def test_context_is_condensed_and_deduplicated_before_it_reaches_the_model(client, auth, session, monkeypatch):
+    from repolens.services import context
+
+    long = (
+        "# Retry policy\n"
+        + "\n".join(f"Unrelated filler sentence number {i} about nothing." for i in range(80))
+        + "\nThe payment service retries failed requests three times.\nThen it alerts on-call.\n"
+    )
+    out = context.condense(long, {"retri", "payment"}, 400)
+    assert len(out) <= 500 and "retries failed requests three times" in out and out.startswith("# Retry policy")
+    s = [{"id": "S1"}, {"id": "S2"}, {"id": "S3"}]
+    r = [{"content": long}, {"content": long.upper().lower()}, {"content": "short other passage"}]
+    got = context.blocks(s, r, "payment retries", 3000)
+    assert [x[0]["id"] for x in got] == ["S1", "S3"]  # S2 repeats S1
+    assert len(got[0][1]) < len(long) / 2
+
+
+def test_cheap_answers_must_cite_or_the_next_model_is_tried(client, auth, session, monkeypatch):
+    from repolens.services.knowledge import _grounded
+
+    assert _grounded("It retries three times [S1].") and _grounded("The sources do not mention that.")
+    assert not _grounded("Probably around three.")

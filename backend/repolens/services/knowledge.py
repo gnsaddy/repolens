@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
-from . import answer_memory, usage
+from . import answer_memory, context, usage
 from .access import Scope
 from .graph import neighbors, node_dict
 from .links import file_url
@@ -232,6 +232,17 @@ def _first_sentences(text: str, n: int = 2) -> str:
     return " ".join(sents[:n])[:500]
 
 
+_NO_ANSWER = re.compile(
+    r"\b(not (enough|mentioned|covered|documented)|no (information|mention)|do(es)? not (say|mention|contain|cover))",
+    re.I,
+)
+
+
+def _grounded(text: str) -> bool:
+    """A cheap model's answer is accepted when it cites a source or says the sources do not cover the question."""
+    return bool(re.search(r"\[S\d+\]", text)) or bool(_NO_ANSWER.search(text))
+
+
 def ask(
     db: Session,
     org: str,
@@ -293,8 +304,8 @@ def ask(
         prompt = (
             "SOURCES:\n"
             + "\n\n".join(
-                f"[{s['id']}] {s['repo']}:{s['file']} ({s['title']})\n{r['content'][:1500]}"
-                for s, r in zip(sources, results, strict=True)
+                f"[{s['id']}] {s['repo']}:{s['file']} ({s['title']})\n{text}"
+                for s, text in context.blocks(sources, results, query, 7000 if llm.savings else 14000)
             )
             + f"\n\nQUESTION: {query[:2000]}"
         )
@@ -328,7 +339,7 @@ def ask(
                 evidence=len(sources),
                 repos=len({s["repo_id"] for s in sources if s.get("repo_id")}) or 1,
             )
-            res = llm.complete("librarian", ASK_SYSTEM, prompt, max_tokens=900, task=task)
+            res = llm.complete("librarian", ASK_SYSTEM, prompt, max_tokens=900, task=task, validate=_grounded)
             cited = set(re.findall(r"\[S(\d+)\]", res.text))
             unknown = sorted(f"S{n}" for n in cited if not 1 <= int(n) <= len(sources))
             db.add(

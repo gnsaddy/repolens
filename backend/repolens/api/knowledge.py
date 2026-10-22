@@ -13,6 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, KGEdge, KGNode, Repository
 from ..schemas import CollectionCreate, DocsUpload, HeatIn, KnowledgeQuery, RepoOut
 from ..security import redact_stored
+from ..services import answer_memory
 from ..services import graph as g
 from ..services import knowledge as kb
 from ..services.access import scope_for
@@ -162,6 +163,14 @@ def knowledge_ask(body: KnowledgeQuery, p: Principal = Depends(current_principal
     scope = scope_for(db, p)
     ids = scope.resolve(body.repo_ids)
     return kb.ask(db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, fresh=body.fresh)
+
+
+@router.post("/knowledge/similar")
+def knowledge_similar(body: KnowledgeQuery, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Questions already answered that are close to this one. Free and instant: nothing is sent to a model."""
+    scope = scope_for(db, p)
+    ids = scope.resolve(body.repo_ids)
+    return answer_memory.suggest(db, p.org_id, "ask", body.query, scope, ids or None, None)
 
 
 # ---------------------------------------------------------------------------------------------- graph

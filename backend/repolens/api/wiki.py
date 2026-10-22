@@ -22,7 +22,7 @@ from ..schemas import (
     WikiPageIn,
 )
 from ..security import encrypt_secret, redact_secrets, redact_stored
-from ..services import connectors, drift
+from ..services import answer_memory, connectors, drift
 from ..services import knowledge as kb
 from ..services import wiki as wk
 from ..services import wiki_import as wi
@@ -743,3 +743,11 @@ def save_page(body: WikiPageIn, p: Principal = Depends(current_principal), db: S
     db.commit()
     schedule_index(repo.id)
     return {"path": path, "created": created, "secrets_redacted": redacted}
+
+
+@router.post("/similar")
+def similar_questions(body: WikiAskIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Questions already answered that are close to this one (free, nothing is sent to a model)."""
+    scope = scope_for(db, p)
+    ids = scope.resolve(body.repo_ids)
+    return answer_memory.suggest(db, p.org_id, "ask", body.query, scope, ids or None, ["doc"])

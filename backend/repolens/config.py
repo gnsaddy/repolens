@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # Answer memory: re-worded repeats of a question are answered from what the model already said (no tokens)
     answer_memory_enabled: bool = True
     answer_memory_threshold: float = 0.92  # cosine similarity of the two questions
+    answer_memory_word_threshold: float = 0.8  # overlap of the questions' content words
     answer_memory_ttl_hours: int = 72
     answer_memory_max_entries: int = 2000
     # Second-stage reranking of search results: "none" | "lexical" (offline) | "api" (Cohere/Jina/Voyage-style /rerank)

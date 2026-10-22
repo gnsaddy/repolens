@@ -5,7 +5,8 @@ import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
-import { api, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeDetail, type Repo } from "@/lib/api";
+import SimilarAnswers from "@/components/SimilarAnswers";
+import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeDetail, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -55,8 +56,9 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
   const [repoId, setRepoId] = useState("");
   const [kind, setKind] = useState<"" | "doc" | "code" | "pr">("");
   const ask = useMutation({ mutationFn: (fresh: boolean = false) => api<AskResult>("/knowledge/ask", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [], fresh } }) });
+  const similar = useMutation({ mutationFn: () => api<SimilarAnswer[]>("/knowledge/similar", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [] } }) });
   const search = useMutation({ mutationFn: () => api<KnowledgeHit[]>("/knowledge/search", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [], kinds: kind ? [kind] : [], k: 10 } }) });
-  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { ask.mutate(false); search.mutate(); } };
+  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { similar.reset(); similar.mutate(); ask.mutate(false); search.mutate(); } };
   const a = ask.data;
   return (
     <div className="space-y-4">
@@ -69,6 +71,7 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
         <Button disabled={ask.isPending || search.isPending}><Search className="h-4 w-4" />Ask</Button>
       </form>
       <ErrorNote error={ask.error ?? search.error} />
+      <SimilarAnswers items={similar.data} />
       {a && (
         <Card>
           <CardTitle right={<div className="flex gap-1">

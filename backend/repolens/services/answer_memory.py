@@ -8,7 +8,7 @@ person's answer is never served to someone with different access.
 
 import hashlib
 import json
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -21,6 +21,26 @@ from .access import Scope
 
 def _embed(text: str) -> list[float]:
     return embeddings.Embedder().embed([text])[0]
+
+
+_STOP = frozenset(
+    "a an the of to in on for and or is are was were be been do does did how what why when where which who whom "
+    "can could should would will with by at from as it its this that these those i we you my our your me us there "
+    "any about into than then so if not no".split()
+)
+
+
+def _words(text: str) -> frozenset[str]:
+    """Content words of a question, lightly stemmed, so re-wordings of it compare as nearly equal."""
+    return frozenset(embeddings.stem(w) for w in (t.lower() for t in embeddings.tokenize(text)) if w not in _STOP)
+
+
+def _similarity(qv: list[float], qw: frozenset[str], row: AnswerMemory) -> tuple[float, float]:
+    """(embedding cosine, word overlap) between a new question and a remembered one."""
+    cos = embeddings.cosine(qv, row.embedding) if row.embedding else 0.0
+    other = _words(row.query)
+    jac = len(qw & other) / len(qw | other) if qw and other else 0.0
+    return cos, jac
 
 
 def scope_key(scope: Scope | None, repo_ids: list[str] | None, kinds: list[str] | None) -> str:
@@ -68,15 +88,15 @@ def lookup(
     ).all()
     if not rows:
         return None
-    qv = _embed(query)
+    qv, qw = _embed(query), _words(query)
     best, score = None, 0.0
     for r in rows:
         if r.source_state.get("fp") != fp or not r.embedding:
             continue
-        c = embeddings.cosine(qv, r.embedding)
-        if c > score:
-            best, score = r, c
-    if best is None or score < s.answer_memory_threshold:
+        cos, jac = _similarity(qv, qw, r)
+        if (cos >= s.answer_memory_threshold or jac >= s.answer_memory_word_threshold) and max(cos, jac) > score:
+            best, score = r, max(cos, jac)
+    if best is None:
         return None
     best.hits += 1
     best.tokens_saved += best.tokens
@@ -94,6 +114,48 @@ def lookup(
     )
     db.commit()
     return {**best.answer, "memory": {"similarity": round(score, 3), "asked": best.query, "tokens_saved": best.tokens}}
+
+
+def similar(
+    db: Session, org: str, kind: str, query: str, key: str, fp: str, limit: int = 3, floor: float = 0.5
+) -> list[dict]:
+    """Earlier questions that are close to this one, best first, so they can be suggested before the model answers."""
+    if not enabled():
+        return []
+    s = get_settings()
+    cutoff = _now() - timedelta(hours=s.answer_memory_ttl_hours)
+    qv, qw = _embed(query), _words(query)
+    out = []
+    for r in db.scalars(
+        select(AnswerMemory).where(
+            AnswerMemory.org_id == org,
+            AnswerMemory.kind == kind,
+            AnswerMemory.scope_key == key,
+            AnswerMemory.created_at >= cutoff,
+        )
+    ):
+        if r.source_state.get("fp") != fp:  # the sources changed since; the old answer may no longer hold
+            continue
+        cos, jac = _similarity(qv, qw, r)
+        score = max(cos, jac)
+        if score >= floor:
+            out.append(
+                {
+                    "id": r.id,
+                    "asked": r.query,
+                    "similarity": round(score, 2),
+                    "answer": r.answer.get("answer", ""),
+                    "sources": [x.get("file") for x in r.answer.get("sources", [])][:4],
+                    "age_hours": int(
+                        (
+                            _now() - (r.created_at if r.created_at.tzinfo else r.created_at.replace(tzinfo=UTC))
+                        ).total_seconds()
+                        // 3600
+                    ),
+                    "hits": r.hits,
+                }
+            )
+    return sorted(out, key=lambda x: -x["similarity"])[:limit]
 
 
 def remember(db: Session, org: str, kind: str, query: str, key: str, fp: str, answer: dict, tokens: int) -> None:
@@ -149,3 +211,15 @@ def clear(db: Session, org: str) -> int:
     db.execute(delete(AnswerMemory).where(AnswerMemory.org_id == org))
     db.commit()
     return n
+
+
+def suggest(
+    db: Session,
+    org: str,
+    kind: str,
+    query: str,
+    scope: Scope | None,
+    repo_ids: list[str] | None,
+    kinds: list[str] | None,
+) -> list[dict]:
+    return similar(db, org, kind, query, scope_key(scope, repo_ids, kinds), fingerprint(db, org, scope, repo_ids))

@@ -38,6 +38,26 @@ function renderPage(url: string) {
 const me = { id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" };
 
 describe("Knowledge page", () => {
+  it("suggests similar earlier questions before the model's answer", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.endsWith("/knowledge/similar")) return json([{ id: "m1", asked: "How are deleted users handled?", similarity: 0.88, answer: "They get an Unknown profile. [S1]", sources: ["docs/arch.md"], age_hours: 3, hits: 2 }]);
+      if (u.endsWith("/knowledge/ask")) return json({ query: "q", mode: "llm", answer: "Fresh AI answer.", sources: [], connections: [] });
+      if (u.endsWith("/knowledge/search")) return json([]);
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=ask");
+    await userEvent.type(await screen.findByLabelText("Question"), "what happens to deleted users");
+    await userEvent.click(screen.getByRole("button", { name: /Ask/ }));
+    const prior = await screen.findByLabelText("Asked before");
+    expect(prior).toHaveTextContent("How are deleted users handled?");
+    expect(prior).toHaveTextContent("88% similar");
+    expect(prior).toHaveTextContent("They get an Unknown profile");
+    expect(await screen.findByText("Fresh AI answer.")).toBeInTheDocument();
+  });
+
   it("labels answers served from memory and can ask the model again", async () => {
     const bodies: unknown[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {

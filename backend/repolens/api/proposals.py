@@ -51,6 +51,7 @@ def _view(p: DocProposal, repo_name: str = "", full: bool = False, options: list
             "original": p.original,
             "proposed": p.proposed,
             "diff": pr.unified_diff(p.original, p.proposed, p.doc_path or "page.md"),
+            "apply_options": options or [],
         }
     return out
 
@@ -125,12 +126,12 @@ def from_incident(body: RunbookIn, p: Principal = Depends(current_principal), db
         )
     )
     if existing is not None:
-        return _view(existing, full=True)
+        return _view(existing, full=True, options=apply_options(db, existing))
     try:
         row = pr.draft_runbook(db, p.org_id, p.user_id, inv, body.collection_id)
     except pr.ProposalError as e:
         raise HTTPException(409, str(e)) from None
-    return _view(row, full=True)
+    return _view(row, full=True, options=apply_options(db, row))
 
 
 @router.put("/{proposal_id}")
@@ -145,7 +146,7 @@ def edit_proposal(
     row.proposed, _ = redact_stored(body.proposed)
     row.drafted_by = "edited"
     db.commit()
-    return _view(row, full=True)
+    return _view(row, full=True, options=apply_options(db, row))
 
 
 @router.post("/{proposal_id}/decision")
@@ -161,4 +162,4 @@ def decide(
         row = pr.decide(db, row, p.user_id, body.approve, body.target)
     except pr.ProposalError as e:
         raise HTTPException(409, str(e)) from None
-    return _view(row, full=True)
+    return _view(row, full=True, options=apply_options(db, row))

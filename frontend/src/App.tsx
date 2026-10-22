@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
@@ -37,6 +38,7 @@ const nav = [
 ];
 
 function Shell() {
+  const loc = useLocation();
   const { user, loading, logout } = useAuth();
   const [palette, setPalette] = useState(false);
   const drift = useQuery({ queryKey: ["drift-count"], enabled: !!user, queryFn: () => api<{ open: number }>("/wiki/drift/count"), refetchInterval: 60_000 });
@@ -78,7 +80,7 @@ function Shell() {
             <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("whitespace-nowrap rounded-full border border-line px-3 py-1 text-xs", isActive && "bg-brand text-white")}>{label}</NavLink>
           ))}
         </nav>
-        <Outlet />
+        <ErrorBoundary resetKey={loc.pathname + loc.search}><Outlet /></ErrorBoundary>
       </main>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </div>

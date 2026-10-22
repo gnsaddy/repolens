@@ -207,3 +207,4 @@ export interface PageSource { content: string; editable: boolean; reason: string
 export interface AtlasSymbol { node_id: string; name: string; type: string; path: string; start_line: number; connections: number; documented: boolean }
 export interface AtlasModule { module: string; files: number; functions: number; classes: number; languages: string[]; documented: number; coverage: number | null; top_symbols: AtlasSymbol[] }
 export interface Atlas { modules: AtlasModule[]; summary: { modules: number; files: number; public_symbols: number; documented: number; coverage: number | null } }
+export interface SimilarAnswer { id: string; asked: string; similarity: number; answer: string; sources: string[]; age_hours: number; hits: number }

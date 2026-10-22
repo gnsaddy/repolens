@@ -248,3 +248,13 @@ def test_access_control_and_markdown_to_storage(client, auth, shop, session):  #
         and "javascript:" not in html.replace("[bad](javascript:alert(1))", "")
     )
     assert "<blockquote>" in html and "CDATA[-a\n+b]]" in html
+
+
+def test_proposal_detail_always_lists_where_it_can_be_applied(client, auth, demo_repo):
+    """The review page needs apply_options; without it the page failed to render (blank screen)."""
+    repo = add_repo(client, auth, demo_repo[0])
+    inv = run_investigation(client, auth, repo["id"])
+    client.post(f"/api/investigations/{inv['id']}/review", headers=auth, json={"outcome": "confirmed"})
+    p = client.post("/api/wiki/proposals/from-incident", headers=auth, json={"investigation_id": inv["id"]})
+    assert p.status_code == 201 and p.json()["apply_options"] == ["local"]
+    assert client.get(f"/api/wiki/proposals/{p.json()['id']}", headers=auth).json()["apply_options"] == ["local"]
