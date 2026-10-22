@@ -57,6 +57,15 @@ def put_connection(body: JiraConnectionIn, p: Principal = Depends(current_princi
     return c
 
 
+@router.delete("/connection", status_code=204)
+def delete_connection(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "jira.configure", "disconnect")
+    c = db.scalar(select(JiraConnection).where(JiraConnection.org_id == p.org_id))
+    if c is not None:
+        db.delete(c)
+        db.commit()
+
+
 @router.post("/test")
 def test_connection(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "jira.read", "test")

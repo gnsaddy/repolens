@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm, useToast } from "@/components/feedback";
 import { RefreshCw, Trash2, Upload } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, Spinner, Textarea, statusTone } from "@/components/ui";
 import { api, type ConnectorInfo, type ConfluenceConn, type ConfluencePreview, type WikiOverview, type WikiSourceStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -51,7 +51,7 @@ export default function Sources({ overview }: { overview?: WikiOverview }) {
       </div>
       {admin && <ConnectorsCard onDone={refresh} />}
       {admin && <SlackExportCard onDone={refresh} />}
-      {admin ? <ConfluenceForm onDone={refresh} /> : <Card><CardTitle>Confluence</CardTitle><p className="text-sm text-muted">Only admins can connect Confluence and import spaces.</p></Card>}
+      {admin ? <ConfluenceForm onDone={refresh} /> : <Card><CardTitle>Confluence</CardTitle><p className="text-sm text-muted">Only admins can import from Confluence.</p></Card>}
     </div>
   );
 }
@@ -127,43 +127,17 @@ function ImportUrl({ collections, onDone }: { collections: { id: string; name: s
 }
 
 function ConfluenceForm({ onDone }: { onDone: () => void }) {
-  const ask = useConfirm();
-  const qc = useQueryClient();
   const conn = useQuery({ queryKey: ["confluence-conn"], queryFn: () => api<ConfluenceConn>("/wiki/confluence/connection") });
-  const [f, setF] = useState({ base_url: "", deployment: "cloud", email: "", token: "" });
-  const [edit, setEdit] = useState(false);
-  const save = useMutation({
-    mutationFn: () => api("/wiki/confluence/connection", { method: "PUT", json: f }),
-    onSuccess: () => { setF({ ...f, token: "" }); setEdit(false); qc.invalidateQueries({ queryKey: ["confluence-conn"] }); },
-  });
-  const remove = useMutation({ mutationFn: () => api("/wiki/confluence/connection", { method: "DELETE" }), onSuccess: () => qc.invalidateQueries({ queryKey: ["confluence-conn"] }) });
-  const test = useMutation({ mutationFn: () => api<{ ok: boolean; user?: string; error?: string }>("/wiki/confluence/test", { method: "POST" }) });
   const c = conn.data;
-  const showForm = edit || (c && !c.connected);
   return (
     <Card>
       <CardTitle right={c?.connected ? <Badge tone="green">connected</Badge> : <Badge>not connected</Badge>}>Confluence</CardTitle>
-      {conn.isLoading ? <Spinner /> : showForm ? (
-        <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
-          <div className="sm:col-span-2"><Label>Base URL</Label><Input value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://yourco.atlassian.net/wiki" aria-label="Base URL" /></div>
-          <div><Label>Deployment</Label><select aria-label="Deployment" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.deployment} onChange={(e) => setF({ ...f, deployment: e.target.value })}><option value="cloud">Cloud (email + API token)</option><option value="datacenter">Data Center (personal access token)</option></select></div>
-          {f.deployment === "cloud" && <div><Label>Email</Label><Input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} aria-label="Email" /></div>}
-          <div className="sm:col-span-2"><Label>{f.deployment === "cloud" ? "API token" : "Personal access token"}</Label><Input type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} aria-label="Token" />
-            <p className="mt-1 text-xs text-muted">Stored encrypted and never shown again. Use a read-only account.</p></div>
-          <div className="sm:col-span-2"><ErrorNote error={save.error} /></div>
-          <div className="flex gap-2 sm:col-span-2"><Button disabled={save.isPending || f.base_url.length < 8 || f.token.length < 4}>Save connection</Button>{c?.connected && <Button type="button" variant="outline" onClick={() => setEdit(false)}>Cancel</Button>}</div>
-        </form>
-      ) : c?.connected && (<>
-        <p className="mb-3 text-sm">{c.base_url} <span className="text-muted">· {c.deployment}{c.email ? ` · ${c.email}` : ""}</span></p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => test.mutate()} disabled={test.isPending}>Test connection</Button>
-          <Button variant="outline" size="sm" onClick={() => { setF({ base_url: c.base_url ?? "", deployment: c.deployment ?? "cloud", email: c.email ?? "", token: "" }); setEdit(true); }}>Change</Button>
-          <Button variant="ghost" size="sm" onClick={async () => { if (await ask({ title: "Disconnect Confluence?", message: "The stored token is deleted. Pages already imported stay in the wiki, but they stop syncing.", confirmLabel: "Disconnect", danger: true })) remove.mutate(); }}>Disconnect</Button>
-          {test.data && <span role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Authenticated as ${test.data.user}` : test.data.error}</span>}
-          <ErrorNote error={test.error} /></div>
+      {conn.isLoading ? <Spinner /> : c?.connected ? (<>
+        <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{c.base_url}</span>. <Link to="/settings#knowledge" className="text-brand hover:underline">Manage connection</Link></p>
         <ConfluenceImport onDone={onDone} />
         <ConfluenceBrowser onDone={onDone} />
-      </>)}
+      </>) : (
+        <p className="text-sm text-muted">Connect Confluence in <Link to="/settings#knowledge" className="text-brand hover:underline">Settings → Knowledge sources</Link> with an API token, then import spaces and pages here.</p>)}
     </Card>
   );
 }

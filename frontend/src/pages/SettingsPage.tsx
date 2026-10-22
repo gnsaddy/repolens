@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useConfirm, useToast } from "@/components/feedback";
-import { KeyRound } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
-import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
+import { Brain, GitFork, KeyRound, Library, Plug, SearchCheck, ShieldCheck, Ticket } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { ConnectionCard, StatusPill, TINTS, selectCls } from "@/components/ConnectionCard";
+import BitbucketConnect from "@/components/connections/BitbucketConnect";
+import ConfluenceConnect from "@/components/connections/ConfluenceConnect";
+import JiraConnect from "@/components/connections/JiraConnect";
+import { useConfirm } from "@/components/feedback";
 import GithubConnect from "@/components/GithubConnect";
-import { api, type BitbucketConn, type LLMSettings, type ModelInfo, type RetrievalStatus, type ScimStatus, type SsoSettings } from "@/lib/api";
+import { Badge, Button, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
+import { api, type BitbucketConn, type ConfluenceConn, type GithubConn, type JiraConnection, type LLMSettings, type ModelInfo, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { timeAgo } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
   ["heuristic", "Offline (no model calls)"],
@@ -14,6 +18,21 @@ const PROVIDERS = [
   ["openai", "OpenAI-compatible (OpenAI, Azure, vLLM, Ollama…)"],
   ["github-models", "GitHub Models (retired 30 July 2026)"],
 ] as const;
+
+const SECTIONS = [
+  { id: "ai", label: "AI model", hint: "Answers and root-cause write-ups", icon: Brain },
+  { id: "code", label: "Code hosting", hint: "GitHub, Bitbucket", icon: GitFork },
+  { id: "knowledge", label: "Knowledge sources", hint: "Jira, Confluence", icon: Plug },
+] as const;
+
+function Section({ id, title, subtitle, children }: { id: string; title: string; subtitle: string; children: ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-6 space-y-3">
+      <div><h2 id={`${id}-h`} className="text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted">{subtitle}</p></div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
 
 export default function SettingsPage() {
   const ask = useConfirm();
@@ -38,54 +57,79 @@ export default function SettingsPage() {
   const presets = f.provider === "github-models" && catalog.data?.length ? catalog.data.map((m) => m.id) : (data?.presets[f.provider] ?? []);
   const online = f.provider !== "heuristic";
 
+  // Connection states for the summary strip (the cards own their own queries; these share the same cache keys).
+  const gh = useQuery({ queryKey: ["github-conn"], queryFn: () => api<GithubConn>("/github/connection") });
+  const bb = useQuery({ queryKey: ["bitbucket-conn"], queryFn: () => api<BitbucketConn>("/bitbucket/connection") });
+  const jira = useQuery({ queryKey: ["jira-conn"], queryFn: () => api<JiraConnection | null>("/jira/connection") });
+  const conf = useQuery({ queryKey: ["confluence-conn"], queryFn: () => api<ConfluenceConn>("/wiki/confluence/connection") });
+  const summary = [
+    { label: "AI model", on: !!data && !data.offline, href: "#ai", icon: Brain },
+    { label: "GitHub", on: !!gh.data?.connected, href: "#code", icon: GitFork },
+    { label: "Bitbucket", on: !!bb.data?.connected, href: "#code", icon: GitFork },
+    { label: "Jira", on: !!jira.data, href: "#knowledge", icon: Ticket },
+    { label: "Confluence", on: !!conf.data?.connected, href: "#knowledge", icon: Library },
+  ];
+
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Connect a language model for AI answers and root-cause narratives. Retrieval, graph and ranking always run locally." />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,520px)_1fr]">
-        <Card>
-          <CardTitle right={data && <div className="flex gap-1"><Badge tone={data.offline ? "gray" : "green"}>{data.offline ? "offline mode" : "AI enabled"}</Badge><Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></div>}>
-            <span className="flex items-center gap-2"><KeyRound className="h-4 w-4" />Language model</span></CardTitle>
-          <form onSubmit={submit} className="space-y-3">
-            <label className="block"><Label>Provider</Label>
-              <select disabled={!admin} className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: PROVIDERS.some(([p]) => p === e.target.value) ? (data?.presets[e.target.value]?.[0] ?? "") : f.model })}>
-                {PROVIDERS.filter(([v]) => v !== "github-models" || data?.provider === "github-models").map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-            {f.provider === "github-models" && <p role="alert" className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">GitHub retired GitHub Models on 30 July 2026, so its API no longer answers for anyone, whatever token you use. Pick another provider: Anthropic, an OpenAI-compatible service (Ollama, Gemini, Groq, OpenRouter, Azure AI Foundry) or offline mode. Your GitHub token still works for pull requests and private repositories.</p>}
-            {online && (<>
-              <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5-5"} />
-                <datalist id="model-presets">{presets.map((m) => <option key={m} value={m} />)}</datalist></label>
-              {f.provider === "openai" && <label className="block"><Label>Base URL</Label><Input disabled={!admin} value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://api.openai.com/v1" /></label>}
-              <label className="block"><Label>{f.provider === "github-models" ? "GitHub token (optional)" : "API key"} {data?.has_key && <span className="text-emerald-700">({data.uses_github_token ? "using your connected GitHub account" : "stored — leave blank to keep"})</span>}</Label>
-                <Input disabled={!admin} type="password" autoComplete="off" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={data?.has_key ? "••••••••••••" : "Paste your API key"} />
-                <span className="mt-1 block text-xs text-muted">{f.provider === "github-models" ? "Leave blank to use the GitHub connection below. Press “Test connection” to confirm the account can call GitHub Models." : f.provider === "anthropic" ? "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console." : "Encrypted at rest. Never shown again and never sent to the browser."}</span></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block"><Label>Input price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.input_price} onChange={(e) => setF({ ...f, input_price: e.target.value })} /></label>
-                <label className="block"><Label>Output price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.output_price} onChange={(e) => setF({ ...f, output_price: e.target.value })} /></label>
-              </div>
-              <p className="text-xs text-muted">Prices drive the cost figures on the Token Usage page. Leave empty to report $0 (unpriced).</p>
-            </>)}
-            <ErrorNote error={save.error ?? reset.error} />
-            {admin ? (
-              <div className="flex flex-wrap gap-2">
-                <Button disabled={save.isPending}>Save</Button>
-                <Button type="button" variant="outline" disabled={test.isPending || !data || data.offline} onClick={() => test.mutate()}>Test connection</Button>
-                {data?.source === "org" && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove the stored key?", message: "The organisation reverts to the server defaults.", confirmLabel: "Remove key", danger: true })) reset.mutate(); }}>Reset</Button>}
-              </div>) : <p className="text-sm text-muted">Only workspace admins can change these settings.</p>}
-            {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
-          </form>
-        </Card>
-        <RetrievalCard />
-        {admin && <SsoCard />}
-        <GithubConnect admin={admin} />
-        <BitbucketConnect admin={admin} />
-        <Card className="lg:col-start-2 lg:row-start-1 lg:row-span-2">
-          <CardTitle>What uses the model</CardTitle>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-            <li><b>Investigations</b> — the root-cause narrative and suggested next steps (ranking and citation checks stay deterministic).</li>
-            <li><b>Knowledge “Ask”</b> — answers written from retrieved passages, with [S#] citations that are checked against the sources.</li>
-            <li>Secrets in prompts are redacted, results are cached, and daily/monthly budgets stop optional calls when exceeded.</li>
-          </ul>
-          <div className="mt-4 rounded-md bg-slate-50 p-3 text-xs text-muted">Embeddings use <code>{data?.embedding_provider ?? "…"}</code> and are configured on the server (<code>REPOLENS_EMBEDDING_PROVIDER</code>); changing them requires re-indexing.</div>
-        </Card>
+      <PageHeader title="Settings" subtitle="Connect a language model and the tools your team already uses. Retrieval, the graph and ranking always run locally." />
+      <div className="mb-6 flex flex-wrap gap-2" aria-label="Connection summary">
+        {summary.map((s) => (
+          <a key={s.label} href={s.href} className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors hover:border-brand", s.on ? "border-emerald-200 bg-emerald-50/60 text-emerald-800" : "border-line bg-white text-muted")}>
+            <span className={cn("h-2 w-2 rounded-full", s.on ? "bg-emerald-500" : "bg-slate-300")} aria-hidden />{s.label}<span className="sr-only">{s.on ? " connected" : " not connected"}</span></a>))}
+      </div>
+      <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <nav aria-label="Settings sections" className="hidden lg:block">
+          <ul className="sticky top-6 space-y-1">{SECTIONS.map((s) => (
+            <li key={s.id}><a href={`#${s.id}`} className="flex items-start gap-3 rounded-xl px-3 py-2.5 hover:bg-white hover:shadow-sm">
+              <s.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted" /><span><span className="block text-sm font-medium">{s.label}</span><span className="block text-xs text-muted">{s.hint}</span></span></a></li>))}</ul>
+        </nav>
+        <div className="max-w-3xl space-y-10">
+          <Section id="ai" title="AI model" subtitle="Optional. Everything works offline; a model makes answers and reports read better.">
+            <ConnectionCard icon={KeyRound} tint="violet" title="Language model"
+              status={data ? <div className="flex items-center gap-1.5"><StatusPill on={!data.offline} onLabel="AI enabled" offLabel="offline mode" /><Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></div> : undefined}
+              description="Choose a provider and paste a key. It is encrypted at rest and never shown again.">
+              <form onSubmit={submit} className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block"><Label>Provider</Label>
+                    <select disabled={!admin} className={selectCls} value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: PROVIDERS.some(([p]) => p === e.target.value) ? (data?.presets[e.target.value]?.[0] ?? "") : "" })}>
+                      {PROVIDERS.filter(([v]) => v !== "github-models" || data?.provider === "github-models").map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+                  {online && <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5-5"} />
+                    <datalist id="model-presets">{presets.map((m) => <option key={m} value={m} />)}</datalist></label>}
+                </div>
+                {f.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">GitHub retired GitHub Models on 30 July 2026, so its API no longer answers for anyone, whatever token you use. Pick another provider: Anthropic, an OpenAI-compatible service (Ollama, Gemini, Groq, OpenRouter, Azure AI Foundry) or offline mode. Your GitHub token still works for pull requests and private repositories.</p>}
+                {online && (<>
+                  {f.provider === "openai" && <label className="block"><Label>Base URL</Label><Input disabled={!admin} value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://api.openai.com/v1" /></label>}
+                  <label className="block"><Label>{f.provider === "github-models" ? "GitHub token (optional)" : "API key"} {data?.has_key && <span className="text-emerald-700">({data.uses_github_token ? "using your connected GitHub account" : "stored — leave blank to keep"})</span>}</Label>
+                    <Input disabled={!admin} type="password" autoComplete="off" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={data?.has_key ? "••••••••••••" : "Paste your API key"} />
+                    <span className="mt-1 block text-xs text-muted">{f.provider === "github-models" ? "Leave blank to use the GitHub connection below. Press “Test connection” to confirm the account can call GitHub Models." : f.provider === "anthropic" ? "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console." : "Encrypted at rest. Never shown again and never sent to the browser."}</span></label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block"><Label>Input price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.input_price} onChange={(e) => setF({ ...f, input_price: e.target.value })} /></label>
+                    <label className="block"><Label>Output price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.output_price} onChange={(e) => setF({ ...f, output_price: e.target.value })} /></label>
+                  </div>
+                  <p className="text-xs text-muted">Prices drive the cost figures on the Token Usage page. Leave empty to report $0 (unpriced).</p>
+                </>)}
+                <ErrorNote error={save.error ?? reset.error} />
+                {admin ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button disabled={save.isPending}>Save</Button>
+                    <Button type="button" variant="outline" disabled={test.isPending || !data || data.offline} onClick={() => test.mutate()}>Test connection</Button>
+                    {data?.source === "org" && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove the stored key?", message: "The organisation reverts to the server defaults.", confirmLabel: "Remove key", danger: true })) reset.mutate(); }}>Reset</Button>}
+                  </div>) : <p className="text-sm text-muted">Only workspace admins can change these settings.</p>}
+                {test.data && <p role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Connected — ${test.data.model}, ${test.data.latency_ms} ms (${test.data.input_tokens} input tokens)` : test.data.error}</p>}
+              </form>
+            </ConnectionCard>
+            <RetrievalCard />
+          </Section>
+          <Section id="code" title="Code hosting" subtitle="Browse and add repositories, import pull requests, clone private code.">
+            <GithubConnect admin={admin} />
+            <BitbucketConnect admin={admin} />
+          </Section>
+          <Section id="knowledge" title="Knowledge sources" subtitle="Tickets and documentation that become searchable history and wiki pages.">
+            <JiraConnect admin={admin} />
+            <ConfluenceConnect admin={admin} />
+          </Section>
+        </div>
       </div>
     </div>
   );
@@ -95,104 +139,14 @@ function RetrievalCard() {
   const { data } = useQuery({ queryKey: ["retrieval-status"], queryFn: () => api<RetrievalStatus>("/settings/retrieval") });
   if (!data) return null;
   return (
-    <Card>
-      <CardTitle>Search quality</CardTitle>
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+    <ConnectionCard icon={SearchCheck} tint="emerald" title="Search quality" description="How results are found and ranked. Set with environment variables on the server (REPOLENS_EMBEDDING_* and REPOLENS_RERANK_*)."
+      status={<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", TINTS.slate)}><ShieldCheck className="h-3 w-3" />{data.embedding.offline ? "runs offline" : "uses a hosted embedder"}</span>}>
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-muted">Embeddings</dt><dd className="font-medium">{data.embedding.model} <Badge tone={data.embedding.offline ? "gray" : "brand"}>{data.embedding.offline ? "offline" : data.embedding.provider}</Badge></dd>
           <dd className="text-xs text-muted">{data.embedding.dimensions} dimensions{data.embedding.offline ? " · works without internet, weaker on natural language" : ""}</dd></div>
         <div><dt className="text-xs text-muted">Reranker</dt><dd className="font-medium">{data.rerank.provider === "none" ? "Off" : data.rerank.model} {!data.rerank.configured && <Badge tone="amber">no endpoint set</Badge>}</dd>
           <dd className="text-xs text-muted">{data.rerank.provider === "none" ? "Enable with REPOLENS_RERANK_PROVIDER" : `re-scores the top ${data.rerank.depth} results of every search`}</dd></div>
       </dl>
-      <p className="mt-3 text-xs text-muted">Set with environment variables on the server: REPOLENS_EMBEDDING_* and REPOLENS_RERANK_*. See docs/features.md.</p>
-    </Card>
-  );
-}
-
-function SsoCard() {
-  const qc = useQueryClient();
-  const ask = useConfirm();
-  const toast = useToast();
-  const sso = useQuery({ queryKey: ["sso"], queryFn: () => api<SsoSettings>("/settings/sso") });
-  const scim = useQuery({ queryKey: ["scim"], queryFn: () => api<ScimStatus>("/settings/scim") });
-  const [f, setF] = useState({ issuer: "", client_id: "", client_secret: "", allowed_domains: "", default_role: "viewer", auto_provision: true, enabled: true });
-  const [newToken, setNewToken] = useState("");
-  useEffect(() => {
-    const d = sso.data;
-    if (d?.configured) setF({ issuer: d.issuer ?? "", client_id: d.client_id ?? "", client_secret: "", allowed_domains: (d.allowed_domains ?? []).join(", "), default_role: d.default_role ?? "viewer", auto_provision: d.auto_provision ?? true, enabled: d.enabled ?? true });
-  }, [sso.data]);
-  const save = useMutation({ mutationFn: () => api<SsoSettings>("/settings/sso", { method: "PUT", json: f }), onSuccess: (d) => { qc.setQueryData(["sso"], d); setF((x) => ({ ...x, client_secret: "" })); toast("Single sign-on saved"); } });
-  const remove = useMutation({ mutationFn: () => api("/settings/sso", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["sso"] }); toast("Single sign-on removed"); } });
-  const mint = useMutation({ mutationFn: () => api<{ token: string }>("/settings/scim/token", { method: "POST" }), onSuccess: (r) => { setNewToken(r.token); qc.invalidateQueries({ queryKey: ["scim"] }); } });
-  const revoke = useMutation({ mutationFn: () => api("/settings/scim", { method: "DELETE" }), onSuccess: () => { setNewToken(""); qc.invalidateQueries({ queryKey: ["scim"] }); toast("SCIM token revoked"); } });
-  const d = sso.data;
-  return (
-    <Card>
-      <CardTitle right={d?.configured ? <Badge tone={d.enabled ? "green" : "gray"}>{d.enabled ? "enabled" : "disabled"}</Badge> : undefined}>Single sign-on and provisioning</CardTitle>
-      <p className="mb-3 text-xs text-muted">Let people sign in with your identity provider (Okta, Microsoft Entra ID, Google Workspace and any OpenID Connect provider). SSO never grants admin: new users start as viewer or member.</p>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
-        <div className="sm:col-span-2"><Label>Issuer URL</Label><Input aria-label="Issuer URL" value={f.issuer} onChange={(e) => setF({ ...f, issuer: e.target.value })} placeholder="https://login.microsoftonline.com/<tenant>/v2.0" /></div>
-        <div><Label>Client id</Label><Input aria-label="Client id" value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} /></div>
-        <div><Label>Client secret</Label><Input aria-label="Client secret" type="password" autoComplete="off" value={f.client_secret} onChange={(e) => setF({ ...f, client_secret: e.target.value })} placeholder={d?.has_secret ? "•••••••• (unchanged)" : ""} /></div>
-        <div className="sm:col-span-2"><Label>Allowed e-mail domains</Label><Input aria-label="Allowed e-mail domains" value={f.allowed_domains} onChange={(e) => setF({ ...f, allowed_domains: e.target.value })} placeholder="acme.com, acme.io" />
-          <p className="mt-1 text-xs text-muted">Only these domains can sign in this way, and a domain can belong to one organisation.</p></div>
-        <div><Label>New users get the role</Label><select aria-label="Default role" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.default_role} onChange={(e) => setF({ ...f, default_role: e.target.value })}><option value="viewer">Viewer</option><option value="member">Member</option></select></div>
-        <div className="flex items-end gap-4 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={f.auto_provision} onChange={(e) => setF({ ...f, auto_provision: e.target.checked })} />Create accounts on first sign-in</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} />Enabled</label></div>
-        {d && <p className="text-xs text-muted sm:col-span-2">Register this redirect URI with your provider: <code className="select-all rounded bg-slate-100 px-1">{d.redirect_uri}</code></p>}
-        <div className="flex gap-2 sm:col-span-2"><Button disabled={save.isPending || !f.issuer || !f.client_id || !f.allowed_domains || (!d?.has_secret && !f.client_secret)}>Save</Button>
-          {d?.configured && <Button type="button" variant="ghost" onClick={async () => { if (await ask({ title: "Remove single sign-on?", message: "People who signed in this way keep their accounts but can no longer use SSO.", confirmLabel: "Remove", danger: true })) remove.mutate(); }}>Remove</Button>}</div>
-        <div className="sm:col-span-2"><ErrorNote error={save.error} /></div>
-      </form>
-      <div className="mt-5 border-t border-line pt-4">
-        <h4 className="mb-1 text-sm font-semibold">Automatic provisioning (SCIM)</h4>
-        <p className="mb-2 text-xs text-muted">Your identity provider creates, updates and deactivates users here. Deactivating a user ends their sessions immediately. Base URL: <code className="select-all rounded bg-slate-100 px-1">{window.location.origin}/scim/v2</code></p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" disabled={mint.isPending} onClick={async () => { if (!scim.data?.configured || await ask({ title: "Replace the SCIM token?", message: "The current token stops working immediately. Update it in your identity provider.", confirmLabel: "Generate new token" })) mint.mutate(); }}>{scim.data?.configured ? "Rotate token" : "Generate token"}</Button>
-          {scim.data?.configured && <Button variant="ghost" size="sm" onClick={async () => { if (await ask({ title: "Revoke the SCIM token?", message: "Provisioning stops until you generate a new one.", confirmLabel: "Revoke", danger: true })) revoke.mutate(); }}>Revoke</Button>}
-          {scim.data?.configured && <span className="text-xs text-muted">{scim.data.last_used_at ? `last used ${timeAgo(scim.data.last_used_at)}` : "not used yet"}</span>}
-        </div>
-        {newToken && <p role="status" className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">Copy this token now, it is not shown again: <code className="select-all break-all font-mono">{newToken}</code></p>}
-      </div>
-    </Card>
-  );
-}
-
-function BitbucketConnect({ admin }: { admin: boolean }) {
-  const qc = useQueryClient();
-  const ask = useConfirm();
-  const toast = useToast();
-  const conn = useQuery({ queryKey: ["bitbucket-conn"], queryFn: () => api<BitbucketConn>("/bitbucket/connection") });
-  const [f, setF] = useState({ deployment: "cloud", base_url: "", username: "", token: "" });
-  const [edit, setEdit] = useState(false);
-  const save = useMutation({ mutationFn: () => api("/bitbucket/connection", { method: "PUT", json: f }), onSuccess: () => { setF({ ...f, token: "" }); setEdit(false); qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket connected"); } });
-  const remove = useMutation({ mutationFn: () => api("/bitbucket/connection", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket disconnected"); } });
-  const test = useMutation({ mutationFn: () => api<{ ok: boolean; user?: string; error?: string }>("/bitbucket/test", { method: "POST" }) });
-  const c = conn.data;
-  const showForm = admin && (edit || !c?.connected);
-  return (
-    <Card>
-      <CardTitle right={c?.connected ? <Badge tone="green">connected</Badge> : <Badge>not connected</Badge>}>Bitbucket</CardTitle>
-      <p className="mb-3 text-xs text-muted">Browse repositories and pull requests, and clone private repositories. Credentials are stored encrypted and never shown again.</p>
-      {showForm ? (
-        <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
-          <div><Label>Deployment</Label><select aria-label="Bitbucket deployment" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.deployment} onChange={(e) => setF({ ...f, deployment: e.target.value })}><option value="cloud">Bitbucket Cloud</option><option value="server">Server / Data Center</option></select></div>
-          {f.deployment === "server"
-            ? <div><Label>Base URL</Label><Input aria-label="Bitbucket base URL" value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://bitbucket.company.com" /></div>
-            : <div><Label>Username (app password only)</Label><Input aria-label="Bitbucket username" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder="leave empty for an access token" /></div>}
-          <div className="sm:col-span-2"><Label>{f.deployment === "server" ? "Personal access token" : f.username ? "App password" : "Access token"}</Label><Input aria-label="Bitbucket token" type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
-            <p className="mt-1 text-xs text-muted">{f.deployment === "server" ? "Create it under Profile → Personal access tokens with Project read and Repository read." : "Cloud: an app password (Account settings → App passwords) with Repositories: read and Pull requests: read, or a repository / workspace access token. Use a read-only credential."}</p></div>
-          <ErrorNote error={save.error} />
-          <div className="flex gap-2 sm:col-span-2"><Button disabled={save.isPending || f.token.length < 4 || (f.deployment === "server" && !f.base_url)}>Save</Button>{c?.connected && <Button type="button" variant="outline" onClick={() => setEdit(false)}>Cancel</Button>}</div>
-        </form>
-      ) : c?.connected && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span>{c.deployment === "server" ? `Server · ${c.base_url}` : `Cloud${c.username ? ` · ${c.username}` : " · access token"}`}</span>
-          {admin && <><Button size="sm" variant="outline" onClick={() => test.mutate()} disabled={test.isPending}>Test</Button><Button size="sm" variant="outline" onClick={() => { setF({ deployment: c.deployment ?? "cloud", base_url: c.base_url ?? "", username: c.username ?? "", token: "" }); setEdit(true); }}>Change</Button>
-            <Button size="sm" variant="ghost" onClick={async () => { if (await ask({ title: "Disconnect Bitbucket?", message: "The stored credential is deleted.", confirmLabel: "Disconnect", danger: true })) remove.mutate(); }}>Disconnect</Button></>}
-          {test.data && <span role="status" className={test.data.ok ? "text-emerald-700" : "text-red-600"}>{test.data.ok ? `Connected as ${test.data.user}` : test.data.error}</span>}
-        </div>)}
-      {!admin && !c?.connected && <p className="text-sm text-muted">Only admins can connect Bitbucket.</p>}
-    </Card>
+    </ConnectionCard>
   );
 }

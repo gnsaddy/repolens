@@ -108,3 +108,18 @@ def test_jira_projects_for_cloud_and_server(client, auth, monkeypatch):
     assert client.get("/api/jira/projects", headers=other).status_code in (404, 400)
     monkeypatch.setattr(jira_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(401)))
     assert client.get("/api/jira/projects", headers=auth).status_code == 502
+
+
+def test_jira_can_be_disconnected_by_an_admin_only(client, auth):
+    configure_jira(client, auth)
+    client.post(
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+    )
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+        "access_token"
+    ]
+    assert client.delete("/api/jira/connection", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403
+    assert client.get("/api/jira/connection", headers=auth).json() is not None
+    assert client.delete("/api/jira/connection", headers=auth).status_code == 204
+    assert client.get("/api/jira/connection", headers=auth).json() is None
+    assert client.delete("/api/jira/connection", headers=auth).status_code == 204  # idempotent

@@ -46,12 +46,13 @@ describe("Wiki", () => {
     expect(screen.getByRole("link", { name: "Open original" })).toHaveAttribute("rel", expect.stringContaining("noopener"));
     expect(await screen.findByText("handbook (2)")).toBeInTheDocument();
   });
-  it("offers Sources when empty and shows Confluence form for admins", async () => {
+  it("offers Sources when empty and sends admins to Settings to connect Confluence", async () => {
     mock();
     renderWiki("/wiki?tab=sources");
     expect(await screen.findByText("Add README / text files")).toBeInTheDocument();
-    expect(await screen.findByLabelText("Base URL")).toBeInTheDocument();
-    expect(screen.getByLabelText("Token")).toHaveAttribute("type", "password");
+    const link = await screen.findByRole("link", { name: "Settings → Knowledge sources" });
+    expect(link).toHaveAttribute("href", "/settings#knowledge");
+    expect(screen.queryByLabelText("Token")).toBeNull(); // credentials are entered in Settings only
   });
   it("switches tabs", async () => {
     mock();

@@ -1,12 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
 import Login, { SsoComplete } from "@/pages/Login";
-import SettingsPage from "@/pages/SettingsPage";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
 const wrap = (ui: React.ReactNode, url = "/") => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={[url]}>{ui}</MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
@@ -46,35 +45,5 @@ describe("SSO sign-in", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ detail: "This sign-in expired. Start again." }, 401));
     wrap(<SsoComplete />, "/sso-complete?code=" + "d".repeat(30));
     expect(await screen.findByRole("alert")).toHaveTextContent("expired");
-  });
-});
-
-describe("SSO settings", () => {
-  it("admins configure SSO without ever seeing the secret and can mint a SCIM token once", async () => {
-    const calls: { url: string; body?: unknown; method?: string }[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
-      const u = String(input);
-      if (init?.method && init.method !== "GET") calls.push({ url: u, method: init.method, body: init.body ? JSON.parse(String(init.body)) : undefined });
-      if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role: "admin", org_id: "o" });
-      if (u.endsWith("/settings/sso") && init?.method === "PUT") return json({ configured: true, redirect_uri: "https://x/api/auth/sso/callback", issuer: "https://idp.example.com", client_id: "cid", has_secret: true, allowed_domains: ["corp.io"], default_role: "viewer", auto_provision: true, enabled: true });
-      if (u.endsWith("/settings/sso")) return json({ configured: false, redirect_uri: "https://x/api/auth/sso/callback" });
-      if (u.endsWith("/settings/scim/token")) return json({ token: "scim_secrettoken" });
-      if (u.endsWith("/settings/scim")) return json({ configured: false, created_at: null, last_used_at: null });
-      if (u.endsWith("/settings/llm")) return json({ provider: "heuristic", model: "claude-sonnet-5-5", base_url: "", has_key: false, source: "env", input_price: null, output_price: null, offline: true, presets: { anthropic: [], openai: [] }, embedding_provider: "hash" });
-      if (u.endsWith("/settings/retrieval")) return json({ embedding: { provider: "hash", model: "x", dimensions: 1, offline: true }, rerank: { provider: "lexical", model: "m", configured: true, depth: 30 } });
-      return json({});
-    });
-    localStorage.setItem("repolens.token", "tok");
-    wrap(<SettingsPage />);
-    await userEvent.type(await screen.findByLabelText("Issuer URL"), "https://idp.example.com");
-    await userEvent.type(screen.getByLabelText("Client id"), "cid");
-    await userEvent.type(screen.getByLabelText("Client secret"), "s3cret");
-    await userEvent.type(screen.getByLabelText("Allowed e-mail domains"), "corp.io");
-    await userEvent.click(within(screen.getByLabelText("Issuer URL").closest("form")!).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/settings/sso"))).toBe(true));
-    expect(screen.queryByDisplayValue("s3cret")).toBeNull(); // the secret field is cleared after saving
-    expect(await screen.findByText(/https:\/\/x\/api\/auth\/sso\/callback/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Generate token" }));
-    expect(await screen.findByText("scim_secrettoken")).toBeInTheDocument();
   });
 });

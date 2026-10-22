@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/feedback";
-import { Copy, ExternalLink, GitPullRequest } from "lucide-react";
+import { Copy, ExternalLink, GitFork } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label } from "@/components/ui";
+import { ConnectionCard, StatusPill } from "@/components/ConnectionCard";
+import { Badge, Button, ErrorNote, Input, Label } from "@/components/ui";
 import { api, type DevicePoll, type DeviceStart, type GithubConn } from "@/lib/api";
 
 const SCOPES = [
@@ -52,11 +53,9 @@ export default function GithubConnect({ admin }: { admin: boolean }) {
   const c = conn.data;
 
   return (
-    <Card className="lg:col-start-1">
-      <CardTitle right={c?.connected && <div className="flex gap-1"><Badge tone="green">connected</Badge><Badge tone="brand">{c.auth_method === "oauth" ? `OAuth${c.login ? ` · @${c.login}` : ""}` : "token"}</Badge></div>}>
-        <span className="flex items-center gap-2"><GitPullRequest className="h-4 w-4" />GitHub</span>
-      </CardTitle>
-      <p className="mb-3 text-xs text-muted">Ingest pull requests into the knowledge graph and optionally use GitHub Models. The token is stored encrypted and never shown again.</p>
+    <ConnectionCard icon={GitFork} tint="slate" title="GitHub" id="github"
+      status={c?.connected ? <div className="flex items-center gap-1.5"><StatusPill on /> <Badge tone="brand">{c.auth_method === "oauth" ? `OAuth${c.login ? ` · @${c.login}` : ""}` : "token"}</Badge></div> : <StatusPill on={false} />}
+      description="Browse repositories, pull requests and issues, import pull requests into the knowledge graph, and clone private repositories. The token is stored encrypted and never shown again.">
       {!admin ? <p className="text-sm text-muted">{c?.connected ? "GitHub is connected." : "An admin must connect GitHub."}</p> : (<>
         {flow ? (
           <div className="rounded-lg border border-line bg-slate-50 p-4" role="status">
@@ -96,6 +95,6 @@ export default function GithubConnect({ admin }: { admin: boolean }) {
             </form>)}
         </div>
       </>)}
-    </Card>
+    </ConnectionCard>
   );
 }
