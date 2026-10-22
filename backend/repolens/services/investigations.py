@@ -10,6 +10,7 @@ from ..agents.workflow import Ctx, Features, run_workflow
 from ..config import get_settings
 from ..db import session_factory
 from ..models import Hypothesis, Investigation, MemoryEntry
+from . import agent_context
 from .access import repo_ids_in_evidence, scope_for_user_id
 from .embeddings import Embedder
 from .llm import LLMClient
@@ -119,6 +120,7 @@ def run_investigation(inv_id: str, features: Features | None = None) -> None:
         inv.status = "completed"
         inv.finished_at = datetime.now(UTC)
         db.commit()
+        agent_context.publish(db, inv.org_id, inv.id, agent_context.digest_of(inv))
         if (features or Features()).memory:
             _remember(db, inv)
     except Exception as e:

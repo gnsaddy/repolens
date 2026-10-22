@@ -9,6 +9,7 @@ person's answer is never served to someone with different access.
 import hashlib
 import json
 from datetime import UTC, timedelta
+from functools import lru_cache
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -19,8 +20,14 @@ from . import embeddings, usage
 from .access import Scope
 
 
+@lru_cache(maxsize=512)
+def _embed_cached(text: str, model: str) -> tuple[float, ...]:
+    return tuple(embeddings.Embedder().embed([text])[0])
+
+
 def _embed(text: str) -> list[float]:
-    return embeddings.Embedder().embed([text])[0]
+    """Embed a question once per process: repeats and the lookup-then-store pair cost one embedding, not two."""
+    return list(_embed_cached(text, embeddings.Embedder().model))
 
 
 _STOP = frozenset(

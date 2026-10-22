@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Change, CodeChunk, DocProposal, Document, DriftAlert, Investigation, KGNode, Repository, WikiSource
 from ..security import redact_secrets, redact_stored
+from . import agent_context
 from . import confluence as cf
 from .llm import LLMClient, LLMUnavailable
 from .llm_router import Task
@@ -167,23 +168,12 @@ def _slug(text: str) -> str:
 def draft_runbook(db: Session, org_id: str, user_id: str, inv: Investigation, collection_id: str = "") -> DocProposal:
     if inv.root_cause_status != "confirmed":
         raise ProposalError("Confirm the root cause first, so runbooks are written from verified findings")
+    digest = agent_context.fetch(db, org_id, inv.id) or agent_context.digest_of(inv)
+    digest["confirmed"] = True  # checked above
     top = inv.hypotheses[0] if inv.hypotheses else None
-    refs = []
-    for e in (top.evidence if top else [])[:8]:
-        if e.get("type") == "code":
-            refs.append(f"- Code: `{e['repo']}:{e['file']}` lines {e['start_line']}-{e['end_line']}")
-        elif e.get("type") == "commit":
-            refs.append(
-                f"- Commit `{e['sha'][:10]}` by {e.get('author', '')}: {(e.get('message') or '').splitlines()[0][:100]}"
-            )
-        elif e.get("type") == "pr":
-            refs.append(f"- Pull request #{e.get('number')}: {e.get('title', '')}")
     cause = (top.title if top else inv.root_cause) or inv.title
-    facts = (
-        f"Title: {inv.title}\nReported problem:\n{inv.query[:2500]}\n\nRoot cause: {cause}\n"
-        f"Explanation: {(top.explanation if top else '')[:2000]}\nSuggested fix: {inv.suggested_fix[:1500]}\nEvidence:\n"
-        + "\n".join(refs)
-    )
+    refs = [f"- {e}" for e in digest.get("evidence", [])]
+    facts = agent_context.render(digest)  # the investigator's digest: no need to resend the whole evidence
     llm = _llm(db, org_id, "wiki-proposal", inv.id)
     body, by = None, "template"
     if llm is not None:

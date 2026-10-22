@@ -108,6 +108,21 @@ When you ask, RepoLens first shows **Asked before**: earlier answers to similar 
 
 To cut tokens further, the context sent to a model is condensed to the lines that match the question, repeated passages are dropped, and savings mode uses a smaller budget. A light model answers first; if its answer cites nothing and does not say the sources lack the answer, one stronger model retries.
 
+### Why there is no Redis
+
+The answer memory, shared agent digests and exact-prompt cache live in the application database (SQLite in development, PostgreSQL in production), next to the data they describe. That keeps them durable across restarts, lets them be invalidated in the same transaction as a re-index, and means one fewer service to run. A small in-process cache holds recent question embeddings. Redis becomes worthwhile only when several API servers need to share a very hot cache or you need sub-millisecond lookups at high request rates; the lookup functions are isolated in `services/answer_memory.py` for that day.
+
+### Agents share context
+
+When an investigation finishes it publishes a short digest (problem, root cause, fix, evidence references). The runbook writer reads that digest instead of the whole evidence again, so the same facts are not paid for twice. Digests expire after 30 days.
+
+### Jira, profile and insights
+
+- **Jira**: open a ticket to read its description and comments, run an analysis (error signatures, stack frames, files and symbols, what was tried, proposed cause, workarounds, fixes, unanswered questions, gaps) and start an investigation seeded with those signals.
+- **Profile**: display name, password, and every device you are signed in on, each of which can be ended. Signing out ends the session on the server.
+- **Insights**: AI utilisation per model and day, tokens avoided by routing and memory, work done, what is indexed and who is active.
+- **Documents**: pages show their kind, purpose, warnings, owners, commands, endpoints and settings at a glance; long sections split at paragraph boundaries and never cut a code block or table.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.

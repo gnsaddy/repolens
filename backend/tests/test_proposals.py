@@ -258,3 +258,20 @@ def test_proposal_detail_always_lists_where_it_can_be_applied(client, auth, demo
     p = client.post("/api/wiki/proposals/from-incident", headers=auth, json={"investigation_id": inv["id"]})
     assert p.status_code == 201 and p.json()["apply_options"] == ["local"]
     assert client.get(f"/api/wiki/proposals/{p.json()['id']}", headers=auth).json()["apply_options"] == ["local"]
+
+
+def test_runbook_uses_the_investigators_digest_instead_of_the_full_evidence(client, auth, demo_repo, session):
+    from repolens.models import CacheEntry
+    from repolens.services import agent_context
+
+    repo = add_repo(client, auth, demo_repo[0])
+    inv = run_investigation(client, auth, repo["id"])
+    row = session.get(CacheEntry, f"handoff:{inv['id']}")
+    assert row is not None and row.task == "handoff"  # published when the investigation finished
+    d = row.value
+    assert d["title"] and d["root_cause"] and len(d["problem"]) <= 400 and d["confirmed"] is False
+    text = agent_context.render(d)
+    assert "not yet confirmed" in text and d["root_cause"] in text and len(text) < 2500
+    client.post(f"/api/investigations/{inv['id']}/review", headers=auth, json={"outcome": "confirmed"})
+    p = client.post("/api/wiki/proposals/from-incident", headers=auth, json={"investigation_id": inv["id"]}).json()
+    assert p["status"] == "pending" and p["proposed"].strip()
