@@ -61,8 +61,18 @@ class BitbucketClient:
             raise BitbucketError(f"Bitbucket is unreachable ({type(e).__name__})") from e
         if r.status_code == 429:
             raise BitbucketError("Bitbucket rate limit reached; try again later", 429)
-        if r.status_code in (401, 403):
-            raise BitbucketError("Bitbucket rejected the credentials or they lack permission", r.status_code)
+        if r.status_code == 401:
+            raise BitbucketError(
+                "Bitbucket did not accept the username and token (401). With an Atlassian API token the username must be "
+                "your Atlassian email; with a repository or workspace access token leave the username empty.",
+                401,
+            )
+        if r.status_code == 403:
+            raise BitbucketError(
+                "Bitbucket accepted the login but the token lacks a permission this needs (403). Give it read access to "
+                "repositories and pull requests (scopes read:repository:bitbucket and read:pullrequest:bitbucket).",
+                403,
+            )
         if r.status_code == 404:
             raise BitbucketError("Not found on Bitbucket, or the credentials cannot see it", 404)
         if r.status_code >= 400:
@@ -100,8 +110,15 @@ class BitbucketClient:
     # -- API ---------------------------------------------------------------------------------------------------
     def whoami(self) -> str:
         if self.deployment == "cloud":
-            d = self._get(f"{self.root}/user")
-            return d.get("display_name") or d.get("username") or "Bitbucket user"
+            try:
+                d = self._get(f"{self.root}/user")
+                return d.get("display_name") or d.get("username") or "Bitbucket user"
+            except BitbucketError as e:
+                if e.status != 403:
+                    raise
+                # Authenticated, but the token cannot read the profile (no user scope). Repositories are what matters.
+                self._get(f"{self.root}/repositories", role="member", pagelen=1)
+                return "Bitbucket (this token can list repositories but not read your profile)"
         self._get(f"{self.root}/projects", limit=1)  # the Server REST API has no "current user" without a username
         return "Bitbucket Server user"
 

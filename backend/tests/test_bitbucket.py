@@ -278,7 +278,11 @@ def test_errors_are_explained_without_leaking(client, auth, monkeypatch):
     )
     connect(client, auth)
     r = client.get("/api/bitbucket/repos", headers=auth)
-    assert r.status_code == 502 and "rejected the credentials" in r.json()["detail"] and "app-password" not in r.text
+    assert (
+        r.status_code == 502
+        and "did not accept the username and token" in r.json()["detail"]
+        and "app-password" not in r.text
+    )
     assert client.post("/api/bitbucket/test", headers=auth).json()["ok"] is False
 
 
@@ -296,3 +300,27 @@ def test_clone_credentials_only_go_to_the_matching_host_and_never_into_urls(clie
     assert _strip_user("https://ana@bitbucket.org:7999/a/b.git") == "https://bitbucket.org:7999/a/b.git"
     with pytest.raises(BitbucketError):
         BitbucketClient("server", "t", base_url="ftp://x")
+
+
+def test_cloud_test_button_tolerates_tokens_without_the_profile_scope_and_explains_failures(client, auth, monkeypatch):
+    def handler(r: httpx.Request) -> httpx.Response:
+        if r.url.path == "/2.0/user":
+            return httpx.Response(
+                403, json={"error": {"message": "Your credentials lack one or more required privilege scopes."}}
+            )
+        if r.url.path == "/2.0/repositories":
+            return httpx.Response(200, json={"values": []})
+        return httpx.Response(404)
+
+    monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(handler))
+    connect(client, auth, username="me@example.com")
+    out = client.post("/api/bitbucket/test", headers=auth).json()
+    assert out["ok"] is True and "can list repositories but not read your profile" in out["user"]
+
+    monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(403)))
+    msg = client.post("/api/bitbucket/test", headers=auth).json()
+    assert msg["ok"] is False and "lacks a permission" in msg["error"] and "read:repository:bitbucket" in msg["error"]
+
+    monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(401)))
+    msg = client.post("/api/bitbucket/test", headers=auth).json()
+    assert msg["ok"] is False and "Atlassian email" in msg["error"] and "app-password" not in msg["error"]
