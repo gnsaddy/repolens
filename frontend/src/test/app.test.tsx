@@ -96,4 +96,23 @@ describe("InvestigationView", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Timeline" }));
     expect(screen.getByText("3 search terms")).toBeInTheDocument();
   });
+
+  it("publishes to a Jira issue typed in the dialog, even when none was linked", async () => {
+    localStorage.setItem("repolens.token", "tok");
+    const posted: unknown[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json({ ...user, role: "admin" });
+      if (u.endsWith("/jira/connection")) return json({ base_url: "https://x.atlassian.net", allow_publish: false });
+      if (u.endsWith("/jira/publish")) { posted.push(JSON.parse(String(init?.body))); return json({ status: "published" }); }
+      return json({ ...inv, title: "FacultyModelList in REP-1" });
+    });
+    wrap(<Routes><Route path="/investigations/:id" element={<InvestigationView />} /></Routes>, "/investigations/abcdef123456");
+    await userEvent.click(await screen.findByRole("button", { name: /Approve & publish to Jira/ }));
+    const key = await screen.findByLabelText("Jira issue key");
+    expect(key).toHaveValue("REP-1"); // taken from the title
+    expect(await screen.findByText(/Publishing is switched off/)).toBeInTheDocument(); // says why it would be refused
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(posted).toEqual([{ investigation_id: "abcdef123456", issue_key: "REP-1", approved: true }]));
+  });
 });

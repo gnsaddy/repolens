@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useConfirm } from "@/components/feedback";
+import Modal from "@/components/Modal";
 import { CheckCircle2, CircleDot, FileText, FlaskConical, GitCommit, GitPullRequest, Network, ThumbsDown, ThumbsUp, Ticket } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Button, Card, CardTitle, CodeBlock, ConfidenceBar, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
+import { Badge, Button, Card, Input, CardTitle, CodeBlock, ConfidenceBar, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
 import { api, type EvidenceItem, type Investigation, type ProposalDetail } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, timeAgo } from "@/lib/utils";
@@ -13,7 +13,6 @@ const TABS = ["Overview", "Timeline", "Findings", "Evidence", "Report"] as const
 type Tab = (typeof TABS)[number];
 
 export default function InvestigationView() {
-  const ask = useConfirm();
   const { id = "" } = useParams();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -32,8 +31,12 @@ export default function InvestigationView() {
     mutationFn: (outcome: "confirmed" | "rejected") => api<Investigation>(`/investigations/${id}/review`, { method: "POST", json: { outcome } }),
     onSuccess: (d) => qc.setQueryData(["investigation", id], d),
   });
+  const [pub, setPub] = useState(false);
+  const [key, setKey] = useState("");
+  const jira = useQuery({ queryKey: ["jira-connection"], queryFn: () => api<{ base_url?: string; allow_publish?: boolean } | null>("/jira/connection"), enabled: pub });
   const publish = useMutation({
-    mutationFn: () => api(`/jira/publish`, { method: "POST", json: { investigation_id: id, approved: true } }),
+    mutationFn: (issue: string) => api(`/jira/publish`, { method: "POST", json: { investigation_id: id, issue_key: issue, approved: true } }),
+    onSuccess: (_r, issue) => { setPub(false); qc.setQueryData(["investigation", id], (d: Investigation | undefined) => (d ? { ...d, jira_issue_key: d.jira_issue_key ?? issue } : d)); },
   });
 
   if (error) return <ErrorNote error={error} />;
@@ -58,14 +61,25 @@ export default function InvestigationView() {
         </div>
         {canWrite(user) && inv.status === "completed" && (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={!inv.jira_issue_key || publish.isPending || publish.isSuccess}
-              title={inv.jira_issue_key ? "Posts the RCA as a Jira comment" : "Link a Jira issue first (Jira page)"}
-              onClick={async () => { if (await ask({ title: `Publish to ${inv.jira_issue_key}?`, message: "The RCA report is posted as a comment on the Jira issue.", confirmLabel: "Publish" })) publish.mutate(); }}>
+            <Button variant="outline" size="sm" disabled={publish.isSuccess}
+              title="Posts the RCA report as a comment on a Jira issue"
+              onClick={() => { setKey(inv.jira_issue_key ?? /\b[A-Z][A-Z0-9]+-\d+\b/.exec(`${inv.title} ${inv.query ?? ""}`)?.[0] ?? ""); publish.reset(); setPub(true); }}>
               <Ticket className="h-4 w-4" />{publish.isSuccess ? "Published" : "Approve & publish to Jira"}
             </Button>
           </div>)}
       </div>
-      <ErrorNote error={publish.error} />
+      {pub && (
+        <Modal title="Publish to Jira" subtitle="The RCA report is posted as a comment on the issue." onClose={() => setPub(false)}>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (key.trim()) publish.mutate(key.trim().toUpperCase()); }}>
+            <label className="block text-sm font-medium">Jira issue key
+              <Input aria-label="Jira issue key" className="mt-1" value={key} onChange={(e) => setKey(e.target.value)} placeholder="e.g. REP-1" autoFocus /></label>
+            {jira.data === null && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Jira is not connected. Connect it in Settings → Integrations first.</p>}
+            {jira.data && jira.data.allow_publish === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Publishing is switched off for this Jira connection. Turn on “Allow publishing” in Settings → Integrations → Jira.</p>}
+            {inv.verification && inv.verification.valid === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">This report failed citation verification, so it cannot be published.</p>}
+            <ErrorNote error={publish.error} />
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setPub(false)}>Cancel</Button><Button disabled={!key.trim() || publish.isPending}>{publish.isPending ? "Publishing…" : "Publish"}</Button></div>
+          </form>
+        </Modal>)}
       {inv.status === "failed" && <ErrorNote error={inv.error ?? "Investigation failed"} />}
 
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">

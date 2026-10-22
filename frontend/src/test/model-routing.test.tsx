@@ -28,6 +28,7 @@ function setup(role = "admin", registry: unknown = { connections: [gemini], savi
     if (u.endsWith("/settings/routing")) return json({ connections: [gemini], savings_mode: false, plan, multi: true, active: 2 });
     if (u.endsWith("/settings/memory") && init?.method === "DELETE") return json({ cleared: 4 });
     if (u.endsWith("/settings/memory")) return json({ enabled: true, entries: 4, hits: 7, tokens_saved: 12345, threshold: 0.92, ttl_hours: 72 });
+    if (u.endsWith("/settings/llm/check") && JSON.parse(String(init?.body)).model) return json({ ok: true, latency_ms: 80 });
     if (u.endsWith("/settings/llm/check")) return json({ ok: true, models: [{ id: "gemini-2.5-flash-lite" }, { id: "gemini-2.5-pro" }, { id: "gemini-2.5-flash" }] });
     if (u.endsWith("/settings/models/connections")) return json({ connections: [gemini], savings_mode: true, plan, multi: true, active: 3 });
     if (u.includes("/settings/models/m1")) return json({ connections: [gemini], savings_mode: true, plan, multi: true, active: 2 });
@@ -68,6 +69,9 @@ describe("Settings: models and routing", () => {
     await userEvent.click(within(dlg).getByRole("checkbox", { name: "gemini-2.5-pro" }));
     expect(within(dlg).getByLabelText("Tier for gemini-2.5-flash-lite")).toHaveValue("light");
     expect(within(dlg).getByLabelText("Tier for gemini-2.5-pro")).toHaveValue("strong");
+    expect(within(dlg).getByRole("button", { name: "Add 2 models" })).toBeDisabled(); // not before every model is tested
+    await userEvent.click(within(dlg).getByRole("button", { name: "Test 2 selected models" }));
+    await waitFor(() => expect(within(dlg).getAllByText(/works/).length).toBe(2));
     await userEvent.click(within(dlg).getByRole("button", { name: "Add 2 models" }));
     await waitFor(() => expect(calls.find((c) => c.url.endsWith("/settings/models/connections"))?.body).toMatchObject({ provider: "gemini", models: [{ model: "gemini-2.5-flash-lite", tier: "light" }, { model: "gemini-2.5-pro", tier: "strong" }] }));
   });

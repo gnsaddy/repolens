@@ -78,6 +78,8 @@ function AddModels({ data, onDone }: { data: ModelRegistry; onDone: (d: ModelReg
   const [picked, setPicked] = useState<Record<string, Tier>>({});
   const [filter, setFilter] = useState("");
   const [err, setErr] = useState("");
+  const [results, setResults] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [testing, setTesting] = useState(false);
   const stored = data.connections.some((c) => c.provider === provider && !c.legacy && c.has_key);
   const check = useMutation({
     mutationFn: () => api<{ ok: boolean; error?: string; models?: { id: string }[] }>("/settings/llm/check", { method: "POST", json: { provider, api_key: apiKey, base_url: baseUrl, model: "" } }),
@@ -87,9 +89,21 @@ function AddModels({ data, onDone }: { data: ModelRegistry; onDone: (d: ModelReg
     mutationFn: () => api<ModelRegistry>("/settings/models/connections", { method: "POST", json: { provider, api_key: apiKey, base_url: baseUrl, models: Object.entries(picked).map(([model, tier]) => ({ model, tier })) } }),
     onSuccess: onDone,
   });
-  const reset = () => { setModels(null); setPicked({}); setErr(""); };
+  const reset = () => { setModels(null); setPicked({}); setErr(""); setResults({}); };
+  const testAll = async () => {
+    setTesting(true);
+    for (const m of Object.keys(picked)) {
+      if (results[m]?.ok) continue;
+      try {
+        const r = await api<{ ok: boolean; error?: string; latency_ms?: number }>("/settings/llm/check", { method: "POST", json: { provider, api_key: apiKey, base_url: baseUrl, model: m } });
+        setResults((x) => ({ ...x, [m]: { ok: r.ok, text: r.ok ? `works, ${r.latency_ms} ms` : r.error ?? "Failed" } }));
+      } catch (e) { setResults((x) => ({ ...x, [m]: { ok: false, text: (e as Error).message } })); }
+    }
+    setTesting(false);
+  };
   const shown = (models ?? []).filter((m) => m.toLowerCase().includes(filter.toLowerCase()));
   const count = Object.keys(picked).length;
+  const allOk = count > 0 && Object.keys(picked).every((m) => results[m]?.ok);
   return (
     <form className="space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (count) save.mutate(); }}>
       <label className="block"><Label>Provider</Label><select className={selectCls} value={provider} onChange={(e) => { setProvider(e.target.value); reset(); }}>{PROVIDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
@@ -100,17 +114,19 @@ function AddModels({ data, onDone }: { data: ModelRegistry; onDone: (d: ModelReg
       {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
       {models && (
         <div className="space-y-2 border-t border-line pt-3">
-          <p role="status" className="text-sm text-emerald-700">Key accepted. Tick the models to use.</p>
+          <p role="status" className="text-sm text-emerald-700">Key accepted. Tick the models to use, then test them.</p>
           <Input aria-label="Filter models" placeholder="Filter models…" className="h-8" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <ul className="max-h-56 space-y-1 overflow-auto">{shown.map((m) => (
             <li key={m} className="flex items-center gap-2 text-sm">
-              <label className="flex flex-1 items-center gap-2"><input type="checkbox" checked={m in picked} onChange={(e) => setPicked((p) => { const n = { ...p }; if (e.target.checked) n[m] = guessTier(m); else delete n[m]; return n; })} /><code className="text-xs">{m}</code></label>
+              <label className="flex flex-1 items-center gap-2"><input type="checkbox" checked={m in picked} onChange={(e) => { setPicked((p) => { const n = { ...p }; if (e.target.checked) n[m] = guessTier(m); else delete n[m]; return n; }); setResults((x) => { const n = { ...x }; delete n[m]; return n; }); }} /><code className="text-xs">{m}</code></label>
+              {results[m] && <span role="status" className={cn("text-xs", results[m].ok ? "text-emerald-700" : "text-red-600")}>{results[m].ok ? "✓ " : "✗ "}{results[m].text}</span>}
               {m in picked && <select aria-label={`Tier for ${m}`} className={cn(selectCls, "h-7 w-auto text-xs")} value={picked[m]} onChange={(e) => setPicked((p) => ({ ...p, [m]: e.target.value as Tier }))}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
             </li>))}</ul>
+          {count > 0 && <Button type="button" variant={allOk ? "outline" : "primary"} disabled={testing || allOk} onClick={testAll}>{testing ? "Testing…" : allOk ? "All models work" : `Test ${count} selected model${count === 1 ? "" : "s"}`}</Button>}
           <p className="text-xs text-muted">Tiers are guessed from the name; change them if needed. Cheap models take simple tasks, strong ones take hard tasks.</p>
         </div>)}
       <ErrorNote error={save.error} />
-      <div className="flex justify-end"><Button disabled={!count || save.isPending}>{count ? `Add ${count} model${count === 1 ? "" : "s"}` : "Add models"}</Button></div>
+      <div className="flex justify-end"><Button disabled={!allOk || save.isPending} title={allOk ? "" : "Test the selected models first"}>{count ? `Add ${count} model${count === 1 ? "" : "s"}` : "Add models"}</Button></div>
     </form>
   );
 }
