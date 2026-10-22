@@ -152,3 +152,69 @@ def test_non_json_model_replies_give_a_clear_error_not_a_decode_error(monkeypatc
     )
     with pytest.raises(RuntimeError, match="rejected the credentials"):
         llm._openai_call("sys", "hi", 10, cfg)
+
+
+def test_gemini_uses_googles_openai_compatible_endpoint_with_a_fixed_url(client, auth, monkeypatch, session):
+    import httpx
+
+    key = "AIzaSyTestKey0123456789abcdefghijk"
+    seen = []
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        seen.append((str(r.url), r.headers.get("authorization"), json.loads(r.content)))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}}], "usage": {"prompt_tokens": 7, "completion_tokens": 2}},
+        )
+
+    monkeypatch.setattr(llm, "_openai_transport", httpx.MockTransport(handler))
+    # a custom base URL is ignored for Gemini: the key is only ever sent to Google
+    r = client.put(
+        "/api/settings/llm",
+        headers=auth,
+        json={"provider": "gemini", "model": "gemini-2.5-flash", "api_key": key, "base_url": "https://evil.example/v1"},
+    )
+    assert r.status_code == 200, r.text
+    v = r.json()
+    assert v["provider"] == "gemini" and v["offline"] is False and v["has_key"] is True
+    assert key not in json.dumps(v) and key not in json.dumps(client.get("/api/settings/llm", headers=auth).json())
+    assert "gemini-2.5-flash" in v["presets"]["gemini"]
+    t = client.post("/api/settings/llm/test", headers=auth).json()
+    assert t["ok"] is True and t["model"] == "gemini-2.5-flash"
+    url, bearer, body = seen[-1]
+    assert (
+        url == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" and bearer == f"Bearer {key}"
+    )
+    assert body["model"] == "gemini-2.5-flash" and body["messages"][-1]["role"] == "user"
+    assert all("evil.example" not in s[0] for s in seen)
+    row = session.query(LLMSetting).one()
+    assert key not in row.api_key_encrypted
+    assert (
+        client.put(
+            "/api/settings/llm", headers=auth, json={"provider": "gemini", "model": "gemini-2.5-pro"}
+        ).status_code
+        == 200
+    )  # key kept
+    other = register(client, "x@other.io", "Other")
+    assert (
+        client.put(
+            "/api/settings/llm", headers=other, json={"provider": "gemini", "model": "gemini-2.5-flash"}
+        ).status_code
+        == 400
+    )  # needs its own key
+
+
+def test_gemini_errors_are_explained_without_leaking_the_key(client, auth, monkeypatch):
+    import httpx
+
+    key = "AIzaSyTestKey0123456789abcdefghijk"
+    monkeypatch.setattr(
+        llm,
+        "_openai_transport",
+        httpx.MockTransport(lambda r: httpx.Response(400, json={"error": {"message": f"API key not valid {key}"}})),
+    )
+    client.put(
+        "/api/settings/llm", headers=auth, json={"provider": "gemini", "model": "gemini-2.5-flash", "api_key": key}
+    )
+    t = client.post("/api/settings/llm/test", headers=auth).json()
+    assert t["ok"] is False and key not in json.dumps(t)

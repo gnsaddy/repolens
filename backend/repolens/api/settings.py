@@ -24,6 +24,7 @@ _catalog_transport: httpx.BaseTransport | None = None
 PRESETS = {
     "anthropic": ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-1"],
     "openai": [],
+    "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],  # suggestions; any model id works
     "github-models": [
         "openai/gpt-4.1",
         "openai/gpt-4.1-mini",

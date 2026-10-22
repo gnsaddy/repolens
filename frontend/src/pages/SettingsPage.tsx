@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 const PROVIDERS = [
   ["heuristic", "Offline (no model calls)"],
   ["anthropic", "Anthropic Claude"],
+  ["gemini", "Google Gemini"],
   ["openai", "OpenAI-compatible (OpenAI, Azure, vLLM, Ollama…)"],
   ["github-models", "GitHub Models (retired 30 July 2026)"],
 ] as const;
@@ -63,7 +64,7 @@ export default function SettingsPage() {
                   <label className="block"><Label>Provider</Label>
                     <select disabled={!admin} className={selectCls} value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: PROVIDERS.some(([p]) => p === e.target.value) ? (data?.presets[e.target.value]?.[0] ?? "") : "" })}>
                       {PROVIDERS.filter(([v]) => v !== "github-models" || data?.provider === "github-models").map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-                  {online && <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5-5"} />
+                  {online && <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : f.provider === "gemini" ? "gemini-2.5-flash" : "claude-sonnet-5-5"} />
                     <datalist id="model-presets">{presets.map((m) => <option key={m} value={m} />)}</datalist></label>}
                 </div>
                 {f.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">GitHub retired GitHub Models on 30 July 2026, so its API no longer answers for anyone, whatever token you use. Pick another provider: Anthropic, an OpenAI-compatible service (Ollama, Gemini, Groq, OpenRouter, Azure AI Foundry) or offline mode. Your GitHub token still works for pull requests and private repositories.</p>}
@@ -71,7 +72,7 @@ export default function SettingsPage() {
                   {f.provider === "openai" && <label className="block"><Label>Base URL</Label><Input disabled={!admin} value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://api.openai.com/v1" /></label>}
                   <label className="block"><Label>{f.provider === "github-models" ? "GitHub token (optional)" : "API key"} {data?.has_key && <span className="text-emerald-700">({data.uses_github_token ? "using your connected GitHub account" : "stored — leave blank to keep"})</span>}</Label>
                     <Input disabled={!admin} type="password" autoComplete="off" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} placeholder={data?.has_key ? "••••••••••••" : "Paste your API key"} />
-                    <span className="mt-1 block text-xs text-muted">{f.provider === "github-models" ? "Leave blank to use the GitHub connection below. Press “Test connection” to confirm the account can call GitHub Models." : f.provider === "anthropic" ? "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console." : "Encrypted at rest. Never shown again and never sent to the browser."}</span></label>
+                    <span className="mt-1 block text-xs text-muted">{f.provider === "github-models" ? "Leave blank to use the GitHub connection below. Press “Test connection” to confirm the account can call GitHub Models." : f.provider === "gemini" ? "Create a key at aistudio.google.com/apikey. It has a free tier with rate limits, and Google may use free-tier requests to improve its products, so avoid it for private code. The key is sent only to Google and stored encrypted." : f.provider === "anthropic" ? "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console." : "Encrypted at rest. Never shown again and never sent to the browser."}</span></label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block"><Label>Input price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.input_price} onChange={(e) => setF({ ...f, input_price: e.target.value })} /></label>
                     <label className="block"><Label>Output price (USD / 1M tokens)</Label><Input disabled={!admin} type="number" min="0" step="0.01" value={f.output_price} onChange={(e) => setF({ ...f, output_price: e.target.value })} /></label>

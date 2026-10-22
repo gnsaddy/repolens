@@ -78,6 +78,10 @@ Investigations > **From a CI log**: upload or paste a JUnit XML report, pytest, 
 
 Ownership is derived from indexed commits: each author scores per file from the size of their changes (log-scaled) with a six-month half-life, so current maintainers outrank whoever wrote it years ago; bots are ignored. The **Ownership** page shows each top-level area's owner split, a bus factor (people holding 80% of the knowledge) and flags areas with a single owner or an owner inactive for a year. Any file or folder can be looked up, the file viewer shows who maintains the open file, and every root-cause report adds a "Who to ask" section for the files it points at. It is a hint from commit history, not a measure of anyone's work.
 
+## Language model providers
+
+Settings > AI & search: **Anthropic Claude**, **Google Gemini**, any **OpenAI-compatible** service (OpenAI, Azure, vLLM, Ollama, Groq, OpenRouter...), or offline. Gemini uses Google's OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai`), which is fixed so the key only ever goes to Google; create a key at aistudio.google.com/apikey. Its free tier is rate limited and Google may use free-tier requests to improve its products, so avoid it for private code. Model names are free text (suggestions: gemini-2.5-flash, gemini-2.5-pro, gemini-2.5-flash-lite). Gemini embeddings can be used too through the embedding settings (`EMBEDDING_BASE_URL` set to the same endpoint), untested.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.

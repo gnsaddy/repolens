@@ -8,7 +8,7 @@ import { AuthProvider } from "@/lib/auth";
 import SettingsPage from "@/pages/SettingsPage";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
-const base = { provider: "heuristic", model: "claude-sonnet-5-5", base_url: "", has_key: false, source: "env", input_price: null, output_price: null, offline: true, presets: { anthropic: ["claude-sonnet-5-5", "claude-haiku-5-5"], openai: [] }, embedding_provider: "hash" };
+const base = { provider: "heuristic", model: "claude-sonnet-5-5", base_url: "", has_key: false, source: "env", input_price: null, output_price: null, offline: true, presets: { anthropic: ["claude-sonnet-5-5", "claude-haiku-5-5"], openai: [], gemini: ["gemini-2.5-flash", "gemini-2.5-pro"] }, embedding_provider: "hash" };
 
 function setup(role: string, onPut?: (b: unknown) => void) {
   localStorage.setItem("repolens.token", "tok");
@@ -26,6 +26,19 @@ beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
 describe("SettingsPage", () => {
+  it("offers Google Gemini with its model suggestions and key guidance, and sends the key only on save", async () => {
+    let sent: Record<string, unknown> | undefined;
+    setup("admin", (b) => { sent = b as Record<string, unknown>; });
+    await screen.findByText("offline mode");
+    await userEvent.selectOptions(screen.getByLabelText("Provider"), "gemini");
+    expect(screen.getByLabelText(/^Model/)).toHaveValue("gemini-2.5-flash");
+    expect(screen.getByText(/aistudio.google.com\/apikey/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Base URL")).toBeNull(); // the Google endpoint is fixed
+    await userEvent.type(screen.getByLabelText(/API key/), "AIzaSyTestKey0123");
+    await userEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+    await waitFor(() => expect(sent).toMatchObject({ provider: "gemini", model: "gemini-2.5-flash", api_key: "AIzaSyTestKey0123" }));
+  });
+
   it("lets an admin pick a provider, paste a key and save; the key field is cleared afterwards", async () => {
     let sent: Record<string, unknown> | undefined;
     setup("admin", (b) => { sent = b as Record<string, unknown>; });

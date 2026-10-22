@@ -44,7 +44,8 @@ class LLMUnavailable(Exception):
 
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference"
-CHAT_PROVIDERS = ("anthropic", "openai", "github-models")
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"  # Google's OpenAI-compatible endpoint
+CHAT_PROVIDERS = ("anthropic", "openai", "github-models", "gemini")
 
 
 def github_token(db: Session, org_id: str) -> str:
@@ -68,6 +69,8 @@ def resolve_config(db: Session, org_id: str) -> LLMConfig:
             row.input_price,
             row.output_price,
         )
+    if cfg.provider == "gemini":
+        cfg.base_url = GEMINI_URL  # fixed: the key is only ever sent to Google
     if cfg.provider == "github-models":
         if "api.openai.com" in cfg.base_url:  # the default base URL is OpenAI's; GitHub Models has its own
             cfg.base_url = GITHUB_MODELS_URL
@@ -157,7 +160,7 @@ class LLMClient:
         try:
             call = (
                 _anthropic_call if self.provider == "anthropic" else _openai_call
-            )  # github-models is OpenAI-compatible
+            )  # github-models and gemini speak the OpenAI chat-completions protocol
             res = call(system, prompt, max_tokens, self.cfg)
         except Exception as e:
             usage.record_event(
