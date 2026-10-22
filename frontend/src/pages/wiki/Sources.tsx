@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm, useToast } from "@/components/feedback";
 import { RefreshCw, Trash2, Upload } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, Spinner, Textarea, statusTone } from "@/components/ui";
 import { api, type ConnectorInfo, type ConfluenceConn, type ConfluencePreview, type WikiOverview, type WikiSourceStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -161,6 +162,7 @@ function ConfluenceForm({ onDone }: { onDone: () => void }) {
           {test.data && <span role="status" className={`text-sm ${test.data.ok ? "text-emerald-700" : "text-red-600"}`}>{test.data.ok ? `Authenticated as ${test.data.user}` : test.data.error}</span>}
           <ErrorNote error={test.error} /></div>
         <ConfluenceImport onDone={onDone} />
+        <ConfluenceBrowser onDone={onDone} />
       </>)}
     </Card>
   );
@@ -194,6 +196,7 @@ function ConfluenceImport({ onDone }: { onDone: () => void }) {
 /** Jira, Slack and other connectors, rendered from the field list the server declares. Secrets are write-only. */
 function ConnectorsCard({ onDone }: { onDone: () => void }) {
   const toast = useToast();
+  const [sp] = useSearchParams();
   const list = useQuery({ queryKey: ["wiki-connectors"], queryFn: () => api<ConnectorInfo[]>("/wiki/connectors") });
   const [kind, setKind] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -202,6 +205,10 @@ function ConnectorsCard({ onDone }: { onDone: () => void }) {
   const [vis, setVis] = useState("restricted");
   const connectors = Array.isArray(list.data) ? list.data : [];
   const info = connectors.find((c) => c.kind === kind);
+  useEffect(() => { // arriving from the Jira page with a query to import
+    const k = sp.get("connector");
+    if (k && connectors.some((c) => c.kind === k) && kind !== k) { setKind(k); setValues(sp.get("jql") ? { jql: sp.get("jql")! } : {}); }
+  }, [connectors.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const split = () => {
     const config: Record<string, string> = {}; let secret = "";
     info?.fields.forEach((f) => { if (f.secret) secret = values[f.key] ?? ""; else if (values[f.key] !== undefined && values[f.key] !== "") config[f.key] = values[f.key]; });
@@ -264,5 +271,55 @@ function SlackExportCard({ onDone }: { onDone: () => void }) {
         webkitdirectory="" onChange={(e) => e.target.files?.length && imp.mutate(e.target.files)} />
       <ErrorNote error={imp.error} />
     </Card>
+  );
+}
+
+interface Space { key: string; name: string; type: string; import_url: string }
+interface PageNode { id: string; title: string; parent_id: string; import_url: string }
+
+/** Pick a space or page from what the connected account can see, instead of pasting a URL. */
+function ConfluenceBrowser({ onDone }: { onDone: () => void }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [space, setSpace] = useState<Space | null>(null);
+  const [vis, setVis] = useState("restricted");
+  const spaces = useQuery({ queryKey: ["confluence-spaces"], enabled: open, retry: false, queryFn: () => api<Space[]>("/wiki/confluence/spaces") });
+  const tree = useQuery({ queryKey: ["confluence-pages", space?.key], enabled: !!space, retry: false, queryFn: () => api<{ truncated: boolean; pages: PageNode[] }>(`/wiki/confluence/spaces/${space!.key}/pages`) });
+  const imp = useMutation({
+    mutationFn: (v: { url: string; mode: string }) => api("/wiki/confluence/import", { method: "POST", json: { ...v, max_pages: 500, visibility: vis } }),
+    onSuccess: () => { toast("Import started. Pages appear as they are indexed."); onDone(); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  const kids = (id: string) => (tree.data?.pages ?? []).filter((p) => p.parent_id === id);
+  const render = (p: PageNode, depth: number): React.ReactNode => (
+    <li key={p.id}>
+      <div className="flex items-center gap-2 py-0.5 text-sm" style={{ paddingLeft: depth * 14 }}><span className="min-w-0 flex-1 truncate">{p.title}</span>
+        <button className="text-xs text-brand hover:underline" aria-label={`Import page ${p.title}`} disabled={imp.isPending} onClick={() => imp.mutate({ url: p.import_url, mode: "page" })}>page</button>
+        {kids(p.id).length > 0 && <button className="text-xs text-brand hover:underline" aria-label={`Import ${p.title} and its children`} disabled={imp.isPending} onClick={() => imp.mutate({ url: p.import_url, mode: "tree" })}>+ children</button>}</div>
+      {kids(p.id).length > 0 && <ul>{kids(p.id).map((c) => render(c, depth + 1))}</ul>}
+    </li>
+  );
+  const ids = new Set((tree.data?.pages ?? []).map((p) => p.id));
+  const roots = (tree.data?.pages ?? []).filter((p) => !p.parent_id || !ids.has(p.parent_id));
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <button className="text-sm font-semibold text-brand hover:underline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{open ? "Hide space browser" : "Browse spaces instead of pasting a URL"}</button>
+      {open && (
+        <div className="mt-3 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div>{spaces.isLoading ? <Spinner /> : spaces.error ? <ErrorNote error={spaces.error} /> : (
+            <ul className="max-h-72 space-y-0.5 overflow-auto" aria-label="Spaces">{spaces.data?.map((s) => (
+              <li key={s.key}><button onClick={() => setSpace(s)} aria-current={space?.key === s.key} className={`w-full rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${space?.key === s.key ? "bg-indigo-50" : ""}`}>{s.name} <span className="text-xs text-muted">{s.key}</span></button></li>))}</ul>)}</div>
+          <div className="min-w-0">
+            {!space ? <p className="text-sm text-muted">Choose a space to see its pages.</p> : (<>
+              <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-sm font-medium">{space.name}</span>
+                <Button size="sm" disabled={imp.isPending} onClick={() => imp.mutate({ url: space.import_url, mode: "space" })}>Import whole space</Button>
+                <select aria-label="Visibility of browsed import" className="h-8 rounded-md border border-line bg-white px-2 text-xs" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted</option><option value="org">Whole organization</option></select></div>
+              {tree.isLoading ? <Spinner /> : tree.error ? <ErrorNote error={tree.error} /> : (<>
+                <ul className="max-h-72 overflow-auto rounded-lg border border-line p-2" aria-label="Pages">{roots.map((p) => render(p, 0))}</ul>
+                {tree.data?.truncated && <p className="mt-1 text-xs text-amber-700">Showing the first 1,000 pages.</p>}</>)}
+            </>)}
+          </div>
+        </div>)}
+    </div>
   );
 }

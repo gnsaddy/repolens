@@ -11,10 +11,19 @@ export default function JiraPage() {
   const nav = useNavigate();
   const conn = useQuery({ queryKey: ["jira-conn"], queryFn: () => api<JiraConnection | null>("/jira/connection") });
   const [f, setF] = useState({ base_url: "", deployment: "cloud", email: "", token: "", allow_publish: false });
-  const [jql, setJql] = useState("statusCategory != Done AND issuetype = Bug ORDER BY created DESC");
+  const [proj, setProj] = useState("");
+  const [status, setStatus] = useState("open");
+  const [type, setType] = useState("Bug");
+  const [text, setText] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+  const [custom, setCustom] = useState<string | null>(null);
+  const built = [proj && `project = "${proj}"`, status === "open" ? "statusCategory != Done" : status === "done" ? "statusCategory = Done" : "", type && `issuetype = "${type}"`, text.trim() && `text ~ "${text.trim().replace(/["\\]/g, " ")}"`].filter(Boolean).join(" AND ") + " ORDER BY updated DESC";
+  const jql = custom ?? built;
+  const setJql = (v: string) => setCustom(v);
   const save = useMutation({ mutationFn: () => api<JiraConnection>("/jira/connection", { method: "PUT", json: f }),
     onSuccess: () => { setF({ ...f, token: "" }); qc.invalidateQueries({ queryKey: ["jira-conn"] }); } });
   const test = useMutation({ mutationFn: () => api<{ ok: boolean; user?: string; error?: string }>("/jira/test", { method: "POST" }) });
+  const projects = useQuery({ queryKey: ["jira-projects"], enabled: !!conn.data, retry: false, queryFn: () => api<{ key: string; name: string }[]>("/jira/projects") });
   const issues = useQuery({ queryKey: ["jira-issues", jql], enabled: !!conn.data, retry: false, queryFn: () => api<JiraIssue[]>(`/jira/issues?jql=${encodeURIComponent(jql)}`) });
   const investigate = useMutation({ mutationFn: (key: string) => api<{ investigation_id: string }>("/jira/investigate", { method: "POST", json: { issue_key: key, repo_ids: [] } }),
     onSuccess: (r) => nav(`/investigations/${r.investigation_id}`) });
@@ -44,7 +53,19 @@ export default function JiraPage() {
         <Card>
           <CardTitle>Issues</CardTitle>
           {!conn.data ? <Empty>Configure the connection to browse issues.</Empty> : (<>
-            <Input value={jql} onChange={(e) => setJql(e.target.value)} aria-label="JQL" className="mb-3 font-mono text-xs" />
+            <div className="mb-3 grid gap-2 sm:grid-cols-4">
+              <select aria-label="Project" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={proj} onChange={(e) => { setCustom(null); setProj(e.target.value); }}>
+                <option value="">All projects</option>{(Array.isArray(projects.data) ? projects.data : []).map((p) => <option key={p.key} value={p.key}>{p.name} ({p.key})</option>)}</select>
+              <select aria-label="Status" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={status} onChange={(e) => { setCustom(null); setStatus(e.target.value); }}>
+                <option value="open">Open</option><option value="done">Done</option><option value="any">Any status</option></select>
+              <select aria-label="Type" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={type} onChange={(e) => { setCustom(null); setType(e.target.value); }}>
+                <option value="Bug">Bugs</option><option value="Incident">Incidents</option><option value="">Any type</option></select>
+              <Input aria-label="Search text" placeholder="Text…" value={text} onChange={(e) => { setCustom(null); setText(e.target.value); }} />
+            </div>
+            <div className="mb-3 flex items-center gap-2 text-xs text-muted">
+              <button className="text-brand hover:underline" onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>{advanced ? "Hide JQL" : "Edit JQL"}</button>
+              <Link className="ml-auto text-brand hover:underline" to={`/wiki?tab=sources&connector=jira&jql=${encodeURIComponent(jql)}`}>Import these as searchable history</Link></div>
+            {advanced && <Input value={jql} onChange={(e) => setJql(e.target.value)} aria-label="JQL" className="mb-3 font-mono text-xs" />}
             <ErrorNote error={issues.error ?? investigate.error} />
             {!issues.data?.length ? <Empty>{issues.isLoading ? "Loading…" : "No issues."}</Empty> : (
               <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Key</th><th className="font-medium">Summary</th><th className="font-medium">Status</th><th /></tr></thead>

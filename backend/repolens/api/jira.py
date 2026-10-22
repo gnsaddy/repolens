@@ -67,6 +67,16 @@ def test_connection(p: Principal = Depends(current_principal), db: Session = Dep
     return {"ok": True, "user": me.get("displayName") or me.get("name")}
 
 
+@router.get("/projects")
+def projects(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Projects the connected account can see, for the issue filter."""
+    authorize(db, p, "jira.read", "projects")
+    try:
+        return _client(_conn(db, p)).projects()
+    except JiraError as e:
+        raise HTTPException(502, str(e)) from e
+
+
 @router.get("/issues")
 def issues(
     jql: str = Query("statusCategory != Done AND issuetype = Bug ORDER BY created DESC"),

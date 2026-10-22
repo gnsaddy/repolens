@@ -182,6 +182,30 @@ class ConfluenceClient:
             raise ConfluenceError(f"Confluence returned {r.status_code}", r.status_code)
         return str(r.json().get("id", ""))
 
+    def spaces(self, limit: int = 300) -> list[dict]:
+        out = []
+        for s in self._paged("/space", {"type": "global", "status": "current"}, limit=100):
+            out.append({"key": s.get("key", ""), "name": s.get("name", ""), "type": s.get("type", "global")})
+            if len(out) >= limit:
+                break
+        return out
+
+    def page_tree(self, space_key: str, cap: int = 1000) -> tuple[list[dict], bool]:
+        """Titles and parents of a space's pages (no bodies), so a tree can be shown before importing anything."""
+        pages = []
+        for p in self._paged("/content", {"spaceKey": space_key, "type": "page", "expand": "ancestors"}, limit=100):
+            anc = p.get("ancestors") or []
+            pages.append(
+                {
+                    "id": str(p.get("id", "")),
+                    "title": p.get("title", ""),
+                    "parent_id": str(anc[-1]["id"]) if anc else "",
+                }
+            )
+            if len(pages) >= cap:
+                return pages, True
+        return pages, False
+
     def space(self, key: str) -> dict:
         return self._get(f"/space/{key}")
 

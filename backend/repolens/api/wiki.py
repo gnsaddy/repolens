@@ -123,6 +123,49 @@ def preview(body: ConfluencePreviewIn, p: Principal = Depends(current_principal)
     return {**root, "suggested_mode": "tree" if root["kind"] == "page" else "space"}
 
 
+def _space_url(client, key: str) -> str:
+    return f"{client.root}/spaces/{key}" if client.deployment == "cloud" else f"{client.root}/display/{key}"
+
+
+def _page_url(client, page_id: str, key: str) -> str:
+    return (
+        f"{client.root}/spaces/{key}/pages/{page_id}"
+        if client.deployment == "cloud"
+        else f"{client.root}/pages/viewpage.action?pageId={page_id}"
+    )
+
+
+@router.get("/confluence/spaces")
+def confluence_spaces(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Spaces the connected account can see, each with the URL to import it."""
+    authorize(db, p, "wiki.configure", "browse")
+    try:
+        client = wi.client_for_org(db, p.org_id)
+        return [{**s, "import_url": _space_url(client, s["key"])} for s in client.spaces()]
+    except ConfluenceError as e:
+        raise HTTPException(502, str(e)) from None
+
+
+@router.get("/confluence/spaces/{key}/pages")
+def confluence_space_pages(key: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """The page tree of a space (titles only), with an import URL for every page."""
+    import re
+
+    authorize(db, p, "wiki.configure", "browse")
+    if not re.fullmatch(r"[\w~.-]{1,80}", key):
+        raise HTTPException(400, "Invalid space key")
+    try:
+        client = wi.client_for_org(db, p.org_id)
+        pages, truncated = client.page_tree(key)
+    except ConfluenceError as e:
+        raise HTTPException(502, str(e)) from None
+    return {
+        "space_url": _space_url(client, key),
+        "truncated": truncated,
+        "pages": [{**x, "import_url": _page_url(client, x["id"], key)} for x in pages],
+    }
+
+
 @router.post("/confluence/import", status_code=202)
 def import_confluence(
     body: ConfluenceImportIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)

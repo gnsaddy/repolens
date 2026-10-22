@@ -148,6 +148,17 @@ class FakeConfluence:
         limit, start = int(q.get("limit", 25)), int(q.get("start", 0))
         if rest == "/user/current":
             return 200, {"displayName": "RepoLens Bot", "accountId": "abc"}, {}
+        if rest == "/space":
+            keys = sorted({p["space"] for p in self.pages.values() if p["space"] not in self.denied_spaces})
+            return (
+                200,
+                {
+                    "results": [{"key": k, "name": f"{k} space", "type": "global"} for k in keys],
+                    "start": 0,
+                    "limit": limit,
+                },
+                {},
+            )
         if rest.startswith("/space/"):
             key = rest.split("/")[2]
             if key in self.denied_spaces:

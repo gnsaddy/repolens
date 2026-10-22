@@ -192,6 +192,15 @@ class JiraClient:
             d = self._req("GET", "/search", params={"jql": jql, "maxResults": limit, "fields": fields})
         return [self._issue_from(i) for i in d.get("issues", [])]
 
+    def projects(self) -> list[dict]:
+        if self.deployment == "cloud":
+            d = self._req("GET", "/project/search", params={"maxResults": 100, "orderBy": "name"})
+            raw = d.get("values", [])
+        else:
+            d = self._req("GET", "/project")
+            raw = d if isinstance(d, list) else []
+        return [{"key": p.get("key", ""), "name": p.get("name", "")} for p in raw if p.get("key")]
+
     def add_comment(self, key: str, markdown: str) -> str:
         body = markdown_to_adf(markdown) if self.deployment == "cloud" else markdown
         d = self._req("POST", f"/issue/{key}/comment", json={"body": body})
