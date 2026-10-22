@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
 import SimilarAnswers from "@/components/SimilarAnswers";
-import { api, type SimilarAnswer, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
+import { api, type SimilarAnswer, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageInsights, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
@@ -69,6 +69,24 @@ function TreeNode({ node, depth, selected, onPick }: { node: WikiTreeNode; depth
   );
 }
 
+function AtAGlance({ i }: { i: PageInsights }) {
+  const any = i.purpose || i.commands.length || i.endpoints.length || i.settings.length || i.owners.length || i.warnings.length;
+  if (!any) return null;
+  return (
+    <Card className="p-4" aria-label="At a glance"><CardTitle>At a glance</CardTitle>
+      <div className="space-y-3 text-sm">
+        {i.purpose && <p className="leading-5">{i.purpose}</p>}
+        {!!i.warnings.length && <ul className="space-y-1">{i.warnings.map((w, k) => <li key={k} className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900"><b className="capitalize">{w.level}:</b> {w.text}</li>)}</ul>}
+        {!!i.owners.length && <div className="text-xs"><span className="text-muted">Who to ask: </span>{i.owners.map((o) => `${o.who} (${o.role})`).join(", ")}</div>}
+        {!!i.commands.length && <div><div className="mb-1 text-xs text-muted">Commands{i.steps ? ` · ${i.steps} steps` : ""}</div><pre className="max-h-32 overflow-auto rounded bg-slate-900 p-2 font-mono text-xs text-slate-100">{i.commands.join("\n")}</pre></div>}
+        {!!i.endpoints.length && <div className="text-xs"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-1.5">{e}</code>)}</div>}
+        {!!i.settings.length && <div className="text-xs"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-1.5">{e}</code>)}</div>}
+        {i.last_dated && <div className="text-xs text-muted">Last dated {i.last_dated}</div>}
+      </div>
+    </Card>
+  );
+}
+
 function RefList({ title, items, open, empty }: { title: string; items: PageRef[]; open: Open; empty?: string }) {
   if (!items.length && !empty) return null;
   return (
@@ -127,6 +145,8 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
             <nav aria-label="Breadcrumbs" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted">{p.breadcrumbs.map((b, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{b.path ? <button className="hover:underline" onClick={() => open(p.repo_id, b.path!)}>{b.title}</button> : b.title}</span>)}</nav>
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone={ORIGIN_TONE[p.source.type] ?? "gray"}>{p.source.type}</Badge>
+              {p.insights && p.insights.kind !== "general" && <Badge tone="brand">{p.insights.kind_label}</Badge>}
+              {p.insights && <span>{p.insights.reading_minutes} min read</span>}
               {p.source.version != null && p.source.version > 0 && <span>version {p.source.version}</span>}
               {p.source.updated_at && <span>updated {timeAgo(p.source.updated_at)}</span>}
               {p.source.synced_at && <span>synced {timeAgo(p.source.synced_at)}</span>}
@@ -142,6 +162,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
       </div>
       <div className="space-y-3">
         {p && (<>
+          {p.insights && <AtAGlance i={p.insights} />}
           {p.outline.length > 1 && <Card className="p-4"><CardTitle>On this page</CardTitle><ul className="space-y-1 text-xs">{p.outline.map((o, i) => <li key={i}><button className="text-left text-brand hover:underline" onClick={() => document.getElementById(slug(o.title))?.scrollIntoView({ behavior: "smooth" })}>{o.title}</button></li>)}</ul></Card>}
           <RefList title="Linked from" items={p.backlinks} open={open} empty="No other page links here." />
           <RefList title="Links to" items={p.links_out} open={open} />

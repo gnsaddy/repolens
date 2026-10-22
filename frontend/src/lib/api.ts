@@ -148,7 +148,9 @@ export interface WikiPage {
   source: { type: string; url: string; version: number | null; synced_at: string | null; updated_at: string | null; repo_url: string };
   backlinks: PageRef[]; links_out: PageRef[]; related: PageRef[]; concepts: string[];
   mentions_code: (GraphNode & { evidence: string; weight: number })[];
+  insights?: PageInsights;
 }
+export interface PageInsights { kind: string; kind_label: string; purpose: string; commands: string[]; endpoints: string[]; settings: string[]; owners: { role: string; who: string }[]; warnings: { level: string; text: string }[]; steps: number; last_dated: string | null; words: number; reading_minutes: number }
 export interface ConceptRow { term: string; docs: number; sections: number; code_like: boolean; in_code: boolean }
 export interface ConceptDetail {
   term: string; summary: string; summary_source: { repo: string; path: string; section: string }; documents: number;

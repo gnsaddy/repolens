@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Change, CodeChunk, Document, KGEdge, KGNode, Repository
 from ..security import redact_stored
-from . import gitops
+from . import doc_intel, gitops
 from .access import Scope
 from .docs import slugify
 from .graph import TEST_PATH, neighbors, node_dict
@@ -345,6 +345,7 @@ def page(db: Session, org_id: str, scope: Scope, repo_id: str, path: str) -> dic
         "mentions_code": sorted(code.values(), key=lambda x: -x["weight"])[:25],
         "related": sorted(related.values(), key=lambda x: -x["weight"])[:8],
         "concepts": [c["term"] for c in concept_index(db, org_id, scope, min_docs=2, only=(repo_id, path))[:12]],
+        "insights": doc_intel.insights(path, _title(node), raw),
     }
 
 

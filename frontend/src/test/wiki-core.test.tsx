@@ -13,7 +13,8 @@ const overview = { sources: [
   { repo_id: "n1", name: "team-notes", kind: "collection", origin: "collection", pages: 1, visibility: "org", status: "ready", last_synced_at: null, web_url: "" },
   { repo_id: "c1", name: "payments", kind: "repo", origin: "repo", pages: 0, visibility: "org", status: "ready", last_synced_at: null, web_url: "" }], totals: { sources: 2, pages: 1, sections: 1 }, health, concepts: 0 };
 const page = { repo_id: "n1", repo: "team-notes", path: "guide.md", title: "Guide", markdown: "# Guide\n\nHello.", unresolved_links: [], breadcrumbs: [], outline: [], deletable: true,
-  source: { type: "upload", url: "", version: null, synced_at: null, updated_at: null, repo_url: "" }, backlinks: [], links_out: [], related: [], concepts: [], mentions_code: [] };
+  source: { type: "upload", url: "", version: null, synced_at: null, updated_at: null, repo_url: "" }, backlinks: [], links_out: [], related: [], concepts: [], mentions_code: [],
+  insights: { kind: "runbook", kind_label: "Runbook", purpose: "Use this when the API stops answering.", commands: ["kubectl rollout restart deploy/payments"], endpoints: ["GET /healthz"], settings: ["RETRY_LIMIT"], owners: [{ role: "owner", who: "platform-team" }], warnings: [{ level: "warning", text: "Never restart during settlement." }], steps: 3, last_dated: "2026-09-30", words: 120, reading_minutes: 1 } };
 
 function setup(url = "/wiki") {
   const calls: { url: string; method?: string; body?: unknown }[] = [];
@@ -44,6 +45,16 @@ describe("DeepMind Wiki core", () => {
     const list = await screen.findByRole("list", { name: "Search results" });
     expect(within(list).getByText("Deploy checklist")).toBeInTheDocument();
     expect(within(list).getByText(/migrations first/)).toBeInTheDocument();
+  });
+
+  it("shows what a senior engineer would look for: kind, warnings, owner, commands", async () => {
+    setup();
+    const glance = await screen.findByLabelText("At a glance");
+    expect(within(glance).getByText(/Use this when the API stops answering/)).toBeInTheDocument();
+    expect(within(glance).getByText(/Never restart during settlement/)).toBeInTheDocument();
+    expect(within(glance).getByText(/platform-team \(owner\)/)).toBeInTheDocument();
+    expect(within(glance).getByText(/kubectl rollout restart/)).toBeInTheDocument();
+    expect(screen.getByText("Runbook")).toBeInTheDocument();
   });
 
   it("edits a page in place and saves it", async () => {

@@ -92,6 +92,53 @@ def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
     return found
 
 
+def _blocks(lines: list[str]) -> list[tuple[int, int]]:
+    """[(start, end)] of paragraphs, tables and fenced code blocks. A fence or a table is never cut in half."""
+    out: list[tuple[int, int]] = []
+    i, n = 0, len(lines)
+    while i < n:
+        if not lines[i].strip():
+            i += 1
+            continue
+        j = i
+        if _FENCE.match(lines[i]):
+            j = i + 1
+            while j < n and not _FENCE.match(lines[j]):
+                j += 1
+            j = min(j + 1, n)
+        elif lines[i].lstrip().startswith("|"):
+            while j < n and lines[j].lstrip().startswith("|"):
+                j += 1
+        else:
+            while j < n and lines[j].strip() and not _FENCE.match(lines[j]):
+                j += 1
+            while j - i > WINDOW // 2:  # one enormous paragraph: cut it by lines, with the usual overlap
+                out.append((i, i + WINDOW // 2))
+                i += WINDOW // 2
+        out.append((i, j))
+        i = j
+    return out
+
+
+def _split(body: list[str]) -> list[tuple[int, list[str]]]:
+    """Cut a long section at paragraph boundaries into parts of about WINDOW lines, repeating the last paragraph."""
+    if len(body) <= MAX_SECTION_LINES:
+        return [(0, body)]
+    parts: list[tuple[int, list[str]]] = []
+    start = prev_start = prev_end = 0
+    for b_start, b_end in _blocks(body):
+        if b_end - start > WINDOW and b_start > start:  # this block would overflow: close the part before it
+            parts.append((start, body[start:b_start]))
+            last = (prev_start, prev_end)
+            plain = not _FENCE.match(body[last[0]]) and not body[last[0]].lstrip().startswith("|")
+            # repeat the end of the previous paragraph for context, but never part of a code block or table
+            start = max(last[0], b_start - OVERLAP) if plain and last[1] == b_start else b_start
+        prev_start, prev_end = b_start, b_end
+    if start < len(body) and body[start:] and any(x.strip() for x in body[start:]):
+        parts.append((start, body[start:]))
+    return parts or [(0, body)]
+
+
 def parse_markdown(path: str, text: str) -> list[ParsedChunk]:
     lines = text.splitlines()
     if not lines:
@@ -124,8 +171,7 @@ def parse_markdown(path: str, text: str) -> list[ParsedChunk]:
         body = lines[idx:end]
         if not any(line.strip() for line in body[1:] if level) and not any(line.strip() for line in body):
             continue
-        for s in range(0, len(body), WINDOW - OVERLAP) if len(body) > MAX_SECTION_LINES else [0]:
-            part = body[s : s + WINDOW] if len(body) > MAX_SECTION_LINES else body
+        for s, part in _split(body):
             content = "\n".join(part)
             chunks.append(
                 ParsedChunk(
@@ -139,6 +185,4 @@ def parse_markdown(path: str, text: str) -> list[ParsedChunk]:
                     imports=extract_links(content),
                 )
             )
-            if len(body) <= MAX_SECTION_LINES or s + WINDOW >= len(body):
-                break
     return chunks
