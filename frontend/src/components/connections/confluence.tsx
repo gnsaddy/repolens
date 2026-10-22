@@ -5,6 +5,7 @@ import { useToast } from "@/components/feedback";
 import { Button, ErrorNote, Input, Label } from "@/components/ui";
 import { api, type ConfluenceConn } from "@/lib/api";
 import type { Integration } from "./types";
+import { useCheck } from "./useCheck";
 
 export function useConfluence(): Integration {
   const qc = useQueryClient();
@@ -13,9 +14,9 @@ export function useConfluence(): Integration {
   const remove = useMutation({ mutationFn: () => api("/wiki/confluence/connection", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["confluence-conn"] }); toast("Confluence disconnected"); } });
   const c = conn.data;
   return {
-    connected: !!c?.connected, loading: conn.isLoading,
+    connected: !!c?.connected, loading: conn.isLoading, account: c?.account || undefined,
     detail: c?.connected ? `${c.base_url} · ${c.deployment === "cloud" ? c.email : "Data Center"}` : "",
-    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/wiki/confluence/test", { method: "POST" }); return r.ok ? `Authenticated as ${r.user}` : { error: r.error ?? "Failed" }; },
+    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/wiki/confluence/test", { method: "POST" }); if (r.ok) qc.invalidateQueries({ queryKey: ["confluence-conn"] }); return r.ok ? `Authenticated as ${r.user}` : { error: r.error ?? "Failed" }; },
     disconnect: () => remove.mutateAsync(),
     disconnectMessage: "The stored token is deleted. Pages already imported stay in the wiki but stop syncing.",
   };
@@ -27,6 +28,8 @@ export function ConfluenceForm({ onDone }: { onDone: () => void }) {
   const existing = useQuery({ queryKey: ["confluence-conn"], queryFn: () => api<ConfluenceConn>("/wiki/confluence/connection") }).data;
   const [f, setF] = useState({ base_url: existing?.base_url ?? "", deployment: existing?.deployment ?? "cloud", email: existing?.email ?? "", token: "" });
   const save = useMutation({ mutationFn: () => api("/wiki/confluence/connection", { method: "PUT", json: f }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["confluence-conn"] }); toast("Confluence connected"); onDone(); } });
+  const check = useCheck("/wiki/confluence/check", () => f);
+  const ready = f.base_url.length >= 8 && f.token.length >= 4 && (f.deployment !== "cloud" || f.email.includes("@"));
   return (
     <form className="grid gap-3" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
       <div><Label>Base URL</Label><Input aria-label="Confluence base URL" required value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://yourco.atlassian.net/wiki" /></div>
@@ -35,7 +38,8 @@ export function ConfluenceForm({ onDone }: { onDone: () => void }) {
       <div><Label>{f.deployment === "cloud" ? "API token" : "Personal access token"}</Label><Input aria-label="Confluence token" type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
         <p className="mt-1 text-xs text-muted">Stored encrypted and never shown again. Use a read-only account.</p></div>
       <ErrorNote error={save.error} />
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button disabled={save.isPending || f.base_url.length < 8 || f.token.length < 4}>Save connection</Button></div>
+      {check.message}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button type="button" variant="outline" disabled={!ready || check.pending} onClick={check.run}>Test connection</Button><Button disabled={save.isPending || f.base_url.length < 8 || f.token.length < 4}>Save connection</Button></div>
     </form>
   );
 }

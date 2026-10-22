@@ -27,6 +27,7 @@ def _view(c: BitbucketConnection | None) -> dict:
         "base_url": (c.base_url or None) if c else None,
         "username": (c.username or None) if c else None,
         "workspaces": (c.workspaces or None) if c else None,
+        "account": (c.account or None) if c else None,
     }
 
 
@@ -89,8 +90,41 @@ def put_connection(
         body.username.strip(),
         encrypt_secret(body.token.strip()),
     )
+    try:
+        c.account = _client_from(body).account()[:200]  # best effort: who this credential belongs to
+    except BitbucketError:
+        c.account = ""
     db.commit()
     return _view(c)
+
+
+def _client_from(body: BitbucketConnectionIn) -> BitbucketClient:
+    base = ""
+    if body.deployment == "server":
+        try:
+            base = validate_base_url(body.base_url)
+        except JiraError as e:
+            raise BitbucketError(str(e)) from None
+    return BitbucketClient(
+        body.deployment,
+        body.token.strip(),
+        body.username.strip(),
+        base,
+        transport=_transport,
+        workspaces=body.workspaces,
+    )
+
+
+@router.post("/check")
+def check_credentials(
+    body: BitbucketConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Try the credentials typed into the form without saving them."""
+    authorize(db, p, "github.configure", f"bitbucket-check-{body.deployment}")
+    try:
+        return {"ok": True, "user": _client_from(body).whoami()}
+    except BitbucketError as e:
+        return {"ok": False, "error": redact_secrets(str(e))}
 
 
 @router.delete("/connection", status_code=204)
@@ -106,9 +140,14 @@ def delete_connection(p: Principal = Depends(current_principal), db: Session = D
 def test_connection(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "github.configure", "bitbucket-test")
     try:
-        who = make_client(db, p.org_id).whoami()
+        client = make_client(db, p.org_id)
+        who = client.whoami()
     except BitbucketError as e:
         return {"ok": False, "error": redact_secrets(str(e))}
+    c = db.scalar(select(BitbucketConnection).where(BitbucketConnection.org_id == p.org_id))
+    if c is not None and (name := client.account()) and name != c.account:
+        c.account = name[:200]
+        db.commit()
     return {"ok": True, "user": who}
 
 

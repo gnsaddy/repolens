@@ -5,6 +5,7 @@ import { useToast } from "@/components/feedback";
 import { Button, ErrorNote, Input, Label } from "@/components/ui";
 import { api, type BitbucketConn } from "@/lib/api";
 import type { Integration } from "./types";
+import { useCheck } from "./useCheck";
 
 export function useBitbucket(): Integration {
   const qc = useQueryClient();
@@ -13,9 +14,9 @@ export function useBitbucket(): Integration {
   const remove = useMutation({ mutationFn: () => api("/bitbucket/connection", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket disconnected"); } });
   const c = conn.data;
   return {
-    connected: !!c?.connected, loading: conn.isLoading,
+    connected: !!c?.connected, loading: conn.isLoading, account: c?.account || undefined,
     detail: c?.connected ? (c.deployment === "server" ? `Server · ${c.base_url}` : `Cloud · ${c.username ? (c.username.includes("@") ? `API token (${c.username})` : `app password (${c.username})`) : "access token"}${c.workspaces ? ` · ${c.workspaces}` : ""}`) : "",
-    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/bitbucket/test", { method: "POST" }); return r.ok ? `Connected as ${r.user}` : { error: r.error ?? "Failed" }; },
+    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/bitbucket/test", { method: "POST" }); if (r.ok) qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); return r.ok ? `Connected as ${r.user}` : { error: r.error ?? "Failed" }; },
     disconnect: () => remove.mutateAsync(),
     disconnectMessage: "The stored credential is deleted.",
   };
@@ -43,6 +44,8 @@ export function BitbucketForm({ onDone }: { onDone: () => void }) {
     mutationFn: () => api("/bitbucket/connection", { method: "PUT", json: { deployment, base_url: deployment === "server" ? baseUrl : "", username: needsUser ? username : "", token, workspaces: deployment === "cloud" ? workspaces : "" } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket connected"); onDone(); },
   });
+  const check = useCheck("/bitbucket/check", () => ({ deployment, base_url: deployment === "server" ? baseUrl : "", username: needsUser ? username : "", token, workspaces: deployment === "cloud" ? workspaces : "" }));
+  const ready = token.length >= 4 && (deployment !== "server" || !!baseUrl) && (!needsUser || !!username);
   const help = deployment === "server" ? "Profile → Manage account → Personal access tokens, with Project read and Repository read."
     : kind === "api" ? "Create it at id.atlassian.com → Security → API tokens → Create API token with scopes → Bitbucket. Needs read:repository:bitbucket and read:pullrequest:bitbucket. Use your Atlassian email as the username."
     : kind === "access" ? "Repository settings → Security → Access tokens (or Workspace settings). Read access to repositories and pull requests. No username."
@@ -58,7 +61,8 @@ export function BitbucketForm({ onDone }: { onDone: () => void }) {
       <div><Label>{deployment === "server" ? "Personal access token" : kind === "app" ? "App password" : "Token"}</Label><Input aria-label="Bitbucket token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
         <p className="mt-1 text-xs text-muted">{help} Use a read-only credential. Stored encrypted, never shown again.</p></div>
       <ErrorNote error={save.error} />
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button disabled={save.isPending || token.length < 4 || (deployment === "server" && !baseUrl) || (needsUser && !username)}>Save connection</Button></div>
+      {check.message}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button type="button" variant="outline" disabled={!ready || check.pending} onClick={check.run}>Test connection</Button><Button disabled={save.isPending || token.length < 4 || (deployment === "server" && !baseUrl) || (needsUser && !username)}>Save connection</Button></div>
     </form>
   );
 }

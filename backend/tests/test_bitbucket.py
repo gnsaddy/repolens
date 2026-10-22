@@ -130,6 +130,7 @@ def test_cloud_connection_is_write_only_and_testable(client, auth, bb):
         "base_url": None,
         "username": "ana",
         "workspaces": None,
+        "account": "Ana",
     } and "app-password" not in json.dumps(v)
     assert client.post("/api/bitbucket/test", headers=auth).json() == {"ok": True, "user": "Ana"}
     basic = "Basic " + base64.b64encode(b"ana:app-password-123").decode()

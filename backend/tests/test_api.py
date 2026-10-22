@@ -356,6 +356,7 @@ def test_jira_publish_failure_keeps_report(client, auth, demo_repo, jira_state):
 
 def test_jira_invalid_issue_key_rejected(client, auth, jira_state):
     configure_jira(client, auth)
+    jira_state["requests"].clear()  # saving the connection looks up the account name; only later calls matter here
     r = client.post("/api/jira/investigate", headers=auth, json={"issue_key": "../../etc", "repo_ids": []})
     assert r.status_code == 502 and not jira_state["requests"]
 

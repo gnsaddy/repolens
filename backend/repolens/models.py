@@ -247,6 +247,7 @@ class JiraConnection(Base):
     secret_encrypted: Mapped[str] = mapped_column(Text)  # Fernet token; never returned by the API
     allow_publish: Mapped[bool] = mapped_column(Boolean, default=False)
     default_project: Mapped[str] = mapped_column(String(50), default="")
+    account: Mapped[str] = mapped_column(String(200), default="")  # who the credential belongs to, for display
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
@@ -441,6 +442,7 @@ class ConfluenceConnection(Base):
     deployment: Mapped[str] = mapped_column(String(12), default="cloud")  # cloud | datacenter
     email: Mapped[str] = mapped_column(String(320), default="")
     secret_encrypted: Mapped[str] = mapped_column(Text)
+    account: Mapped[str] = mapped_column(String(200), default="")  # who the credential belongs to, for display
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
@@ -567,5 +569,6 @@ class BitbucketConnection(Base):
     base_url: Mapped[str] = mapped_column(String(300), default="")  # server only; cloud is api.bitbucket.org
     username: Mapped[str] = mapped_column(String(200), default="")  # cloud app password user; empty for token auth
     workspaces: Mapped[str] = mapped_column(String(300), default="")  # cloud: comma-separated workspace slugs to list
+    account: Mapped[str] = mapped_column(String(200), default="")  # who the credential belongs to, for display
     token_encrypted: Mapped[str] = mapped_column(Text)  # never returned by the API
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

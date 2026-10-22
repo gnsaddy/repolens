@@ -113,6 +113,16 @@ class BitbucketClient:
         return out[:limit], True
 
     # -- API ---------------------------------------------------------------------------------------------------
+    def account(self) -> str:
+        """Display name of the credential's owner, or "" when it cannot be read (never raises)."""
+        if self.deployment != "cloud":
+            return ""
+        try:
+            d = self._get(f"{self.root}/user")
+        except BitbucketError:
+            return ""
+        return d.get("display_name") or d.get("nickname") or d.get("username") or ""
+
     def whoami(self) -> str:
         if self.deployment == "cloud":
             try:

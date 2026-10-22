@@ -82,8 +82,25 @@ def put_connection(body: GithubConnectionIn, p: Principal = Depends(current_prin
         c = GithubConnection(org_id=p.org_id, token_encrypted="")
         db.add(c)
     c.api_base, c.token_encrypted, c.auth_method, c.login, c.scope = base, encrypt_secret(body.token), "token", "", ""
+    try:  # best effort: remember whose token this is so the UI can show it
+        c.login = (GitHubClient(body.token, base, transport=_transport).whoami().get("login") or "")[:100]
+    except GitHubError:
+        pass
     db.commit()
     return _conn_view(c)
+
+
+@router.post("/github/check")
+def check_credentials(
+    body: GithubConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Try a token typed into the form without saving it."""
+    authorize(db, p, "github.configure", "check")
+    try:
+        me = GitHubClient(body.token, validate_api_base(body.api_base), transport=_transport).whoami()
+    except GitHubError as e:
+        return {"ok": False, "error": redact_secrets(str(e))}
+    return {"ok": True, "user": me.get("login")}
 
 
 # ---------------------------------------------------------------------------------------- OAuth device flow
@@ -321,6 +338,10 @@ def test_connection(p: Principal = Depends(current_principal), db: Session = Dep
         me = make_client(db, p.org_id).whoami()
     except GitHubError as e:
         return {"ok": False, "error": redact_secrets(str(e))}
+    c = db.scalar(select(GithubConnection).where(GithubConnection.org_id == p.org_id))
+    if c is not None and me.get("login") and me["login"] != c.login:
+        c.login = me["login"][:100]
+        db.commit()
     return {"ok": True, "user": me.get("login")}
 
 

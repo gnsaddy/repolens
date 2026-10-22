@@ -53,8 +53,27 @@ def put_connection(body: JiraConnectionIn, p: Principal = Depends(current_princi
     c.base_url, c.deployment, c.email = base, body.deployment, body.email
     c.secret_encrypted = encrypt_secret(body.token)  # never stored or returned in plaintext
     c.allow_publish, c.default_project = body.allow_publish, body.default_project
+    try:  # best effort: remember whose token this is
+        me = JiraClient(base, body.deployment, body.token, body.email, transport=_transport).myself()
+        c.account = (me.get("displayName") or me.get("name") or "")[:200]
+    except JiraError:
+        c.account = ""
     db.commit()
     return c
+
+
+@router.post("/check")
+def check_credentials(body: JiraConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Try the credentials typed into the form without saving them."""
+    authorize(db, p, "jira.configure", "check")
+    try:
+        if body.deployment == "cloud" and not body.email:
+            return {"ok": False, "error": "Jira Cloud needs the account email alongside the API token"}
+        base = validate_base_url(body.base_url)
+        me = JiraClient(base, body.deployment, body.token, body.email, transport=_transport).myself()
+    except JiraError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "user": me.get("displayName") or me.get("name")}
 
 
 @router.delete("/connection", status_code=204)
@@ -69,11 +88,16 @@ def delete_connection(p: Principal = Depends(current_principal), db: Session = D
 @router.post("/test")
 def test_connection(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "jira.read", "test")
+    conn = _conn(db, p)
     try:
-        me = _client(_conn(db, p)).myself()
+        me = _client(conn).myself()
     except JiraError as e:
         return {"ok": False, "error": str(e)}
-    return {"ok": True, "user": me.get("displayName") or me.get("name")}
+    name = me.get("displayName") or me.get("name")
+    if name and name != conn.account:
+        conn.account = name[:200]
+        db.commit()
+    return {"ok": True, "user": name}
 
 
 @router.get("/projects")

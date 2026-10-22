@@ -26,7 +26,7 @@ from ..services import knowledge as kb
 from ..services import wiki as wk
 from ..services import wiki_import as wi
 from ..services.access import scope_for
-from ..services.confluence import ConfluenceError, parse_confluence_url
+from ..services.confluence import ConfluenceClient, ConfluenceError, parse_confluence_url
 from ..services.jira import JiraError, validate_base_url
 from ..services.policy import authorize
 from .repos import _get_repo, schedule_index
@@ -46,7 +46,13 @@ def get_connection(p: Principal = Depends(current_principal), db: Session = Depe
         return {"connected": False}
     if p.role != "admin":  # members only learn that a connection exists
         return {"connected": True}
-    return {"connected": True, "base_url": c.base_url, "deployment": c.deployment, "email": c.email}
+    return {
+        "connected": True,
+        "base_url": c.base_url,
+        "deployment": c.deployment,
+        "email": c.email,
+        "account": c.account,
+    }
 
 
 @router.put("/confluence/connection")
@@ -66,8 +72,42 @@ def put_connection(
         db.add(c)
     c.base_url, c.deployment, c.email = base, body.deployment, body.email
     c.secret_encrypted = encrypt_secret(body.token)  # encrypted at rest, never returned
+    try:  # best effort: remember whose token this is
+        me = ConfluenceClient(
+            base, body.deployment, body.token, body.email, transport=wi.confluence_transport
+        ).current_user()
+        c.account = (me.get("displayName") or me.get("username") or "")[:200]
+    except ConfluenceError:
+        c.account = ""
     db.commit()
-    return {"connected": True, "base_url": c.base_url, "deployment": c.deployment, "email": c.email}
+    return {
+        "connected": True,
+        "base_url": c.base_url,
+        "deployment": c.deployment,
+        "email": c.email,
+        "account": c.account,
+    }
+
+
+@router.post("/confluence/check")
+def check_credentials(
+    body: ConfluenceConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """Try the credentials typed into the form without saving them."""
+    authorize(db, p, "wiki.configure", "check")
+    try:
+        if body.deployment == "cloud" and not body.email:
+            return {"ok": False, "error": "Confluence Cloud needs the account email next to the API token"}
+        me = ConfluenceClient(
+            validate_base_url(body.base_url),
+            body.deployment,
+            body.token,
+            body.email,
+            transport=wi.confluence_transport,
+        ).current_user()
+    except (ConfluenceError, JiraError) as e:
+        return {"ok": False, "error": redact_secrets(str(e).replace("Jira URL", "Confluence URL"))}
+    return {"ok": True, "user": me.get("displayName") or me.get("username") or me.get("email")}
 
 
 @router.delete("/confluence/connection", status_code=204)
@@ -86,7 +126,12 @@ def test_connection(p: Principal = Depends(current_principal), db: Session = Dep
         me = wi.client_for_org(db, p.org_id).current_user()
     except ConfluenceError as e:
         return {"ok": False, "error": redact_secrets(str(e))}
-    return {"ok": True, "user": me.get("displayName") or me.get("username") or me.get("email")}
+    name = me.get("displayName") or me.get("username") or me.get("email")
+    conn = _conn(db, p.org_id)
+    if conn is not None and name and name != conn.account:
+        conn.account = str(name)[:200]
+        db.commit()
+    return {"ok": True, "user": name}
 
 
 def _resolve_root(db: Session, org_id: str, url: str) -> dict:

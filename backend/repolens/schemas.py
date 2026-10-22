@@ -147,6 +147,7 @@ class JiraConnectionOut(ORM):
     email: str
     allow_publish: bool
     default_project: str
+    account: str = ""
 
 
 class JiraInvestigateIn(BaseModel):

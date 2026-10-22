@@ -6,6 +6,7 @@ import { useToast } from "@/components/feedback";
 import { Button, ErrorNote, Input, Label } from "@/components/ui";
 import { api, type DevicePoll, type DeviceStart, type GithubConn } from "@/lib/api";
 import type { Integration } from "./types";
+import { useCheck } from "./useCheck";
 
 const SCOPES = [
   ["repo read:user", "Private + public repositories"],
@@ -19,9 +20,9 @@ export function useGithub(): Integration {
   const remove = useMutation({ mutationFn: () => api("/github/connection", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["github-conn"] }); qc.invalidateQueries({ queryKey: ["llm-settings"] }); toast("GitHub disconnected"); } });
   const c = conn.data;
   return {
-    connected: !!c?.connected, loading: conn.isLoading,
+    connected: !!c?.connected, loading: conn.isLoading, account: c?.login ? `@${c.login}` : undefined,
     detail: c?.connected ? `${c.auth_method === "oauth" ? `OAuth${c.login ? ` · @${c.login}` : ""}` : "Personal access token"} · ${c.api_base}` : "",
-    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/github/test", { method: "POST" }); return r.ok ? `Connected as ${r.user}` : { error: r.error ?? "Failed" }; },
+    test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/github/test", { method: "POST" }); if (r.ok) qc.invalidateQueries({ queryKey: ["github-conn"] }); return r.ok ? `Connected as ${r.user}` : { error: r.error ?? "Failed" }; },
     disconnect: () => remove.mutateAsync(),
     disconnectMessage: "The stored token is deleted. Also revoke the app at github.com/settings/applications.",
   };
@@ -65,6 +66,7 @@ export function GithubForm({ onDone }: { onDone: () => void }) {
     onSuccess: () => { setToken(""); finished(); },
   });
   const c = conn.data;
+  const check = useCheck("/github/check", () => ({ token, api_base: apiBase }));
 
   return (
     <div className="space-y-4">
@@ -74,7 +76,8 @@ export function GithubForm({ onDone }: { onDone: () => void }) {
           <span className="mt-1 block text-xs text-muted">Fine-grained token with read access to Contents, Pull requests, Issues and Metadata. Stored encrypted, never shown again.</span></label>
         <label className="block"><Label>API URL (change for GitHub Enterprise)</Label><Input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
         <ErrorNote error={saveToken.error} />
-        <div className="flex justify-end"><Button disabled={saveToken.isPending}>Save token</Button></div>
+        {check.message}
+        <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={token.length < 8 || check.pending} onClick={check.run}>Test connection</Button><Button disabled={saveToken.isPending}>Save token</Button></div>
       </form>
       <div className="border-t border-line pt-3">
         <button type="button" className="text-sm text-brand hover:underline" onClick={() => setShowToken((v) => !v)} aria-expanded={!showToken}>{showToken ? "Or sign in with GitHub (device flow)" : "Hide device flow"}</button>

@@ -72,7 +72,7 @@ export default function IntegrationsPanel({ admin }: { admin: boolean }) {
               <li key={d.id} className="flex flex-wrap items-center gap-4 p-4">
                 <IconTile icon={d.icon} tint={d.tint} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><span className="font-semibold">{d.name}</span><StatusPill on onLabel={d.wiki ? `${d.wiki.count} source${d.wiki.count === 1 ? "" : "s"}` : "Connected"} /></div>
+                  <div className="flex items-center gap-2"><span className="font-semibold">{d.name}</span><StatusPill on onLabel={d.wiki ? `${d.wiki.count} source${d.wiki.count === 1 ? "" : "s"}` : "Connected"} />{d.state?.account && <span className="truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700" title="The account this credential belongs to">{d.state.account}</span>}</div>
                   <p className="truncate text-sm text-muted">{d.wiki ? "Set up per collection in the wiki." : d.state?.detail}</p>
                   {notes[d.id] && <p role="status" className={cn("text-sm", notes[d.id].ok ? "text-emerald-700" : "text-red-600")}>{notes[d.id].text}</p>}
                 </div>

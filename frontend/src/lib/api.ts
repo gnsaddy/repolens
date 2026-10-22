@@ -56,7 +56,7 @@ export interface FileView {
   path: string; sha: string; language: string; content: string;
   symbols: { name: string; parent: string; type: string; start: number; end: number }[];
 }
-export interface JiraConnection { base_url: string; deployment: "cloud" | "datacenter"; email: string; allow_publish: boolean; default_project: string }
+export interface JiraConnection { base_url: string; deployment: "cloud" | "datacenter"; email: string; allow_publish: boolean; default_project: string; account?: string }
 export interface JiraIssue { key: string; summary: string; status: string; type: string; priority: string; url: string; investigation_id: string | null }
 
 const TOKEN_KEY = "repolens.token";
@@ -163,7 +163,7 @@ export interface WikiHealth {
   undocumented_code: GraphNode[]; outdated_references: { repo: string; repo_id: string; path: string; section: string; term: string }[];
 }
 export interface WikiSourceStatus { sync_interval_hours?: number; next_sync_at?: string | null; label?: string; id: string; repo_id: string; name: string; kind: string; url: string; mode: string; space_key: string; pages: number; status: string; repo_status: string; error: string | null; last_synced_at: string | null; visibility: string }
-export interface ConfluenceConn { connected: boolean; base_url?: string; deployment?: "cloud" | "datacenter"; email?: string }
+export interface ConfluenceConn { connected: boolean; base_url?: string; deployment?: "cloud" | "datacenter"; email?: string; account?: string }
 export interface ConfluencePreview { kind: "page" | "space"; space_key: string; title: string; page_id: string; suggested_mode: "tree" | "space" }
 
 export interface BranchList { branches: string[]; default: string }
@@ -191,4 +191,4 @@ export interface GhRepoPage { total: number; page: number; per_page: number; tru
 export interface GhPull { number: number; title: string; state: string; draft: boolean; author: string; head: string; base: string; labels: string[]; url: string; updated_at: string | null }
 export interface GhIssue { number: number; title: string; state: string; comments: number; author: string; labels: string[]; url: string; updated_at: string | null }
 export interface GhBranch { name: string; protected: boolean; default?: boolean }
-export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null; workspaces?: string | null }
+export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null; workspaces?: string | null; account?: string | null }

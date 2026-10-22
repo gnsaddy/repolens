@@ -13,7 +13,8 @@ afterEach(() => vi.restoreAllMocks());
 const llm = { provider: "heuristic", model: "claude-sonnet-5-5", base_url: "", has_key: false, source: "env", input_price: null, output_price: null, offline: true, presets: { anthropic: [], openai: [] }, embedding_provider: "hash" };
 
 interface State { jira: unknown; confluence: unknown; github?: unknown; bitbucket?: unknown; sources?: unknown[] }
-function setup(state: State, role = "admin", url = "/settings") {
+function setup(initial: State, role = "admin", url = "/settings") {
+  const state: State = { ...initial }; // tests mutate their own copy
   const calls: { url: string; method?: string; body?: unknown }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const u = String(input);
@@ -25,6 +26,10 @@ function setup(state: State, role = "admin", url = "/settings") {
     if (u.endsWith("/jira/connection") && init?.method === "DELETE") { state.jira = null; return Promise.resolve(new Response(null, { status: 204 })); }
     if (u.endsWith("/jira/connection")) return json(state.jira);
     if (u.endsWith("/jira/test")) return json({ ok: true, user: "Bot" });
+    if (u.endsWith("/jira/check")) { const b = JSON.parse(String(init?.body)); return json(b.token === "good-token-123" ? { ok: true, user: "Ana Lee" } : { ok: false, error: "Jira returned 401" }); }
+    if (u.endsWith("/github/check")) return json({ ok: true, user: "octo-admin" });
+    if (u.endsWith("/bitbucket/check")) return json({ ok: true, user: "Ana (Bitbucket)" });
+    if (u.endsWith("/wiki/confluence/check")) return json({ ok: true, user: "RepoLens Bot" });
     if (u.endsWith("/wiki/confluence/connection") && init?.method === "PUT") { state.confluence = { connected: true, base_url: "https://acme.atlassian.net/wiki", deployment: "cloud", email: "bot@acme.io" }; return json(state.confluence); }
     if (u.endsWith("/wiki/confluence/connection")) return json(state.confluence);
     if (u.endsWith("/wiki/confluence/test")) return json({ ok: true, user: "RepoLens Bot" });
@@ -139,5 +144,68 @@ describe("Bitbucket credential types", () => {
     await userEvent.click(d.getByRole("button", { name: "Save connection" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/bitbucket/connection") && c.method === "PUT")).toBe(true));
     expect(calls.find((c) => c.method === "PUT")!.body).toEqual({ deployment: "cloud", base_url: "", username: "me@example.com", token: "ATATT3xFfGF0abc123", workspaces: "my-team" });
+  });
+});
+
+describe("Connected accounts and in-card testing", () => {
+  it("shows who each connected integration belongs to next to the Connected pill", async () => {
+    setup({
+      jira: { base_url: "https://acme.atlassian.net", deployment: "cloud", email: "bot@acme.io", allow_publish: false, default_project: "", account: "Ana Lee" },
+      confluence: { connected: true, base_url: "https://acme.atlassian.net/wiki", deployment: "cloud", email: "bot@acme.io", account: "RepoLens Bot" },
+      github: { connected: true, api_base: "https://api.github.com", auth_method: "token", login: "gnsaddy" },
+      bitbucket: { connected: true, deployment: "cloud", base_url: null, username: "me@x.io", account: "Aditya Raj" },
+    });
+    const list = await screen.findByRole("list", { name: "Connected integrations" });
+    expect(await within(list).findByText("@gnsaddy")).toBeInTheDocument();
+    expect(within(list).getByText("Ana Lee")).toBeInTheDocument();
+    expect(within(list).getByText("RepoLens Bot")).toBeInTheDocument();
+    expect(within(list).getByText("Aditya Raj")).toBeInTheDocument();
+  });
+
+  it("the Connect card has a Test connection button that checks the typed values without saving", async () => {
+    const calls = setup(none);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Jira" }));
+    const d = within(screen.getByRole("dialog"));
+    expect(d.getByRole("button", { name: "Test connection" })).toBeDisabled(); // nothing typed yet
+    await userEvent.type(d.getByLabelText("Jira URL"), "https://acme.atlassian.net");
+    await userEvent.type(d.getByLabelText("Jira account email"), "bot@acme.io");
+    await userEvent.type(d.getByLabelText("Jira token"), "wrong-token-1");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Jira returned 401")).toBeInTheDocument();
+    await userEvent.clear(d.getByLabelText("Jira token"));
+    await userEvent.type(d.getByLabelText("Jira token"), "good-token-123");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Works — signed in as Ana Lee")).toBeInTheDocument();
+    expect(calls.filter((c) => c.url.endsWith("/jira/check"))).toHaveLength(2);
+    expect(calls.some((c) => c.method === "PUT")).toBe(false); // testing never saved anything
+    expect(screen.getByRole("dialog")).toBeInTheDocument(); // and did not close the card
+  });
+
+  it("every form has the button: Confluence, Bitbucket and GitHub", async () => {
+    const calls = setup(none);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Confluence" }));
+    let d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText("Confluence base URL"), "https://acme.atlassian.net/wiki");
+    await userEvent.type(d.getByLabelText("Confluence account email"), "bot@acme.io");
+    await userEvent.type(d.getByLabelText("Confluence token"), "api-token-xyz");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Works — signed in as RepoLens Bot")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Connect Bitbucket" }));
+    d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText("Bitbucket username"), "me@x.io");
+    await userEvent.type(d.getByLabelText("Bitbucket token"), "ATATT3xFfGF0abc123");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Works — signed in as Ana (Bitbucket)")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Connect GitHub" }));
+    d = within(screen.getByRole("dialog"));
+    await userEvent.type(d.getByLabelText(/Personal access token/), "github_pat_abcdefgh");
+    await userEvent.click(d.getByRole("button", { name: "Test connection" }));
+    expect(await d.findByText("Works — signed in as octo-admin")).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    expect(JSON.stringify(calls)).toContain("/github/check");
   });
 });
