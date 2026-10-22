@@ -166,6 +166,11 @@ def github_models_catalog(p: Principal = Depends(current_principal), db: Session
         data = r.json()
     except httpx.HTTPError as e:
         raise HTTPException(502, redact_secrets(f"GitHub Models catalog unavailable: {type(e).__name__}")) from e
+    except ValueError:
+        raise HTTPException(
+            502,
+            f"GitHub Models sent a non-JSON reply ({r.text[:20].strip()!r}); it may be unavailable from this network",
+        ) from None
     items = data if isinstance(data, list) else data.get("models", [])
     return [
         {"id": m.get("id"), "name": m.get("name", ""), "publisher": m.get("publisher", "")}

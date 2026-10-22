@@ -126,3 +126,29 @@ def test_env_provider_still_works_without_org_setting(client, auth, monkeypatch)
     get_settings.cache_clear()
     v = client.get("/api/settings/llm", headers=auth).json()
     assert v["source"] == "env" and v["has_key"] is True and v["offline"] is False
+
+
+def test_non_json_model_replies_give_a_clear_error_not_a_decode_error(monkeypatch):
+    import httpx
+    import pytest
+
+    from repolens.services import llm
+
+    cfg = llm.LLMConfig("github-models", "openai/gpt-4.1", "https://models.github.ai/inference", "tok", "org")
+    monkeypatch.setattr(
+        llm,
+        "_openai_transport",
+        httpx.MockTransport(lambda r: httpx.Response(200, text="OK\r\n", headers={"content-type": "text/plain"})),
+    )
+    with pytest.raises(
+        RuntimeError, match=r"models.github.ai answered 200 with something that is not a model reply.*'OK'"
+    ):
+        llm._openai_call("sys", "hi", 10, cfg)
+    monkeypatch.setattr(llm, "_openai_transport", httpx.MockTransport(lambda r: httpx.Response(200, json={"oops": 1})))
+    with pytest.raises(RuntimeError, match="unexpected reply"):
+        llm._openai_call("sys", "hi", 10, cfg)
+    monkeypatch.setattr(
+        llm, "_openai_transport", httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "bad"}))
+    )
+    with pytest.raises(RuntimeError, match="rejected the credentials"):
+        llm._openai_call("sys", "hi", 10, cfg)

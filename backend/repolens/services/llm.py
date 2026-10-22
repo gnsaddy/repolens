@@ -106,8 +106,23 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
             },
         )
+    if r.status_code in (401, 403):
+        raise RuntimeError(
+            f"The model service rejected the credentials ({r.status_code}). Check the key or token and its permissions."
+        )
     r.raise_for_status()
-    d = r.json()
+    try:
+        d = r.json()
+    except ValueError:
+        host = httpx.URL(cfg.base_url).host
+        raise RuntimeError(
+            f"{host} answered {r.status_code} with something that is not a model reply "
+            f"({r.headers.get('content-type', 'unknown type')}: {r.text[:40].strip()!r}). The service may be "
+            "unavailable from this network, not enabled for this account, or the base URL is wrong. "
+            "Try another provider or model."
+        ) from None
+    if "choices" not in d:
+        raise RuntimeError(f"The model service returned an unexpected reply: {str(d)[:120]!r}")
     u = d.get("usage", {})
     cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
     return LLMResult(
