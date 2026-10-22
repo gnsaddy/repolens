@@ -134,9 +134,10 @@ describe("Bitbucket credential types", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Connect Bitbucket" }));
     const d = within(screen.getByRole("dialog"));
     await userEvent.type(d.getByLabelText("Bitbucket username"), "me@example.com");
+    await userEvent.type(d.getByLabelText("Bitbucket workspace"), "my-team");
     await userEvent.type(d.getByLabelText("Bitbucket token"), "ATATT3xFfGF0abc123");
     await userEvent.click(d.getByRole("button", { name: "Save connection" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/bitbucket/connection") && c.method === "PUT")).toBe(true));
-    expect(calls.find((c) => c.method === "PUT")!.body).toEqual({ deployment: "cloud", base_url: "", username: "me@example.com", token: "ATATT3xFfGF0abc123" });
+    expect(calls.find((c) => c.method === "PUT")!.body).toEqual({ deployment: "cloud", base_url: "", username: "me@example.com", token: "ATATT3xFfGF0abc123", workspaces: "my-team" });
   });
 });

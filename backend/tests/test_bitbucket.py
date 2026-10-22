@@ -49,7 +49,9 @@ def cloud(state):
         p = r.url.path
         if p == "/2.0/user":
             return httpx.Response(200, json={"display_name": "Ana"})
-        if p == "/2.0/repositories":
+        if p == "/2.0/workspaces":
+            return httpx.Response(200, json={"values": [{"slug": "acme"}]})
+        if p == "/2.0/repositories/acme":
             if r.url.params.get("page") == "2":
                 return httpx.Response(
                     200,
@@ -65,7 +67,7 @@ def cloud(state):
                     },
                 )
             return httpx.Response(
-                200, json={**CLOUD_REPOS, "next": "https://api.bitbucket.org/2.0/repositories?page=2"}
+                200, json={**CLOUD_REPOS, "next": "https://api.bitbucket.org/2.0/repositories/acme?page=2"}
             )
         if p == "/2.0/repositories/acme/orders/pullrequests":
             return httpx.Response(
@@ -127,6 +129,7 @@ def test_cloud_connection_is_write_only_and_testable(client, auth, bb):
         "deployment": "cloud",
         "base_url": None,
         "username": "ana",
+        "workspaces": None,
     } and "app-password" not in json.dumps(v)
     assert client.post("/api/bitbucket/test", headers=auth).json() == {"ok": True, "user": "Ana"}
     basic = "Basic " + base64.b64encode(b"ana:app-password-123").decode()
@@ -308,8 +311,8 @@ def test_cloud_test_button_tolerates_tokens_without_the_profile_scope_and_explai
             return httpx.Response(
                 403, json={"error": {"message": "Your credentials lack one or more required privilege scopes."}}
             )
-        if r.url.path == "/2.0/repositories":
-            return httpx.Response(200, json={"values": []})
+        if r.url.path == "/2.0/workspaces":
+            return httpx.Response(200, json={"values": [{"slug": "acme"}]})
         return httpx.Response(404)
 
     monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(handler))
@@ -319,7 +322,11 @@ def test_cloud_test_button_tolerates_tokens_without_the_profile_scope_and_explai
 
     monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(403)))
     msg = client.post("/api/bitbucket/test", headers=auth).json()
-    assert msg["ok"] is False and "lacks a permission" in msg["error"] and "read:repository:bitbucket" in msg["error"]
+    assert (
+        msg["ok"] is False
+        and "lacks permission to list workspaces" in msg["error"]
+        and "read:workspace:bitbucket" in msg["error"]
+    )
 
     monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(401)))
     msg = client.post("/api/bitbucket/test", headers=auth).json()
@@ -349,3 +356,63 @@ def test_atlassian_api_tokens_need_the_email_and_clone_with_their_own_git_user(c
     assert (
         clone_header("cloud", "tok", "ana") == "Authorization: Basic " + base64.b64encode(b"ana:tok").decode()
     )  # app passwords keep their user
+
+
+def test_account_wide_listing_is_never_used_and_workspaces_can_be_set(client, auth, monkeypatch):
+    seen = []
+
+    def handler(r: httpx.Request) -> httpx.Response:
+        seen.append(r.url.path)
+        if r.url.path == "/2.0/workspaces":
+            return httpx.Response(
+                404, json={"error": {"message": "Not found"}}
+            )  # the credential cannot list workspaces
+        if r.url.path == "/2.0/repositories/my-team":
+            return httpx.Response(
+                200,
+                json={
+                    "values": [
+                        {
+                            "full_name": "my-team/api",
+                            "slug": "api",
+                            "workspace": {"slug": "my-team"},
+                            "links": {"clone": [{"name": "https", "href": "https://bitbucket.org/my-team/api.git"}]},
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(404, json={"error": {"message": "Not found"}})
+
+    monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(handler))
+    connect(client, auth)
+    # without a workspace the failure tells you what to enter, and names the missing piece
+    r = client.get("/api/bitbucket/repos", headers=auth)
+    assert r.status_code == 404 and "Workspace field" in r.json()["detail"]
+    assert "/2.0/repositories" not in seen  # the removed account-wide endpoint is not called
+    v = client.put(
+        "/api/bitbucket/connection",
+        headers=auth,
+        json={
+            "deployment": "cloud",
+            "username": "me@example.com",
+            "token": "ATATT3xFfGF0abc123",
+            "workspaces": "my-team, other",
+        },
+    ).json()
+    assert v["workspaces"] == "my-team,other"
+    seen.clear()
+    items = client.get("/api/bitbucket/repos", headers=auth).json()["items"]
+    assert [i["full_name"] for i in items] == ["my-team/api"]  # "other" could not be read, which did not hide my-team
+    assert "/2.0/workspaces" not in seen  # configured workspaces are used directly
+    # a 404 says which address was not found
+    monkeypatch.setattr(bb_api, "_transport", httpx.MockTransport(lambda r: httpx.Response(404)))
+    msg = client.post("/api/bitbucket/test", headers=auth).json()
+    assert msg["ok"] is False and "/2.0/" in msg["error"]
+    assert (
+        client.put(
+            "/api/bitbucket/connection",
+            headers=auth,
+            json={"deployment": "cloud", "token": "tok-123", "workspaces": "bad;slug"},
+        ).status_code
+        == 422
+    )

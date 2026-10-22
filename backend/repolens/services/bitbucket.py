@@ -33,8 +33,10 @@ class BitbucketClient:
         username: str = "",
         base_url: str = "",
         transport: httpx.BaseTransport | None = None,
+        workspaces: str = "",
     ):
         self.deployment = deployment
+        self.workspaces = [w for w in workspaces.replace(",", " ").split() if w]
         headers = {"Accept": "application/json", "User-Agent": "repolens-ai"}
         auth = None
         if deployment == "cloud":
@@ -74,7 +76,10 @@ class BitbucketClient:
                 403,
             )
         if r.status_code == 404:
-            raise BitbucketError("Not found on Bitbucket, or the credentials cannot see it", 404)
+            raise BitbucketError(
+                f"Bitbucket returned 404 for {urlparse(str(r.url)).path}: not found, or the credentials cannot see it",
+                404,
+            )
         if r.status_code >= 400:
             raise BitbucketError(f"Bitbucket returned {r.status_code}", r.status_code)
         try:
@@ -114,21 +119,62 @@ class BitbucketClient:
                 d = self._get(f"{self.root}/user")
                 return d.get("display_name") or d.get("username") or "Bitbucket user"
             except BitbucketError as e:
-                if e.status != 403:
+                if e.status not in (403, 404):
                     raise
                 # Authenticated, but the token cannot read the profile (no user scope). Repositories are what matters.
-                self._get(f"{self.root}/repositories", role="member", pagelen=1)
+                ws = self._cloud_workspaces()
+                if self.workspaces:  # configured: prove the first one can be read
+                    self._get(f"{self.root}/repositories/{ws[0]}", pagelen=1)
                 return "Bitbucket (this token can list repositories but not read your profile)"
         self._get(f"{self.root}/projects", limit=1)  # the Server REST API has no "current user" without a username
         return "Bitbucket Server user"
+
+    def _cloud_workspaces(self) -> list[str]:
+        """Workspace slugs to list: the ones configured, otherwise every workspace the credential can see.
+        (The account-wide repository listing was removed from the Bitbucket Cloud API, so repositories are read per workspace.)"""
+        if self.workspaces:
+            return self.workspaces
+        try:
+            raw, _ = self._cloud_pages(f"{self.root}/workspaces", 100, pagelen=100)
+        except BitbucketError as e:
+            if e.status in (403, 404):
+                why = (
+                    "The token lacks permission to list workspaces (403): add the scope read:workspace:bitbucket, or"
+                    if e.status == 403
+                    else "This credential cannot list workspaces (404). Either way,"
+                )
+                raise BitbucketError(
+                    f"{why} enter your workspace slug (the first part of bitbucket.org/<workspace>/<repository>) in "
+                    "the Workspace field of the Bitbucket connection.",
+                    e.status,
+                ) from None
+            raise
+        slugs = [w.get("slug", "") for w in raw if w.get("slug")]
+        if not slugs:
+            raise BitbucketError(
+                "This credential can see no workspaces. Enter your workspace slug in the connection.", 404
+            )
+        return slugs
 
     def list_repos(self, limit: int = 500) -> tuple[list[dict], bool]:
         """Normalised repositories: full_name = owner/slug, plus clone and web URLs."""
         out: list[dict] = []
         if self.deployment == "cloud":
-            raw, more = self._cloud_pages(
-                f"{self.root}/repositories", limit, role="member", sort="-updated_on", pagelen=100
-            )
+            raw, more = [], False
+            first_error: BitbucketError | None = None
+            for ws in self._cloud_workspaces():
+                try:
+                    got, extra = self._cloud_pages(
+                        f"{self.root}/repositories/{ws}", limit, sort="-updated_on", pagelen=100
+                    )
+                except BitbucketError as e:  # one unreadable workspace must not hide the others
+                    first_error = first_error or e
+                    continue
+                raw += got
+                more = more or extra
+            if not raw and first_error:
+                raise first_error
+            raw.sort(key=lambda r: r.get("updated_on") or "", reverse=True)
             for r in raw:
                 clones = {c.get("name"): c.get("href", "") for c in (r.get("links") or {}).get("clone", [])}
                 ws = (r.get("workspace") or {}).get("slug") or r.get("full_name", "/").split("/")[0]

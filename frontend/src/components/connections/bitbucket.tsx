@@ -14,7 +14,7 @@ export function useBitbucket(): Integration {
   const c = conn.data;
   return {
     connected: !!c?.connected, loading: conn.isLoading,
-    detail: c?.connected ? (c.deployment === "server" ? `Server · ${c.base_url}` : `Cloud · ${c.username ? (c.username.includes("@") ? `API token (${c.username})` : `app password (${c.username})`) : "access token"}`) : "",
+    detail: c?.connected ? (c.deployment === "server" ? `Server · ${c.base_url}` : `Cloud · ${c.username ? (c.username.includes("@") ? `API token (${c.username})` : `app password (${c.username})`) : "access token"}${c.workspaces ? ` · ${c.workspaces}` : ""}`) : "",
     test: async () => { const r = await api<{ ok: boolean; user?: string; error?: string }>("/bitbucket/test", { method: "POST" }); return r.ok ? `Connected as ${r.user}` : { error: r.error ?? "Failed" }; },
     disconnect: () => remove.mutateAsync(),
     disconnectMessage: "The stored credential is deleted.",
@@ -37,9 +37,10 @@ export function BitbucketForm({ onDone }: { onDone: () => void }) {
   const [baseUrl, setBaseUrl] = useState(existing?.base_url ?? "");
   const [username, setUsername] = useState(existing?.username ?? "");
   const [token, setToken] = useState("");
+  const [workspaces, setWorkspaces] = useState(existing?.workspaces ?? "");
   const needsUser = deployment === "cloud" && kind !== "access";
   const save = useMutation({
-    mutationFn: () => api("/bitbucket/connection", { method: "PUT", json: { deployment, base_url: deployment === "server" ? baseUrl : "", username: needsUser ? username : "", token } }),
+    mutationFn: () => api("/bitbucket/connection", { method: "PUT", json: { deployment, base_url: deployment === "server" ? baseUrl : "", username: needsUser ? username : "", token, workspaces: deployment === "cloud" ? workspaces : "" } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket connected"); onDone(); },
   });
   const help = deployment === "server" ? "Profile → Manage account → Personal access tokens, with Project read and Repository read."
@@ -52,6 +53,8 @@ export function BitbucketForm({ onDone }: { onDone: () => void }) {
       {deployment === "cloud" && <div><Label>Credential type</Label><select aria-label="Bitbucket credential type" className={selectCls} value={kind} onChange={(e) => setKind(e.target.value as Kind)}>{CLOUD_KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>}
       {deployment === "server" && <div><Label>Base URL</Label><Input aria-label="Bitbucket base URL" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://bitbucket.company.com" /></div>}
       {needsUser && <div><Label>{kind === "api" ? "Atlassian email" : "Bitbucket username"}</Label><Input aria-label="Bitbucket username" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder={kind === "api" ? "you@company.com" : "your-username"} /></div>}
+      {deployment === "cloud" && <div><Label>Workspace (recommended)</Label><Input aria-label="Bitbucket workspace" value={workspaces} onChange={(e) => setWorkspaces(e.target.value)} placeholder="my-team" />
+        <p className="mt-1 text-xs text-muted">The first part of your repository addresses: bitbucket.org/<b>my-team</b>/repo. Several can be separated by commas. Leave empty to list every workspace the token can see, which needs the read:workspace:bitbucket scope.</p></div>}
       <div><Label>{deployment === "server" ? "Personal access token" : kind === "app" ? "App password" : "Token"}</Label><Input aria-label="Bitbucket token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
         <p className="mt-1 text-xs text-muted">{help} Use a read-only credential. Stored encrypted, never shown again.</p></div>
       <ErrorNote error={save.error} />

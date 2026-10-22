@@ -26,6 +26,7 @@ def _view(c: BitbucketConnection | None) -> dict:
         "deployment": c.deployment if c else None,
         "base_url": (c.base_url or None) if c else None,
         "username": (c.username or None) if c else None,
+        "workspaces": (c.workspaces or None) if c else None,
     }
 
 
@@ -35,7 +36,12 @@ def make_client(db: Session, org_id: str) -> BitbucketClient:
         raise HTTPException(404, "Bitbucket is not configured")
     try:
         return BitbucketClient(
-            c.deployment, decrypt_secret(c.token_encrypted), c.username, c.base_url, transport=_transport
+            c.deployment,
+            decrypt_secret(c.token_encrypted),
+            c.username,
+            c.base_url,
+            transport=_transport,
+            workspaces=c.workspaces,
         )
     except BitbucketError as e:
         raise HTTPException(400, str(e)) from None
@@ -76,6 +82,7 @@ def put_connection(
     if c is None:
         c = BitbucketConnection(org_id=p.org_id, token_encrypted="")
         db.add(c)
+    c.workspaces = ",".join(w for w in re.split(r"[,\s]+", body.workspaces) if w) if body.deployment == "cloud" else ""
     c.deployment, c.base_url, c.username, c.token_encrypted = (
         body.deployment,
         base,

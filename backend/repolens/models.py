@@ -566,5 +566,6 @@ class BitbucketConnection(Base):
     deployment: Mapped[str] = mapped_column(String(10), default="cloud")  # cloud | server
     base_url: Mapped[str] = mapped_column(String(300), default="")  # server only; cloud is api.bitbucket.org
     username: Mapped[str] = mapped_column(String(200), default="")  # cloud app password user; empty for token auth
+    workspaces: Mapped[str] = mapped_column(String(300), default="")  # cloud: comma-separated workspace slugs to list
     token_encrypted: Mapped[str] = mapped_column(Text)  # never returned by the API
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

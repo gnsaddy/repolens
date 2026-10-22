@@ -191,4 +191,4 @@ export interface GhRepoPage { total: number; page: number; per_page: number; tru
 export interface GhPull { number: number; title: string; state: string; draft: boolean; author: string; head: string; base: string; labels: string[]; url: string; updated_at: string | null }
 export interface GhIssue { number: number; title: string; state: string; comments: number; author: string; labels: string[]; url: string; updated_at: string | null }
 export interface GhBranch { name: string; protected: boolean; default?: boolean }
-export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null }
+export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null; workspaces?: string | null }

@@ -204,6 +204,7 @@ class BitbucketConnectionIn(BaseModel):
     deployment: str = Field(default="cloud", pattern="^(cloud|server)$")
     base_url: str = Field(default="", max_length=300)  # Bitbucket Server / Data Center only
     username: str = Field(default="", max_length=200)  # Cloud with an app password; leave empty for an access token
+    workspaces: str = Field(default="", max_length=300, pattern=r"^[\w., -]*$")  # Cloud: workspace slugs to list
     token: str = Field(min_length=4, max_length=500)
 
 
