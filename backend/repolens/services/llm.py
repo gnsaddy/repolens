@@ -120,6 +120,11 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
             f"({r.headers.get('content-type', 'unknown type')}: {r.text[:40].strip()!r}). The service may be "
             "unavailable from this network, not enabled for this account, or the base URL is wrong. "
             "Try another provider or model."
+            + (
+                " GitHub retired GitHub Models on 30 July 2026, so this provider no longer works."
+                if host.endswith("github.ai")
+                else ""
+            )
         ) from None
     if "choices" not in d:
         raise RuntimeError(f"The model service returned an unexpected reply: {str(d)[:120]!r}")

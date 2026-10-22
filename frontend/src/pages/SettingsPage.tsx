@@ -12,7 +12,7 @@ const PROVIDERS = [
   ["heuristic", "Offline (no model calls)"],
   ["anthropic", "Anthropic Claude"],
   ["openai", "OpenAI-compatible (OpenAI, Azure, vLLM, Ollama…)"],
-  ["github-models", "GitHub Models (uses your connected GitHub account)"],
+  ["github-models", "GitHub Models (retired 30 July 2026)"],
 ] as const;
 
 export default function SettingsPage() {
@@ -48,7 +48,8 @@ export default function SettingsPage() {
           <form onSubmit={submit} className="space-y-3">
             <label className="block"><Label>Provider</Label>
               <select disabled={!admin} className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value, model: PROVIDERS.some(([p]) => p === e.target.value) ? (data?.presets[e.target.value]?.[0] ?? "") : f.model })}>
-                {PROVIDERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+                {PROVIDERS.filter(([v]) => v !== "github-models" || data?.provider === "github-models").map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            {f.provider === "github-models" && <p role="alert" className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">GitHub retired GitHub Models on 30 July 2026, so its API no longer answers for anyone, whatever token you use. Pick another provider: Anthropic, an OpenAI-compatible service (Ollama, Gemini, Groq, OpenRouter, Azure AI Foundry) or offline mode. Your GitHub token still works for pull requests and private repositories.</p>}
             {online && (<>
               <label className="block"><Label>Model</Label><Input disabled={!admin} required list="model-presets" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={f.provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5-5"} />
                 <datalist id="model-presets">{presets.map((m) => <option key={m} value={m} />)}</datalist></label>
