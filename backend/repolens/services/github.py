@@ -84,6 +84,51 @@ class GitHubClient:
             page += 1
         return out[:limit]
 
+    def list_repos(self, limit: int = 500) -> tuple[list[dict], bool]:
+        """Repositories the token can see (own, collaborator and organisation), most recently pushed first."""
+        out: list[dict] = []
+        page = 1
+        while len(out) < limit:
+            batch = self._get(
+                "/user/repos",
+                sort="pushed",
+                direction="desc",
+                per_page=100,
+                page=page,
+                affiliation="owner,collaborator,organization_member",
+            )
+            if not isinstance(batch, list) or not batch:
+                return out, False
+            out += batch
+            if len(batch) < 100:
+                return out, False
+            page += 1
+        return out[:limit], True
+
+    def list_pulls_state(self, repo: str, state: str, limit: int = 50) -> list[dict]:
+        d = self._get(f"/repos/{repo}/pulls", state=state, sort="updated", direction="desc", per_page=min(limit, 100))
+        return d[:limit] if isinstance(d, list) else []
+
+    def list_issues(self, repo: str, state: str, limit: int = 50) -> list[dict]:
+        """Issues only: GitHub's issues endpoint also returns pull requests, which are listed separately."""
+        out: list[dict] = []
+        page = 1
+        while len(out) < limit and page <= 4:
+            d = self._get(
+                f"/repos/{repo}/issues", state=state, sort="updated", direction="desc", per_page=100, page=page
+            )
+            if not isinstance(d, list) or not d:
+                break
+            out += [i for i in d if "pull_request" not in i]
+            if len(d) < 100:
+                break
+            page += 1
+        return out[:limit]
+
+    def list_branches(self, repo: str) -> list[dict]:
+        d = self._get(f"/repos/{repo}/branches", per_page=100)
+        return d if isinstance(d, list) else []
+
     def get_pull(self, repo: str, number: int) -> dict:
         d = self._get(f"/repos/{repo}/pulls/{number}")
         return d if isinstance(d, dict) else {}

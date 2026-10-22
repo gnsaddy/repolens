@@ -38,6 +38,10 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Blast radius: changed symbols → dependents (including other repositories) → tests to run → docs to update
 * ❌ Calibration against real outcomes (needs labelled incidents)
 
+## Browse GitHub
+
+Once a token is connected (Settings, a personal access token or the device flow), the **GitHub** page lists every repository it can see (own, collaborator and organisation, most recently pushed first, searchable by name or description, 25 per page, up to 500), marks the ones already in RepoLens, and shows a repository's live pull requests, issues and branches with open/closed/all filters. "Add to RepoLens" clones and indexes it, with a branch picker. Nothing is imported until you add it; a token that cannot see a repository simply does not list it. Rejected or expired tokens produce a clear message and the token is never echoed.
+
 ## Single sign-on and SCIM provisioning
 
 **Settings > Single sign-on** connects any OpenID Connect provider (Okta, Microsoft Entra ID, Google Workspace, Keycloak...): issuer URL, client id/secret, allowed e-mail domains, and the role for new users (viewer or member; SSO never grants admin). The sign-in page shows "Continue with single sign-on" once the typed e-mail's domain has SSO. It uses the authorization-code flow with PKCE; state, nonce and verifier are kept on the server, single use and expire after 10 minutes; ID tokens are verified against the provider's published keys with an algorithm allow-list, plus issuer, audience, expiry and nonce; only verified e-mail addresses in the allowed domains sign in; a user is never moved between organisations and a domain can belong to only one. The browser receives a one-time code, never a token in a URL. Set `REPOLENS_PUBLIC_URL` behind a proxy so the redirect URI shown in Settings is the one you register.

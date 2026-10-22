@@ -186,3 +186,8 @@ export interface ProposalRow { id: string; kind: "update" | "new"; source: strin
 export interface ProposalDetail extends ProposalRow { original: string; proposed: string; diff: string; apply_options: string[] }
 export interface SsoSettings { configured: boolean; redirect_uri: string; issuer?: string; client_id?: string; has_secret?: boolean; allowed_domains?: string[]; default_role?: string; auto_provision?: boolean; enabled?: boolean }
 export interface ScimStatus { configured: boolean; created_at: string | null; last_used_at: string | null }
+export interface GhRepo { full_name: string; name: string; owner: string; description: string; private: boolean; fork: boolean; archived: boolean; default_branch: string; language: string; stars: number; open_issues: number; updated_at: string | null; html_url: string; clone_url: string; added_repo_id: string | null }
+export interface GhRepoPage { total: number; page: number; per_page: number; truncated: boolean; items: GhRepo[] }
+export interface GhPull { number: number; title: string; state: string; draft: boolean; author: string; head: string; base: string; labels: string[]; url: string; updated_at: string | null }
+export interface GhIssue { number: number; title: string; state: string; comments: number; author: string; labels: string[]; url: string; updated_at: string | null }
+export interface GhBranch { name: string; protected: boolean }

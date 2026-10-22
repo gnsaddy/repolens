@@ -180,6 +180,140 @@ def delete_connection(p: Principal = Depends(current_principal), db: Session = D
         db.commit()
 
 
+# ---------------------------------------------------------------------------------------- browse
+_REPO_PART = r"^[\w.-]{1,100}$"
+
+
+def _full_name(owner: str, name: str) -> str:
+    import re
+
+    if not (re.fullmatch(_REPO_PART, owner) and re.fullmatch(_REPO_PART, name)):
+        raise HTTPException(400, "Invalid repository name")
+    return f"{owner}/{name}"
+
+
+def _gh(fn):
+    """Run a GitHub call, turning failures into clear 4xx/5xx for the UI."""
+    try:
+        return fn()
+    except GitHubError as e:
+        if e.status in (401, 403) and "rate limit" not in str(e):
+            raise HTTPException(
+                502, "GitHub rejected the token. It may be expired or lack permission for that repository."
+            ) from e
+        if e.status == 404:
+            raise HTTPException(404, "Not found on GitHub, or the token cannot see it") from e
+        raise HTTPException(502, redact_secrets(str(e))) from e
+
+
+def _repo_row(r: dict, added: dict[str, str]) -> dict:
+    return {
+        "full_name": r.get("full_name", ""),
+        "name": r.get("name", ""),
+        "owner": (r.get("owner") or {}).get("login", ""),
+        "description": (r.get("description") or "")[:300],
+        "private": bool(r.get("private")),
+        "fork": bool(r.get("fork")),
+        "archived": bool(r.get("archived")),
+        "default_branch": r.get("default_branch", ""),
+        "language": r.get("language") or "",
+        "stars": r.get("stargazers_count", 0),
+        "open_issues": r.get("open_issues_count", 0),
+        "updated_at": r.get("pushed_at") or r.get("updated_at"),
+        "html_url": r.get("html_url", ""),
+        "clone_url": (r.get("clone_url") or (r.get("html_url", "") + ".git")),
+        "added_repo_id": added.get(r.get("full_name", "").lower()),
+    }
+
+
+@router.get("/github/repos")
+def browse_repos(
+    q: str = "",
+    page: int = 1,
+    per_page: int = 30,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Repositories the connected token can see, with the ones already added to RepoLens marked."""
+    from ..services.access import scope_for
+
+    client = make_client(db, p.org_id)
+    items, truncated = _gh(client.list_repos)
+    scope = scope_for(db, p)
+    added: dict[str, str] = {}
+    for r in db.scalars(select(Repository).where(Repository.org_id == p.org_id, Repository.source == "git")):
+        full = parse_github_repo(r.url)
+        if full and scope.can(r.id):
+            added.setdefault(full.lower(), r.id)
+    needle = q.strip().lower()
+    rows = [
+        x
+        for x in items
+        if not needle or needle in x.get("full_name", "").lower() or needle in (x.get("description") or "").lower()
+    ]
+    per_page = max(1, min(per_page, 100))
+    start = (max(page, 1) - 1) * per_page
+    return {
+        "total": len(rows),
+        "page": page,
+        "per_page": per_page,
+        "truncated": truncated,
+        "items": [_repo_row(x, added) for x in rows[start : start + per_page]],
+    }
+
+
+@router.get("/github/repos/{owner}/{name}/pulls")
+def browse_pulls(
+    owner: str, name: str, state: str = "open", p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    if state not in ("open", "closed", "all"):
+        raise HTTPException(400, "state must be open, closed or all")
+    rows = _gh(lambda: make_client(db, p.org_id).list_pulls_state(_full_name(owner, name), state))
+    return [
+        {
+            "number": x["number"],
+            "title": (x.get("title") or "")[:300],
+            "state": "merged" if x.get("merged_at") else x.get("state", ""),
+            "draft": bool(x.get("draft")),
+            "author": (x.get("user") or {}).get("login", ""),
+            "head": (x.get("head") or {}).get("ref", ""),
+            "base": (x.get("base") or {}).get("ref", ""),
+            "labels": [lb.get("name", "") for lb in x.get("labels", [])],
+            "url": x.get("html_url", ""),
+            "updated_at": x.get("updated_at"),
+        }
+        for x in rows
+    ]
+
+
+@router.get("/github/repos/{owner}/{name}/issues")
+def browse_issues(
+    owner: str, name: str, state: str = "open", p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    if state not in ("open", "closed", "all"):
+        raise HTTPException(400, "state must be open, closed or all")
+    rows = _gh(lambda: make_client(db, p.org_id).list_issues(_full_name(owner, name), state))
+    return [
+        {
+            "number": x["number"],
+            "title": (x.get("title") or "")[:300],
+            "state": x.get("state", ""),
+            "comments": x.get("comments", 0),
+            "author": (x.get("user") or {}).get("login", ""),
+            "labels": [lb.get("name", "") for lb in x.get("labels", [])],
+            "url": x.get("html_url", ""),
+            "updated_at": x.get("updated_at"),
+        }
+        for x in rows
+    ]
+
+
+@router.get("/github/repos/{owner}/{name}/branches")
+def browse_branches(owner: str, name: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    rows = _gh(lambda: make_client(db, p.org_id).list_branches(_full_name(owner, name)))
+    return [{"name": b.get("name", ""), "protected": bool(b.get("protected"))} for b in rows]
+
+
 @router.post("/github/test")
 def test_connection(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "github.configure", "test")

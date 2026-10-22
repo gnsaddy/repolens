@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, GitFork, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -18,6 +18,7 @@ import InvestigationView from "./pages/InvestigationView";
 const TokenUsage = lazy(() => import("./pages/TokenUsage"));
 import Wiki from "./pages/Wiki";
 import Ownership from "./pages/Ownership";
+import GitHubBrowse from "./pages/GitHubBrowse";
 import JiraPage from "./pages/JiraPage";
 
 const nav = [
@@ -28,6 +29,7 @@ const nav = [
   { to: "/risk", label: "Change Risk", icon: ShieldAlert },
   { to: "/ownership", label: "Ownership", icon: Users },
   { to: "/repositories", label: "Repositories", icon: FolderGit2 },
+  { to: "/github", label: "GitHub", icon: GitFork },
   { to: "/jira", label: "Jira", icon: Ticket },
   { to: "/usage", label: "Token Usage", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -95,6 +97,7 @@ export default function App() {
         <Route path="wiki" element={<Wiki />} />
         <Route path="risk" element={<Risk />} />
         <Route path="ownership" element={<Ownership />} />
+        <Route path="github" element={<GitHubBrowse />} />
         <Route path="repositories" element={<Repositories />} />
         <Route path="jira" element={<JiraPage />} />
         <Route path="settings" element={<SettingsPage />} />

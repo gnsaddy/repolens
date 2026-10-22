@@ -14,6 +14,7 @@ export const PAGES = [
   { label: "DeepMind Wiki: health", to: "/wiki?tab=health", hint: "orphans, broken links, stale pages" },
   { label: "Change risk", to: "/risk", hint: "score a commit or branch" },
   { label: "Ownership", to: "/ownership", hint: "who maintains what, who to ask" },
+  { label: "GitHub", to: "/github", hint: "browse your repositories, pull requests and issues" },
   { label: "Repositories", to: "/repositories", hint: "add a repository, choose branches" },
   { label: "Jira", to: "/jira" },
   { label: "Token usage", to: "/usage", hint: "cost and budgets" },
