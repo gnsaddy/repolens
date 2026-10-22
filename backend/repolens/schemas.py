@@ -200,6 +200,13 @@ class GithubConnectionIn(BaseModel):
     api_base: str = Field(default="https://api.github.com", max_length=300)
 
 
+class BitbucketConnectionIn(BaseModel):
+    deployment: str = Field(default="cloud", pattern="^(cloud|server)$")
+    base_url: str = Field(default="", max_length=300)  # Bitbucket Server / Data Center only
+    username: str = Field(default="", max_length=200)  # Cloud with an app password; leave empty for an access token
+    token: str = Field(min_length=4, max_length=500)
+
+
 class SyncPullsIn(BaseModel):
     github_repo: str | None = Field(default=None, max_length=200, pattern=r"^[\w.-]+/[\w.-]+$")
     limit: int = Field(default=100, ge=1, le=300)

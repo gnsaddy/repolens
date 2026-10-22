@@ -4,7 +4,7 @@ import { KeyRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
 import GithubConnect from "@/components/GithubConnect";
-import { api, type LLMSettings, type ModelInfo, type RetrievalStatus, type ScimStatus, type SsoSettings } from "@/lib/api";
+import { api, type BitbucketConn, type LLMSettings, type ModelInfo, type RetrievalStatus, type ScimStatus, type SsoSettings } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 
@@ -76,6 +76,7 @@ export default function SettingsPage() {
         <RetrievalCard />
         {admin && <SsoCard />}
         <GithubConnect admin={admin} />
+        <BitbucketConnect admin={admin} />
         <Card className="lg:col-start-2 lg:row-start-1 lg:row-span-2">
           <CardTitle>What uses the model</CardTitle>
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
@@ -153,6 +154,45 @@ function SsoCard() {
         </div>
         {newToken && <p role="status" className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">Copy this token now, it is not shown again: <code className="select-all break-all font-mono">{newToken}</code></p>}
       </div>
+    </Card>
+  );
+}
+
+function BitbucketConnect({ admin }: { admin: boolean }) {
+  const qc = useQueryClient();
+  const ask = useConfirm();
+  const toast = useToast();
+  const conn = useQuery({ queryKey: ["bitbucket-conn"], queryFn: () => api<BitbucketConn>("/bitbucket/connection") });
+  const [f, setF] = useState({ deployment: "cloud", base_url: "", username: "", token: "" });
+  const [edit, setEdit] = useState(false);
+  const save = useMutation({ mutationFn: () => api("/bitbucket/connection", { method: "PUT", json: f }), onSuccess: () => { setF({ ...f, token: "" }); setEdit(false); qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket connected"); } });
+  const remove = useMutation({ mutationFn: () => api("/bitbucket/connection", { method: "DELETE" }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["bitbucket-conn"] }); toast("Bitbucket disconnected"); } });
+  const test = useMutation({ mutationFn: () => api<{ ok: boolean; user?: string; error?: string }>("/bitbucket/test", { method: "POST" }) });
+  const c = conn.data;
+  const showForm = admin && (edit || !c?.connected);
+  return (
+    <Card>
+      <CardTitle right={c?.connected ? <Badge tone="green">connected</Badge> : <Badge>not connected</Badge>}>Bitbucket</CardTitle>
+      <p className="mb-3 text-xs text-muted">Browse repositories and pull requests, and clone private repositories. Credentials are stored encrypted and never shown again.</p>
+      {showForm ? (
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
+          <div><Label>Deployment</Label><select aria-label="Bitbucket deployment" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={f.deployment} onChange={(e) => setF({ ...f, deployment: e.target.value })}><option value="cloud">Bitbucket Cloud</option><option value="server">Server / Data Center</option></select></div>
+          {f.deployment === "server"
+            ? <div><Label>Base URL</Label><Input aria-label="Bitbucket base URL" value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} placeholder="https://bitbucket.company.com" /></div>
+            : <div><Label>Username (app password only)</Label><Input aria-label="Bitbucket username" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} placeholder="leave empty for an access token" /></div>}
+          <div className="sm:col-span-2"><Label>{f.deployment === "server" ? "Personal access token" : f.username ? "App password" : "Access token"}</Label><Input aria-label="Bitbucket token" type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
+            <p className="mt-1 text-xs text-muted">{f.deployment === "server" ? "Create it under Profile → Personal access tokens with Project read and Repository read." : "Cloud: an app password (Account settings → App passwords) with Repositories: read and Pull requests: read, or a repository / workspace access token. Use a read-only credential."}</p></div>
+          <ErrorNote error={save.error} />
+          <div className="flex gap-2 sm:col-span-2"><Button disabled={save.isPending || f.token.length < 4 || (f.deployment === "server" && !f.base_url)}>Save</Button>{c?.connected && <Button type="button" variant="outline" onClick={() => setEdit(false)}>Cancel</Button>}</div>
+        </form>
+      ) : c?.connected && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>{c.deployment === "server" ? `Server · ${c.base_url}` : `Cloud${c.username ? ` · ${c.username}` : " · access token"}`}</span>
+          {admin && <><Button size="sm" variant="outline" onClick={() => test.mutate()} disabled={test.isPending}>Test</Button><Button size="sm" variant="outline" onClick={() => { setF({ deployment: c.deployment ?? "cloud", base_url: c.base_url ?? "", username: c.username ?? "", token: "" }); setEdit(true); }}>Change</Button>
+            <Button size="sm" variant="ghost" onClick={async () => { if (await ask({ title: "Disconnect Bitbucket?", message: "The stored credential is deleted.", confirmLabel: "Disconnect", danger: true })) remove.mutate(); }}>Disconnect</Button></>}
+          {test.data && <span role="status" className={test.data.ok ? "text-emerald-700" : "text-red-600"}>{test.data.ok ? `Connected as ${test.data.user}` : test.data.error}</span>}
+        </div>)}
+      {!admin && !c?.connected && <p className="text-sm text-muted">Only admins can connect Bitbucket.</p>}
     </Card>
   );
 }

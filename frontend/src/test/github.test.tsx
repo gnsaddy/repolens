@@ -56,3 +56,28 @@ describe("GitHub browser", () => {
     expect(posted[0]).toEqual({ name: "orders", source: "git", url: "https://github.com/acme/orders.git", branches: ["main", "develop"] });
   });
 });
+
+describe("Bitbucket browser", () => {
+  it("uses the Bitbucket endpoints, hides the issues tab and shows branches", async () => {
+    const urls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      urls.push(u);
+      if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" });
+      if (u.endsWith("/bitbucket/connection")) return json({ connected: true, deployment: "cloud", base_url: null, username: "ana" });
+      if (u.includes("/bitbucket/repos?")) return json({ total: 1, page: 1, per_page: 25, truncated: false, items: [repo("orders", { owner: "acme", clone_url: "https://bitbucket.org/acme/orders.git", html_url: "https://bitbucket.org/acme/orders" })] });
+      if (u.includes("/pulls?")) return json([{ number: 4, title: "Fix rounding", state: "merged", draft: false, author: "Bo", head: "fix", base: "main", labels: [], url: "https://bitbucket.org/acme/orders/pull-requests/4", updated_at: null }]);
+      if (u.endsWith("/branches")) return json([{ name: "main", protected: false }]);
+      return json([]);
+    });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter><GitHubBrowse provider="bitbucket" /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
+    expect(await screen.findByText("Bitbucket")).toBeInTheDocument();
+    await userEvent.click(await screen.findByText("acme/orders"));
+    expect(await screen.findByRole("link", { name: "#4 Fix rounding" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Issues/ })).toBeNull();
+    await userEvent.click(screen.getByRole("tab", { name: /Branches/ }));
+    expect(await screen.findByText("main")).toBeInTheDocument();
+    expect(screen.getByText("Open on Bitbucket")).toBeInTheDocument();
+    expect(urls.some((u) => u.includes("/github/"))).toBe(false);
+  });
+});

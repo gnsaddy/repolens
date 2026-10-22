@@ -555,3 +555,16 @@ class ScimToken(Base):
     token_hash: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BitbucketConnection(Base):
+    """Bitbucket Cloud (app password or access token) or Bitbucket Server / Data Center (personal access token)."""
+
+    __tablename__ = "bitbucket_connections"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), unique=True)
+    deployment: Mapped[str] = mapped_column(String(10), default="cloud")  # cloud | server
+    base_url: Mapped[str] = mapped_column(String(300), default="")  # server only; cloud is api.bitbucket.org
+    username: Mapped[str] = mapped_column(String(200), default="")  # cloud app password user; empty for token auth
+    token_encrypted: Mapped[str] = mapped_column(Text)  # never returned by the API
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

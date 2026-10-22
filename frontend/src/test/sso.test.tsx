@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,7 @@ describe("SSO settings", () => {
     await userEvent.type(screen.getByLabelText("Client id"), "cid");
     await userEvent.type(screen.getByLabelText("Client secret"), "s3cret");
     await userEvent.type(screen.getByLabelText("Allowed e-mail domains"), "corp.io");
-    await userEvent.click(screen.getAllByRole("button", { name: "Save" }).at(-1)!);
+    await userEvent.click(within(screen.getByLabelText("Issuer URL").closest("form")!).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/settings/sso"))).toBe(true));
     expect(screen.queryByDisplayValue("s3cret")).toBeNull(); // the secret field is cleared after saving
     expect(await screen.findByText(/https:\/\/x\/api\/auth\/sso\/callback/)).toBeInTheDocument();

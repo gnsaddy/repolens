@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from .api import (
     auth,
+    bitbucket,
     github,
     investigations,
     jira,
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
         scim.router,
         scim.admin,
         github.router,
+        bitbucket.router,
         risk.router,
         settings.router,
         usage.router,

@@ -15,6 +15,7 @@ export const PAGES = [
   { label: "Change risk", to: "/risk", hint: "score a commit or branch" },
   { label: "Ownership", to: "/ownership", hint: "who maintains what, who to ask" },
   { label: "GitHub", to: "/github", hint: "browse your repositories, pull requests and issues" },
+  { label: "Bitbucket", to: "/bitbucket", hint: "browse Bitbucket repositories and pull requests" },
   { label: "Repositories", to: "/repositories", hint: "add a repository, choose branches" },
   { label: "Jira", to: "/jira" },
   { label: "Token usage", to: "/usage", hint: "cost and budgets" },

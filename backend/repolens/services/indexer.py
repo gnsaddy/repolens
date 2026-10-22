@@ -45,13 +45,30 @@ def clone_auth_for(db: Session | None, org_id: str, url: str) -> str | None:
     from .links import basic_auth_header
 
     conn = db.scalar(select(GithubConnection).where(GithubConnection.org_id == org_id))
-    if conn is None or not conn.token_encrypted:
-        return None
-    if urlparse(oauth_base(conn.api_base)).hostname != urlparse(url).hostname:
-        return None  # never send the token to a host it was not issued for
-    from ..security import decrypt_secret
+    if (
+        conn is not None
+        and conn.token_encrypted
+        and urlparse(oauth_base(conn.api_base)).hostname == urlparse(url).hostname
+    ):
+        from ..security import decrypt_secret
 
-    return basic_auth_header(decrypt_secret(conn.token_encrypted))
+        return basic_auth_header(decrypt_secret(conn.token_encrypted))
+    return _bitbucket_clone_auth(db, org_id, url)  # never send a token to a host it was not issued for
+
+
+def _bitbucket_clone_auth(db: Session, org_id: str, url: str) -> str | None:
+    from ..models import BitbucketConnection
+    from ..security import decrypt_secret
+    from .bitbucket import CLOUD_HOST, clone_header
+
+    b = db.scalar(select(BitbucketConnection).where(BitbucketConnection.org_id == org_id))
+    if b is None or not b.token_encrypted:
+        return None
+    host = urlparse(url).hostname
+    allowed = CLOUD_HOST if b.deployment == "cloud" else urlparse(b.base_url).hostname
+    return (
+        clone_header(b.deployment, decrypt_secret(b.token_encrypted), b.username) if host and host == allowed else None
+    )
 
 
 def _clone_auth(db: Session | None, repo: Repository) -> str | None:

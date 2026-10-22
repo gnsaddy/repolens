@@ -4,36 +4,44 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner } from "@/components/ui";
-import { api, type GhBranch, type GhIssue, type GhPull, type GhRepo, type GhRepoPage, type GithubConn, type Repo } from "@/lib/api";
+import { api, type GhBranch, type GhIssue, type GhPull, type GhRepo, type GhRepoPage, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, timeAgo } from "@/lib/utils";
 
 const PAGE = 25;
 const STATE_TONE: Record<string, "green" | "blue" | "gray" | "brand"> = { open: "green", merged: "brand", closed: "gray" };
 
-/** Browse what the connected GitHub token can see (repositories, pull requests, issues, branches) and add repositories. */
-export default function GitHubBrowse() {
+export type Provider = "github" | "bitbucket";
+const PROVIDERS: Record<Provider, { label: string; path: string; issues: boolean; connect: string }> = {
+  github: { label: "GitHub", path: "/github", issues: true, connect: "Settings → GitHub" },
+  bitbucket: { label: "Bitbucket", path: "/bitbucket", issues: false, connect: "Settings → Bitbucket" },
+};
+interface ConnInfo { connected: boolean; login?: string | null; api_base?: string | null; deployment?: string | null; base_url?: string | null; username?: string | null }
+
+/** Browse what a connected GitHub or Bitbucket credential can see (repositories, pull requests, issues, branches) and add repositories. */
+export default function GitHubBrowse({ provider = "github" }: { provider?: Provider }) {
+  const P = PROVIDERS[provider];
   const { user } = useAuth();
-  const conn = useQuery({ queryKey: ["github-conn"], queryFn: () => api<GithubConn>("/github/connection") });
+  const conn = useQuery({ queryKey: [`${provider}-conn`], queryFn: () => api<ConnInfo>(`${P.path}/connection`) });
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState<string | null>(null);
   useEffect(() => { const t = setTimeout(() => { setDebounced(q.trim()); setPage(1); }, 250); return () => clearTimeout(t); }, [q]);
-  const repos = useQuery({ queryKey: ["gh-repos", debounced, page], enabled: !!conn.data?.connected, retry: false,
-    queryFn: () => api<GhRepoPage>(`/github/repos?q=${encodeURIComponent(debounced)}&page=${page}&per_page=${PAGE}`) });
+  const repos = useQuery({ queryKey: [`${provider}-repos`, debounced, page], enabled: !!conn.data?.connected, retry: false,
+    queryFn: () => api<GhRepoPage>(`${P.path}/repos?q=${encodeURIComponent(debounced)}&page=${page}&per_page=${PAGE}`) });
   const current = repos.data?.items.find((r) => r.full_name === sel) ?? null;
 
   if (conn.isLoading) return <Spinner />;
   if (!conn.data?.connected) {
     return (
-      <div><PageHeader title="GitHub" subtitle="Browse repositories, pull requests and issues your token can see." />
-        <Empty>GitHub is not connected. Add a personal access token under <Link className="text-brand hover:underline" to="/settings">Settings → GitHub</Link>.</Empty></div>);
+      <div><PageHeader title={P.label} subtitle={`Browse repositories, pull requests${P.issues ? ", issues" : ""} and branches your credentials can see.`} />
+        <Empty>{P.label} is not connected. Add credentials under <Link className="text-brand hover:underline" to="/settings">{P.connect}</Link>.</Empty></div>);
   }
   const totalPages = Math.max(1, Math.ceil((repos.data?.total ?? 0) / PAGE));
   return (
     <div>
-      <PageHeader title="GitHub" subtitle={`Connected${conn.data.login ? ` as @${conn.data.login}` : ""} · ${conn.data.api_base}`} />
+      <PageHeader title={P.label} subtitle={provider === "github" ? `Connected${conn.data.login ? ` as @${conn.data.login}` : ""} · ${conn.data.api_base}` : `Connected to Bitbucket ${conn.data.deployment === "server" ? `Server · ${conn.data.base_url}` : "Cloud"}`} />
       <div className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="p-3">
           <Input aria-label="Search repositories" placeholder="Search your repositories…" value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
@@ -52,28 +60,29 @@ export default function GitHubBrowse() {
               <Button size="sm" variant="ghost" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button></div>)}
           {repos.data?.truncated && <p className="mt-2 text-xs text-amber-700">Showing the 500 most recently pushed repositories. Search to narrow down.</p>}
         </Card>
-        <div className="min-w-0">{current ? <RepoDetail key={current.full_name} repo={current} writable={canWrite(user)} /> : <Empty>Select a repository to see its pull requests, issues and branches.</Empty>}</div>
+        <div className="min-w-0">{current ? <RepoDetail key={current.full_name} repo={current} writable={canWrite(user)} provider={provider} /> : <Empty>Select a repository to see its pull requests, issues and branches.</Empty>}</div>
       </div>
     </div>
   );
 }
 
-function RepoDetail({ repo, writable }: { repo: GhRepo; writable: boolean }) {
+function RepoDetail({ repo, writable, provider }: { repo: GhRepo; writable: boolean; provider: Provider }) {
+  const P = PROVIDERS[provider];
   const [tab, setTab] = useState<"pulls" | "issues" | "branches">("pulls");
   const [state, setState] = useState("open");
-  const base = `/github/repos/${repo.owner}/${repo.name}`;
-  const pulls = useQuery({ queryKey: ["gh-pulls", repo.full_name, state], enabled: tab === "pulls", retry: false, queryFn: () => api<GhPull[]>(`${base}/pulls?state=${state}`) });
-  const issues = useQuery({ queryKey: ["gh-issues", repo.full_name, state], enabled: tab === "issues", retry: false, queryFn: () => api<GhIssue[]>(`${base}/issues?state=${state}`) });
-  const branches = useQuery({ queryKey: ["gh-branches", repo.full_name], enabled: tab === "branches", retry: false, queryFn: () => api<GhBranch[]>(`${base}/branches`) });
+  const base = `${P.path}/repos/${repo.owner}/${repo.name}`;
+  const pulls = useQuery({ queryKey: [`${provider}-pulls`, repo.full_name, state], enabled: tab === "pulls", retry: false, queryFn: () => api<GhPull[]>(`${base}/pulls?state=${state}`) });
+  const issues = useQuery({ queryKey: [`${provider}-issues`, repo.full_name, state], enabled: tab === "issues" && P.issues, retry: false, queryFn: () => api<GhIssue[]>(`${base}/issues?state=${state}`) });
+  const branches = useQuery({ queryKey: [`${provider}-branches`, repo.full_name], enabled: tab === "branches", retry: false, queryFn: () => api<GhBranch[]>(`${base}/branches`) });
   return (
     <Card>
-      <CardTitle right={<a className="inline-flex items-center gap-1 text-xs text-brand hover:underline" href={repo.html_url} target="_blank" rel="noopener noreferrer">Open on GitHub<ExternalLink className="h-3 w-3" /></a>}>
+      <CardTitle right={<a className="inline-flex items-center gap-1 text-xs text-brand hover:underline" href={repo.html_url} target="_blank" rel="noopener noreferrer">Open on {P.label}<ExternalLink className="h-3 w-3" /></a>}>
         <span className="flex items-center gap-2">{repo.full_name}{repo.private && <Badge tone="amber">private</Badge>}{repo.fork && <Badge>fork</Badge>}{repo.archived && <Badge>archived</Badge>}</span></CardTitle>
       <p className="text-sm text-muted">{repo.description || "No description"}</p>
       <p className="mt-1 text-xs text-muted">default branch {repo.default_branch} · {repo.language || "unknown language"} · {repo.open_issues} open issues and PRs</p>
-      <div className="mt-3"><AddRepo repo={repo} writable={writable} /></div>
+      <div className="mt-3"><AddRepo repo={repo} writable={writable} provider={provider} /></div>
       <div role="tablist" className="mt-5 flex gap-1 border-b border-line">
-        {([["pulls", "Pull requests", GitPullRequest], ["issues", "Issues", CircleDot], ["branches", "Branches", GitBranch]] as const).map(([k, label, Icon]) => (
+        {([["pulls", "Pull requests", GitPullRequest], ["issues", "Issues", CircleDot], ["branches", "Branches", GitBranch]] as const).filter(([k]) => k !== "issues" || P.issues).map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       {tab !== "branches" && (
@@ -100,15 +109,15 @@ function RepoDetail({ repo, writable }: { repo: GhRepo; writable: boolean }) {
 }
 
 /** Add this repository to RepoLens: choose which branches to index, then it is cloned and indexed. */
-function AddRepo({ repo, writable }: { repo: GhRepo; writable: boolean }) {
+function AddRepo({ repo, writable, provider }: { repo: GhRepo; writable: boolean; provider: Provider }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([repo.default_branch]);
-  const branches = useQuery({ queryKey: ["gh-branches", repo.full_name], enabled: open, retry: false, queryFn: () => api<GhBranch[]>(`/github/repos/${repo.owner}/${repo.name}/branches`) });
+  const branches = useQuery({ queryKey: [`${provider}-branches`, repo.full_name], enabled: open, retry: false, queryFn: () => api<GhBranch[]>(`${PROVIDERS[provider].path}/repos/${repo.owner}/${repo.name}/branches`) });
   const add = useMutation({
     mutationFn: () => api<Repo>("/repositories", { method: "POST", json: { name: repo.name, source: "git", url: repo.clone_url, branches: picked } }),
-    onSuccess: () => { toast(`Added ${repo.full_name}. Indexing in the background.`); setOpen(false); qc.invalidateQueries({ queryKey: ["gh-repos"] }); qc.invalidateQueries({ queryKey: ["repos"] }); },
+    onSuccess: () => { toast(`Added ${repo.full_name}. Indexing in the background.`); setOpen(false); qc.invalidateQueries({ queryKey: [`${provider}-repos`] }); qc.invalidateQueries({ queryKey: ["repos"] }); },
   });
   if (repo.added_repo_id) return <p className="text-sm text-emerald-700">Already in RepoLens. <Link className="text-brand hover:underline" to="/repositories">View under Repositories</Link></p>;
   if (!writable) return <p className="text-xs text-muted">Ask a member or admin to add this repository.</p>;
