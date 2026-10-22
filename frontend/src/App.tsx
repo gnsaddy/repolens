@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, LogOut, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -21,6 +21,8 @@ import Wiki from "./pages/Wiki";
 import Ownership from "./pages/Ownership";
 import RepoBrowser from "./pages/GitHubBrowse";
 import JiraPage from "./pages/JiraPage";
+import Profile from "./pages/Profile";
+import Insights from "./pages/Insights";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -33,6 +35,7 @@ const nav = [
   { to: "/github", label: "GitHub", icon: GitFork },
   { to: "/bitbucket", label: "Bitbucket", icon: GitMerge },
   { to: "/jira", label: "Jira", icon: Ticket },
+  { to: "/insights", label: "Insights", icon: Gauge },
   { to: "/usage", label: "Token Usage", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -68,7 +71,10 @@ function Shell() {
           ))}
         </nav>
         <div className="border-t border-white/10 pt-3 text-xs">
-          <div className="truncate px-2 text-slate-400">{user.email}</div>
+          <NavLink to="/profile" className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-white/10", isActive && "bg-white/10")} title="Your profile and sessions">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</span>
+            <span className="min-w-0"><span className="block truncate text-slate-200">{user.name || user.email}</span><span className="block truncate text-slate-400">{user.role}</span></span>
+          </NavLink>
           <button onClick={logout} className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10">
             <LogOut className="h-4 w-4" />Sign out
           </button>
@@ -105,6 +111,8 @@ export default function App() {
         <Route path="repositories" element={<Repositories />} />
         <Route path="jira" element={<JiraPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="insights" element={<Insights />} />
         <Route path="usage" element={<Suspense fallback={<Spinner />}><TokenUsage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

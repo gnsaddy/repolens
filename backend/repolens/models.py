@@ -54,6 +54,21 @@ class User(Base):
     external_id: Mapped[str] = mapped_column(String(200), default="")  # the identity provider's subject / SCIM id
 
 
+class UserSession(Base):
+    """One sign-in. Tokens carry the session id, so a session can be ended from the server at any time."""
+
+    __tablename__ = "user_sessions"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    method: Mapped[str] = mapped_column(String(10), default="password")  # password | sso
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    user_agent: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Repository(Base):
     __tablename__ = "repositories"
     __table_args__ = (UniqueConstraint("org_id", "name"),)

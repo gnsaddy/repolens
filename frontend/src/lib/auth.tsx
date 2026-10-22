@@ -2,14 +2,17 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { api, setUnauthorizedHandler, tokenStore, type User } from "./api";
 
 interface AuthCtx { user: User | null; loading: boolean; login: (e: string, p: string) => Promise<void>; completeSso: (code: string) => Promise<void>;
-  register: (e: string, p: string, org: string, name: string) => Promise<void>; logout: () => void }
+  register: (e: string, p: string, org: string, name: string) => Promise<void>; logout: () => void; setUser: (u: User) => void }
 const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(!!tokenStore.get());
 
-  const logout = useCallback(() => { tokenStore.set(null); setUser(null); }, []);
+  const logout = useCallback(() => {
+    if (tokenStore.get()) api("/auth/logout", { method: "POST" }).catch(() => undefined); // end the session on the server too
+    tokenStore.set(null); setUser(null);
+  }, []);
   useEffect(() => { setUnauthorizedHandler(logout); }, [logout]);
   useEffect(() => {
     if (!tokenStore.get()) return;
@@ -23,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, organization: string, name: string) =>
     accept(await api("/auth/register", { method: "POST", json: { email, password, organization, name } }));
 
-  return <Ctx.Provider value={{ user, loading, login, completeSso, register, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, login, completeSso, register, logout, setUser }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthCtx {

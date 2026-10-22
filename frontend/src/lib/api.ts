@@ -1,4 +1,4 @@
-export interface User { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; org_id: string }
+export interface User { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; org_id: string; auth_source?: string }
 export interface Repo {
   id: string; name: string; source: "local" | "git" | "docs"; url: string; default_branch: string; branch?: string; indexed_sha: string | null; web_url?: string; visibility?: "org" | "restricted";
   status: "pending" | "indexing" | "ready" | "error"; file_count: number; chunk_count: number; updated_at: string;
@@ -218,4 +218,14 @@ export interface JiraAnalysis {
   discussion: { comments: number; cause: JiraClaim[]; tried: JiraClaim[]; workarounds: JiraClaim[]; fixes: JiraClaim[]; open_questions: JiraClaim[] };
   timeline: { author: string; created: string; kind: string; excerpt: string }[]; flags: string[]; search_terms: string[]; next_steps: string[];
   related: { repo: string; repo_id: string; file: string; kind: string; title: string; start_line: number; node_id: string | null }[];
+}
+
+export interface SessionRow { id: string; device: string; ip: string; method: string; created_at: string; last_seen_at: string; current: boolean }
+export interface MetricsOverview {
+  days: number;
+  content: { repositories: number; doc_collections: number; pages: number; chunks: number; graph_nodes: number; graph_edges: number; indexing_errors: number };
+  work: { investigations: number; completed: number; failed: number; confirmed: number; avg_minutes: number | null; proposals_pending: number; proposals_applied: number; drift_open: number };
+  ai: { requests: number; tokens: number; cost: number; errors: number; cache_hits: number; tokens_avoided: number; savings_rate: number; by_model: UsageGroup[]; by_agent: UsageGroup[]; daily: { date: string; input_tokens: number; output_tokens: number; cost: number }[] };
+  memory: { enabled: boolean; entries: number; hits: number; tokens_saved: number; stored: number };
+  team: { users: number; active_sessions: number; active_users_period: number };
 }

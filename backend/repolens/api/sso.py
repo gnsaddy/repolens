@@ -9,8 +9,8 @@ from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import Organization, SsoConfig, User
 from ..schemas import TokenOut, UserOut
-from ..security import create_token, encrypt_secret
-from ..services import sso
+from ..security import encrypt_secret
+from ..services import sessions, sso
 from ..services.policy import authorize
 
 public = APIRouter(prefix="/api/auth/sso", tags=["sso"])
@@ -80,13 +80,13 @@ class ExchangeIn(BaseModel):
 
 
 @public.post("/exchange", response_model=TokenOut)
-def exchange(body: ExchangeIn, db: Session = Depends(get_db)):
+def exchange(body: ExchangeIn, request: Request, db: Session = Depends(get_db)):
     """Trade the one-time code for an application token (so no token ever appears in a URL)."""
     try:
         user = sso.redeem_login_code(db, body.code)
     except sso.SsoError as e:
         raise HTTPException(401, str(e)) from None
-    return TokenOut(access_token=create_token(user.id, user.org_id, user.role), user=UserOut.model_validate(user))
+    return TokenOut(access_token=sessions.start(db, user, request, "sso"), user=UserOut.model_validate(user))
 
 
 # ------------------------------------------------------------------------------------------------ admin settings

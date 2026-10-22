@@ -21,7 +21,7 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
 
 
-def create_token(user_id: str, org_id: str, role: str) -> str:
+def create_token(user_id: str, org_id: str, role: str, sid: str | None = None) -> str:
     s = get_settings()
     now = datetime.now(UTC)
     payload = {
@@ -31,6 +31,8 @@ def create_token(user_id: str, org_id: str, role: str) -> str:
         "iat": now,
         "exp": now + timedelta(minutes=s.jwt_ttl_minutes),
     }
+    if sid:
+        payload["sid"] = sid
     return jwt.encode(payload, s.jwt_secret, algorithm="HS256")
 
 

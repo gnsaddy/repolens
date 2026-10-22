@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import AuditEvent, User
 from .security import decode_token
+from .services import sessions
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -18,6 +19,7 @@ class Principal:
     org_id: str
     role: str
     email: str = ""
+    session_id: str | None = None
 
 
 def current_principal(
@@ -32,8 +34,11 @@ def current_principal(
     user = db.get(User, data["sub"])
     if user is None or not user.active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user")
+    sid = data.get("sid")
+    if sid and not sessions.check(db, sid, user.id):  # signed out or revoked from another device
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This session was ended. Sign in again.")
     # Role comes from the database so demotions take effect immediately.
-    return Principal(user.id, user.org_id, user.role, user.email)
+    return Principal(user.id, user.org_id, user.role, user.email, session_id=sid)
 
 
 _RANK = {"viewer": 0, "member": 1, "admin": 2}

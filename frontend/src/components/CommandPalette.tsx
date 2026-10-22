@@ -19,6 +19,8 @@ export const PAGES = [
   { label: "Repositories", to: "/repositories", hint: "add a repository, choose branches" },
   { label: "Jira", to: "/jira" },
   { label: "Token usage", to: "/usage", hint: "cost and budgets" },
+  { label: "Insights", to: "/insights", hint: "usage, savings and what is indexed" },
+  { label: "Your profile", to: "/profile", hint: "account, password and sessions" },
   { label: "Settings", to: "/settings", hint: "LLM provider, GitHub" },
 ];
 
