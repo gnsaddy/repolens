@@ -19,6 +19,7 @@ from ..schemas import (
     ScheduleIn,
     SlackExportIn,
     WikiAskIn,
+    WikiPageIn,
 )
 from ..security import encrypt_secret, redact_secrets, redact_stored
 from ..services import connectors, drift
@@ -666,3 +667,79 @@ def ask(body: WikiAskIn, p: Principal = Depends(current_principal), db: Session 
     return kb.ask(
         db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, kinds=["doc"], fresh=body.fresh
     )
+
+
+@router.get("/search")
+def search_pages(
+    q: str = Query(min_length=2, max_length=300),
+    limit: int = Query(15, ge=1, le=40),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Find documentation pages by meaning, one result per page."""
+    return wk.search_pages(db, p.org_id, scope_for(db, p), q, limit)
+
+
+@router.get("/atlas")
+def atlas(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Modules of a code repository with their key symbols and documentation coverage."""
+    repo = _get_repo(db, p, repo_id)
+    if repo.source == "docs":
+        raise HTTPException(400, "The atlas maps code repositories")
+    return wk.atlas(db, p.org_id, scope_for(db, p), repo_id)
+
+
+@router.get("/page/source")
+def page_source(
+    repo_id: str,
+    path: str = Query(min_length=1, max_length=1000),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """The raw text of a page and whether it can be edited here."""
+    from .knowledge import managed_by_sync
+
+    repo = _get_repo(db, p, repo_id)
+    doc = db.scalar(select(Document).where(Document.repo_id == repo.id, Document.path == path))
+    if doc is None:
+        raise HTTPException(404, "Page not found")
+    why = f"Synced from {doc.source_type}; edit it there (or propose an edit)." if managed_by_sync(doc) else None
+    return {"content": doc.content, "editable": why is None, "reason": why, "updated_at": doc.updated_at}
+
+
+@router.put("/page")
+def save_page(body: WikiPageIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Create or edit a page in a documentation collection."""
+    from .knowledge import _clean_path, managed_by_sync
+
+    repo = _get_repo(db, p, body.repo_id)
+    if repo.source != "docs":
+        raise HTTPException(400, "Pages can only be edited in a documentation collection")
+    path = _clean_path(body.path)
+    if "\x00" in body.content:
+        raise HTTPException(400, "Binary content rejected")
+    authorize(db, p, "document.write", repo.name, count=1)
+    content, redacted = redact_stored(body.content)
+    h = hashlib.sha256(content.encode()).hexdigest()
+    row = db.scalar(select(Document).where(Document.repo_id == repo.id, Document.path == path))
+    created = row is None
+    if row is None:
+        db.add(
+            Document(
+                org_id=p.org_id,
+                repo_id=repo.id,
+                path=path,
+                title=posixpath.basename(path),
+                content=content,
+                content_hash=h,
+                created_by=p.user_id,
+            )
+        )
+    elif managed_by_sync(row):
+        raise HTTPException(409, f"This page is synced from {row.source_type}; edit it there")
+    elif row.content_hash != h:
+        row.content, row.content_hash = content, h
+    repo.status = "indexing"
+    db.commit()
+    schedule_index(repo.id)
+    return {"path": path, "created": created, "secrets_redacted": redacted}

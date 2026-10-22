@@ -174,6 +174,12 @@ class DocsUpload(BaseModel):
     documents: list[DocIn] = Field(min_length=1, max_length=200)
 
 
+class WikiPageIn(BaseModel):
+    repo_id: str
+    path: str = Field(min_length=1, max_length=500)
+    content: str = Field(max_length=500_000)
+
+
 class HeatIn(BaseModel):
     metric: str = Field(pattern="^(churn|bugs|connections|undocumented)$")
     node_ids: list[str] = Field(min_length=1, max_length=500)

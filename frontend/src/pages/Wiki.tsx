@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, Check, FileEdit, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, FileEdit, Map as MapIcon, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
@@ -8,8 +8,9 @@ import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
 import Markdown, { slug } from "./wiki/Markdown";
 import Sources from "./wiki/Sources";
+import { AtlasTab, EditButton, NewPageButton, PageEditor, PageSearch } from "./wiki/WikiCore";
 
-const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["drift", "Drift", AlertTriangle], ["proposals", "Proposals", FileEdit], ["sources", "Sources", Database]] as const;
+const TABS = [["browse", "Browse", BookOpen], ["ask", "Ask", Sparkles], ["atlas", "Code atlas", MapIcon], ["concepts", "Concepts", Lightbulb], ["health", "Health", HeartPulse], ["drift", "Drift", AlertTriangle], ["proposals", "Proposals", FileEdit], ["sources", "Sources", Database]] as const;
 type Tab = (typeof TABS)[number][0];
 type Open = (repoId: string, path: string, anchor?: string) => void;
 
@@ -42,6 +43,7 @@ export default function Wiki() {
       </div>
       {tab === "browse" && <Browse sources={o?.sources ?? []} repo={sp.get("repo")} path={sp.get("path")} anchor={sp.get("a")} open={open} openConcept={(t) => go("concepts", { term: t })} onAdd={() => go("sources")} />}
       {tab === "ask" && <AskWiki open={open} />}
+      {tab === "atlas" && <AtlasTab sources={o?.sources ?? []} />}
       {tab === "concepts" && <Concepts initial={sp.get("term")} open={open} />}
       {tab === "health" && <Health open={open} />}
       {tab === "drift" && <Drift open={open} review={(id) => go("proposals", { id })} />}
@@ -82,6 +84,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
   const toast = useToast();
   const qc = useQueryClient();
   const repoId = repo ?? sources[0]?.repo_id ?? null;
+  const [editing, setEditing] = useState<"edit" | "new" | null>(null);
   const tree = useQuery({ queryKey: ["wiki-tree", repoId], enabled: !!repoId, queryFn: () => api<WikiTreeNode[]>(`/wiki/tree?repo_id=${repoId}`) });
   const firstPage = (nodes: WikiTreeNode[]): string | null => { for (const n of nodes) { if (n.path) return n.path; const c = firstPage(n.children); if (c) return c; } return null; };
   const pagePath = path ?? (tree.data ? firstPage(tree.data) : null);
@@ -104,16 +107,21 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
       <p className="mt-4 text-xs text-muted">Repositories you index also show their README and docs here automatically.</p>
     </Card>);
   const p = page.data;
+  const current = sources.find((x) => x.repo_id === repoId);
+  const finish = (np: string) => { setEditing(null); if (np && np !== pagePath) open(repoId!, np); };
   return (
+    <div>
+    <PageSearch open={open} />
     <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
       <Card className="max-h-[40rem] overflow-auto p-3">
         <label className="mb-2 block text-xs font-medium text-muted">Source
           <select aria-label="Source" className="mt-1 h-8 w-full rounded-md border border-line bg-white px-2 text-sm font-normal text-ink" value={repoId ?? ""} onChange={(e) => open(e.target.value, "")}>
             {sources.map((s) => <option key={s.repo_id} value={s.repo_id}>{s.name} ({s.pages})</option>)}</select></label>
+        <div className="mb-2"><NewPageButton source={current} onClick={() => setEditing("new")} /></div>
         {tree.isLoading ? <Spinner /> : <ul aria-label="Page tree">{tree.data?.map((n) => <TreeNode key={n.key} node={n} depth={0} selected={pagePath} onPick={(pp) => open(repoId!, pp)} />)}</ul>}
       </Card>
       <div className="min-w-0">
-        {page.isLoading || (!p && !page.error) ? <Spinner /> : page.error ? <ErrorNote error={page.error} /> : p && (
+        {editing === "new" ? <Card><CardTitle>New page in {current?.name}</CardTitle><PageEditor repoId={repoId!} path={null} onDone={finish} /></Card> : editing === "edit" && p ? <Card><CardTitle>Edit {p.title}</CardTitle><PageEditor repoId={repoId!} path={p.path} onDone={finish} /></Card> : page.isLoading || (!p && !page.error) ? <Spinner /> : page.error ? <ErrorNote error={page.error} /> : p && (
           <Card>
             <nav aria-label="Breadcrumbs" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted">{p.breadcrumbs.map((b, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{b.path ? <button className="hover:underline" onClick={() => open(p.repo_id, b.path!)}>{b.title}</button> : b.title}</span>)}</nav>
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -121,6 +129,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
               {p.source.version != null && p.source.version > 0 && <span>version {p.source.version}</span>}
               {p.source.updated_at && <span>updated {timeAgo(p.source.updated_at)}</span>}
               {p.source.synced_at && <span>synced {timeAgo(p.source.synced_at)}</span>}
+              {p.deletable && <EditButton onClick={() => setEditing("edit")} />}
               {p.deletable && <button className="ml-auto inline-flex items-center gap-1 text-red-600 hover:underline" onClick={async () => { if (await ask({ title: `Delete "${p.title}"?`, message: "The page is removed from search, the graph and the wiki. You can upload it again later.", confirmLabel: "Delete page", danger: true })) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" />Delete page</button>}
               {!p.deletable && !p.managed_by && <span className="ml-auto" title="Part of a code repository's index">From repository {p.repo}</span>}
               {p.managed_by && <span className="ml-auto" title="This page is kept in sync with its source. Remove the source on the Sources tab to delete it.">Synced from {p.managed_by}</span>}
@@ -142,6 +151,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
           {!!p.concepts.length && <Card className="p-4"><CardTitle>Concepts</CardTitle><div className="flex flex-wrap gap-1.5">{p.concepts.map((c) => <button key={c} onClick={() => openConcept(c)} className="rounded-full border border-line px-2 py-0.5 text-xs hover:bg-slate-50">{c}</button>)}</div></Card>}
         </>)}
       </div>
+    </div>
     </div>
   );
 }

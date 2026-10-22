@@ -96,6 +96,12 @@ Answers are remembered on the server. A repeated or re-worded question is matche
 
 An entry is only reused while the repositories and wiki pages it was based on are unchanged, so a re-index or edit retires it. Entries are keyed by the repositories the asker can see, so answers never cross access boundaries, and expire after 72 hours. Settings shows entries, reuse count and tokens saved, and admins can clear it. Tune with `REPOLENS_ANSWER_MEMORY_ENABLED`, `_THRESHOLD`, `_TTL_HOURS` and `_MAX_ENTRIES`.
 
+### DeepMind Wiki: search, edit and atlas
+
+- **Search by meaning** across every page from the Browse tab (`GET /api/wiki/search`), one result per page with a snippet. Results respect repository access.
+- **Edit and create pages** in documentation collections without leaving the wiki (`PUT /api/wiki/page`). Saving redacts secrets, re-indexes and relinks the page to code. Pages synced from Confluence stay read-only here.
+- **Code atlas** (a tab per code repository): modules with file, class and function counts, their most connected symbols, and how much of each is explained by the wiki, so undocumented areas are easy to spot.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.

@@ -686,3 +686,111 @@ def health(db: Session, org_id: str, scope: Scope, stale_days: int = 180, limit:
         "undocumented_code": cap([{**node_dict(n, {r.id: r.name for r in repos.values()})} for n in undocumented]),
         "outdated_references": cap(stale_refs),
     }
+
+
+# ------------------------------------------------------------------------------------------------ search and atlas
+def search_pages(db: Session, org_id: str, scope: Scope, query: str, limit: int = 15) -> list[dict]:
+    """Documentation pages that answer a query, best first, one row per page."""
+    from . import knowledge as kb
+
+    best: dict[tuple[str, str], dict] = {}
+    for r in kb.search(db, org_id, query, scope.ids_or_none(), k=limit * 3, scope=scope, kinds=["doc"]):
+        key = (r["repo_id"], r["file"])
+        if key in best:
+            continue
+        best[key] = {
+            "repo": r["repo"],
+            "repo_id": r["repo_id"],
+            "path": r["file"],
+            "title": r["title"] or posixpath.basename(r["file"]),
+            "snippet": re.sub(r"\s+", " ", r["content"])[:240],
+            "start_line": r["start_line"],
+            "score": round(float(r["score"]), 3),
+        }
+    return list(best.values())[:limit]
+
+
+def _module_of(path: str) -> str:
+    parts = [p for p in path.split("/") if p]
+    if len(parts) <= 1:
+        return "(root)"
+    if parts[0] in ("src", "lib", "app", "packages", "pkg", "internal", "cmd") and len(parts) > 2:
+        return f"{parts[0]}/{parts[1]}"
+    return parts[0]
+
+
+def atlas(db: Session, org_id: str, scope: Scope, repo_id: str) -> dict:
+    """A map of a code repository built from its graph: modules, their key symbols, and what is undocumented."""
+    nodes = list(
+        db.scalars(
+            select(KGNode).where(
+                KGNode.org_id == org_id,
+                KGNode.repo_id == repo_id,
+                KGNode.type.in_(("file", "function", "class", "method")),
+            )
+        )
+    )
+    section_ids = set(
+        db.scalars(select(KGNode.id).where(KGNode.org_id == org_id, KGNode.type == "section"))
+    )  # doc sections anywhere in the workspace may document this code
+    documented = {
+        e.dst_id
+        for e in db.scalars(select(KGEdge).where(KGEdge.org_id == org_id, KGEdge.rel == "MENTIONS"))
+        if e.src_id in section_ids
+    }
+    mods: dict[str, dict] = {}
+    for n in nodes:
+        if TEST_PATH.search(n.path):
+            continue
+        m = mods.setdefault(
+            _module_of(n.path),
+            {"files": 0, "functions": 0, "classes": 0, "documented": 0, "symbols": [], "langs": Counter()},
+        )
+        if n.type == "file":
+            m["files"] += 1
+            m["langs"][posixpath.splitext(n.path)[1].lstrip(".") or "other"] += 1
+        elif not n.name.startswith("_"):
+            m["classes" if n.type == "class" else "functions"] += 1
+            doc = n.id in documented
+            m["documented"] += doc
+            m["symbols"].append((n, doc))
+    out = []
+    for name, m in mods.items():
+        public = m["functions"] + m["classes"]
+        top = sorted(m["symbols"], key=lambda t: -t[0].degree)[:5]
+        out.append(
+            {
+                "module": name,
+                "files": m["files"],
+                "functions": m["functions"],
+                "classes": m["classes"],
+                "languages": [k for k, _ in m["langs"].most_common(3)],
+                "documented": m["documented"],
+                "coverage": round(m["documented"] / public, 2) if public else None,
+                "top_symbols": [
+                    {
+                        "node_id": n.id,
+                        "name": n.qualname or n.name,
+                        "type": n.type,
+                        "path": n.path,
+                        "start_line": n.start_line,
+                        "connections": n.degree,
+                        "documented": doc,
+                    }
+                    for n, doc in top
+                ],
+            }
+        )
+    out.sort(key=lambda x: -(x["functions"] + x["classes"]))
+    total = sum(x["functions"] + x["classes"] for x in out)
+    docd = sum(x["documented"] for x in out)
+    return {
+        "modules": out,
+        "summary": {
+            "modules": len(out),
+            "files": sum(x["files"] for x in out),
+            "public_symbols": total,
+            "documented": docd,
+            "coverage": round(docd / total, 2) if total else None,
+        },
+    }

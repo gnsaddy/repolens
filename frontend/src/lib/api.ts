@@ -201,3 +201,9 @@ export interface RegConnection { id: string; provider: string; base_url: string 
 export interface PlanRow { kind: string; label: string; tier: Tier; model: string | null; provider: string | null; why: string }
 export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; plan: PlanRow[]; multi: boolean; active: number }
 export interface MemoryStats { enabled: boolean; entries: number; hits: number; tokens_saved: number; threshold: number; ttl_hours: number }
+
+export interface PageHit { repo: string; repo_id: string; path: string; title: string; snippet: string; start_line: number; score: number }
+export interface PageSource { content: string; editable: boolean; reason: string | null; updated_at: string }
+export interface AtlasSymbol { node_id: string; name: string; type: string; path: string; start_line: number; connections: number; documented: boolean }
+export interface AtlasModule { module: string; files: number; functions: number; classes: number; languages: string[]; documented: number; coverage: number | null; top_symbols: AtlasSymbol[] }
+export interface Atlas { modules: AtlasModule[]; summary: { modules: number; files: number; public_symbols: number; documented: number; coverage: number | null } }
