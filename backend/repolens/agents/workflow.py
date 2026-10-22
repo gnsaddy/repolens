@@ -24,6 +24,7 @@ from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
 from ..services.llm import LLMClient, LLMUnavailable
+from ..services.llm_router import Task
 from ..services.usage import BudgetExceeded
 
 PROMPT_VERSION = "rca-synth-v1"
@@ -438,8 +439,7 @@ def build_graph(ctx: Ctx):
                 [
                     PROMPT_VERSION,
                     SCHEMA_VERSION,
-                    ctx.llm.provider,
-                    ctx.llm.model,
+                    ctx.llm.cache_id,
                     shas,
                     hashlib.sha256(prompt.encode()).hexdigest(),
                 ]
@@ -464,7 +464,17 @@ def build_graph(ctx: Ctx):
                 f"cache hit (~{cached.tokens_baseline} tokens avoided, estimate)",
             )
         try:
-            res = ctx.llm.complete("investigator", SYSTEM_PROMPT, prompt)
+            task = Task(
+                "investigator",
+                prompt_chars=len(prompt),
+                evidence=sum(len(h["evidence"]) for h in hyps[:3]),
+                has_trace=bool(retrieval.extract_stack_refs(state["query"])),
+                repos=len({e.get("repo_id") for h in hyps[:3] for e in h["evidence"] if e.get("repo_id")}) or 1,
+                low_confidence=top["confidence"] < 0.5,
+            )
+            res = ctx.llm.complete(
+                "investigator", SYSTEM_PROMPT, prompt, task=task, validate=lambda t: bool(_parse_json(t))
+            )
             data = _parse_json(res.text)
             if not data:
                 raise ValueError("model returned unparseable output")
@@ -486,7 +496,11 @@ def build_graph(ctx: Ctx):
             return {
                 "narrative": narrative,
                 "llm_used": True,
-            }, f"LLM synthesis ({res.input_tokens}+{res.output_tokens} tokens)"
+            }, f"LLM synthesis ({res.input_tokens}+{res.output_tokens} tokens" + (
+                f", {res.route['model']} [{res.route['tier']}]" + (", escalated" if res.route["escalated"] else "")
+                if res.route
+                else ""
+            ) + ")"
         except (BudgetExceeded, LLMUnavailable) as e:
             return {
                 "narrative": deterministic,

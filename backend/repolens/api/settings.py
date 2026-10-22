@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
-from ..models import LLMSetting
-from ..schemas import LLMCheckIn, LLMSettingIn
-from ..security import encrypt_secret, redact_secrets
+from ..models import LLMConnection, LLMModel, LLMSetting
+from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn
+from ..security import decrypt_secret, encrypt_secret, redact_secrets
+from ..services import answer_memory, llm_router
 from ..services.jira import JiraError, validate_base_url
 from ..services.llm import (
     CHAT_PROVIDERS,
@@ -139,13 +140,26 @@ def _scrub(text: str, key: str) -> str:
     return out.replace(key, "[REDACTED]") if len(key) >= 8 else out
 
 
+def _stored_key(db: Session, org_id: str, provider: str, base_url: str = "") -> str:
+    """The key already saved for this provider: in the multi-model registry, else the single legacy setting."""
+    base = "" if provider != "openai" else base_url
+    conn = db.scalar(
+        select(LLMConnection).where(
+            LLMConnection.org_id == org_id, LLMConnection.provider == provider, LLMConnection.base_url == base
+        )
+    )
+    if conn is not None and conn.api_key_encrypted:
+        return decrypt_secret(conn.api_key_encrypted)
+    stored = resolve_config(db, org_id)
+    return stored.api_key if stored.provider == provider else ""
+
+
 @router.post("/llm/check")
 def check_llm(body: LLMCheckIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Try a provider and key before saving anything. Without a model it lists the models the key can use;
     with a model it sends one tiny test message."""
     authorize(db, p, "llm.test", f"check-{body.provider}")
-    stored = resolve_config(db, p.org_id)
-    key = body.api_key.strip() or (stored.api_key if stored.provider == body.provider else "")
+    key = body.api_key.strip() or _stored_key(db, p.org_id, body.provider, body.base_url.strip())
     if not key:
         return {"ok": False, "error": "Paste an API key first"}
     base = {"gemini": GEMINI_URL, "anthropic": "", "openai": body.base_url.strip() or "https://api.openai.com/v1"}[
@@ -241,3 +255,207 @@ def github_models_catalog(p: Principal = Depends(current_principal), db: Session
         for m in items
         if m.get("id")
     ][:200]
+
+
+# ------------------------------------------------------------------------------------------------ multi-model registry
+def _registry_view(db: Session, org_id: str) -> dict:
+    conns = db.scalars(
+        select(LLMConnection).where(LLMConnection.org_id == org_id).order_by(LLMConnection.created_at)
+    ).all()
+    models = db.scalars(select(LLMModel).where(LLMModel.org_id == org_id).order_by(LLMModel.created_at)).all()
+    out = []
+    for c in conns:
+        out.append(
+            {
+                "id": c.id,
+                "provider": c.provider,
+                "base_url": c.base_url or None,
+                "has_key": bool(c.api_key_encrypted),
+                "models": [
+                    {
+                        "id": m.id,
+                        "model": m.model,
+                        "tier": m.tier,
+                        "enabled": m.enabled,
+                        "input_price": m.input_price,
+                        "output_price": m.output_price,
+                    }
+                    for m in models
+                    if m.connection_id == c.id
+                ],
+            }
+        )
+    routes = llm_router.all_routes(db, org_id)
+    savings = llm_router.savings_mode(db, org_id)
+    legacy = not conns and bool(routes)  # one model from the single-model setup or the server environment
+    if legacy:  # show it like a one-model connection so the page has one shape
+        r = routes[0].cfg
+        out.append(
+            {
+                "id": "legacy",
+                "provider": r.provider,
+                "base_url": None,
+                "has_key": True,
+                "legacy": True,
+                "models": [
+                    {
+                        "id": "legacy",
+                        "model": r.model,
+                        "tier": "standard",
+                        "enabled": True,
+                        "input_price": r.input_price,
+                        "output_price": r.output_price,
+                    }
+                ],
+            }
+        )
+    return {
+        "connections": out,
+        "savings_mode": savings,
+        "plan": llm_router.plan(routes, savings),
+        "multi": len(routes) > 1,
+        "active": len(routes),
+    }
+
+
+def _adopt_legacy(db: Session, org_id: str) -> None:
+    """The first time models are managed here, keep the single model that was already working."""
+    if db.scalar(select(LLMConnection.id).where(LLMConnection.org_id == org_id).limit(1)):
+        return
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
+    if row is None or row.provider not in ("anthropic", "openai", "gemini") or not row.api_key_encrypted:
+        return
+    base = row.base_url if row.provider == "openai" else ""
+    conn = LLMConnection(org_id=org_id, provider=row.provider, base_url=base, api_key_encrypted=row.api_key_encrypted)
+    db.add(conn)
+    db.flush()
+    db.add(
+        LLMModel(
+            org_id=org_id,
+            connection_id=conn.id,
+            model=row.model,
+            tier="standard",
+            input_price=row.input_price,
+            output_price=row.output_price,
+        )
+    )
+    db.flush()
+
+
+@router.get("/models")
+def get_registry(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Connected providers, their models and tiers, and what each kind of task would use right now."""
+    return _registry_view(db, p.org_id)
+
+
+@router.post("/models/connections", status_code=201)
+def save_connection(body: ConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Add or update a provider and the models to route to. Models not listed are left as they are."""
+    authorize(db, p, "llm.configure", body.provider, op="registry")
+    base = ""
+    if body.provider == "openai":
+        base = body.base_url.strip() or "https://api.openai.com/v1"
+        try:
+            validate_base_url(base)
+        except JiraError as e:
+            raise HTTPException(400, str(e).replace("Jira URL", "Base URL")) from e
+    _adopt_legacy(db, p.org_id)
+    conn = db.scalar(
+        select(LLMConnection).where(
+            LLMConnection.org_id == p.org_id, LLMConnection.provider == body.provider, LLMConnection.base_url == base
+        )
+    )
+    if conn is None:
+        if not body.api_key.strip():
+            raise HTTPException(400, "An API key is required for a new provider")
+        conn = LLMConnection(org_id=p.org_id, provider=body.provider, base_url=base)
+        db.add(conn)
+    if body.api_key.strip():
+        conn.api_key_encrypted = encrypt_secret(body.api_key.strip())
+    db.flush()
+    existing = {m.model: m for m in db.scalars(select(LLMModel).where(LLMModel.connection_id == conn.id))}
+    for spec in body.models:
+        m = existing.get(spec.model)
+        if m is None:
+            m = LLMModel(org_id=p.org_id, connection_id=conn.id, model=spec.model)
+            db.add(m)
+        m.tier, m.enabled, m.input_price, m.output_price = spec.tier, True, spec.input_price, spec.output_price
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+def _model_row(db: Session, p: Principal, model_id: str) -> LLMModel:
+    m = db.get(LLMModel, model_id)
+    if m is None or m.org_id != p.org_id:
+        raise HTTPException(404, "Model not found")
+    return m
+
+
+@router.put("/models/{model_id}")
+def patch_model(
+    model_id: str, body: ModelPatch, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    authorize(db, p, "llm.configure", model_id, op="model")
+    m = _model_row(db, p, model_id)
+    for field in ("tier", "enabled"):
+        if (v := getattr(body, field)) is not None:
+            setattr(m, field, v)
+    if "input_price" in body.model_fields_set:
+        m.input_price = body.input_price
+    if "output_price" in body.model_fields_set:
+        m.output_price = body.output_price
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+@router.delete("/models/{model_id}")
+def delete_model(model_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "llm.configure", model_id, op="model-delete")
+    m = _model_row(db, p, model_id)
+    conn_id = m.connection_id
+    db.delete(m)
+    db.flush()
+    if not db.scalar(select(LLMModel.id).where(LLMModel.connection_id == conn_id).limit(1)):
+        conn = db.get(LLMConnection, conn_id)
+        if conn is not None:
+            db.delete(conn)  # a provider with no models has nothing to keep a key for
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+@router.delete("/models/connections/{conn_id}")
+def delete_connection(conn_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "llm.configure", conn_id, op="connection-delete")
+    c = db.get(LLMConnection, conn_id)
+    if c is None or c.org_id != p.org_id:
+        raise HTTPException(404, "Provider not found")
+    for m in db.scalars(select(LLMModel).where(LLMModel.connection_id == c.id)):
+        db.delete(m)
+    db.delete(c)
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+@router.put("/routing")
+def set_routing(body: RoutingIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Savings mode: send plain tasks to cheaper models. Off means every task uses its normal tier."""
+    authorize(db, p, "llm.configure", "routing", savings_mode=body.savings_mode)
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == p.org_id))
+    if row is None:
+        row = LLMSetting(org_id=p.org_id)
+        db.add(row)
+    row.savings_mode, row.updated_by = body.savings_mode, p.user_id
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+@router.get("/memory")
+def memory_stats(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """What the local answer memory has saved so far."""
+    return answer_memory.stats(db, p.org_id)
+
+
+@router.delete("/memory")
+def memory_clear(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "llm.configure", "answer-memory")
+    return {"cleared": answer_memory.clear(db, p.org_id)}

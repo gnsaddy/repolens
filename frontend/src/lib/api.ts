@@ -103,6 +103,7 @@ export interface KnowledgeHit {
 }
 export interface AskResult {
   query: string; answer: string; mode: "llm" | "extractive" | "none"; cached?: boolean; unknown_citations?: string[];
+  memory?: { similarity: number; asked: string; tokens_saved: number }; route?: { model: string; provider: string; tier: string; why: string; escalated: boolean };
   sources: { id: string; repo: string; repo_id?: string; url?: string; file: string; kind: string; title: string; start_line: number; end_line: number;
     node_id: string | null; snippet: string; via_graph: { from: string; relation: string } | null }[];
   connections: { from: string; label: string; to: string; to_type: string; provenance: string }[];
@@ -193,3 +194,10 @@ export interface GhIssue { number: number; title: string; state: string; comment
 export interface GhBranch { name: string; protected: boolean; default?: boolean }
 export interface BitbucketConn { connected: boolean; deployment: "cloud" | "server" | null; base_url: string | null; username: string | null; workspaces?: string | null; account?: string | null }
 export interface ModelList { provider: string; current: string; current_found: boolean; models: { id: string; name: string }[] }
+
+export type Tier = "light" | "standard" | "strong";
+export interface RegModel { id: string; model: string; tier: Tier; enabled: boolean; input_price: number | null; output_price: number | null }
+export interface RegConnection { id: string; provider: string; base_url: string | null; has_key: boolean; legacy?: boolean; models: RegModel[] }
+export interface PlanRow { kind: string; label: string; tier: Tier; model: string | null; provider: string | null; why: string }
+export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; plan: PlanRow[]; multi: boolean; active: number }
+export interface MemoryStats { enabled: boolean; entries: number; hits: number; tokens_saved: number; threshold: number; ttl_hours: number }

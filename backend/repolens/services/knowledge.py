@@ -9,11 +9,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
-from . import usage
+from . import answer_memory, usage
 from .access import Scope
 from .graph import neighbors, node_dict
 from .links import file_url
 from .llm import LLMClient, LLMUnavailable
+from .llm_router import Task
 from .retrieval import search_chunks
 from .usage import BudgetExceeded
 
@@ -240,7 +241,15 @@ def ask(
     user_jira_key: str | None = None,
     scope: Scope | None = None,
     kinds: list[str] | None = None,
+    fresh: bool = False,
 ) -> dict:
+    llm = LLMClient(db, org, "knowledge", "")
+    mem_key = answer_memory.scope_key(scope, repo_ids, kinds)
+    fp = answer_memory.fingerprint(db, org, scope, repo_ids)
+    if not llm.offline and not fresh:
+        hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
+        if hit:
+            return {**hit, "query": query, "mode": "llm", "cached": True}
     results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
     sources = [
         {
@@ -280,7 +289,6 @@ def ask(
     base = {"query": query, "sources": sources, "connections": connections[:12]}
     if not results:
         return {**base, "answer": "Nothing relevant was found in the indexed documents and code.", "mode": "none"}
-    llm = LLMClient(db, org, "knowledge", "")
     if not llm.offline:
         prompt = (
             "SOURCES:\n"
@@ -291,12 +299,10 @@ def ask(
             + f"\n\nQUESTION: {query[:2000]}"
         )
         key = hashlib.sha256(
-            json.dumps(
-                [ASK_PROMPT_VERSION, llm.provider, llm.model, hashlib.sha256(prompt.encode()).hexdigest()]
-            ).encode()
+            json.dumps([ASK_PROMPT_VERSION, llm.cache_id, hashlib.sha256(prompt.encode()).hexdigest()]).encode()
         ).hexdigest()
         cached = db.get(CacheEntry, key)
-        if cached:
+        if cached and not fresh:
             usage.record_event(
                 db,
                 org,
@@ -316,7 +322,13 @@ def ask(
                 "unknown_citations": cached.value.get("unknown", []),
             }
         try:
-            res = llm.complete("librarian", ASK_SYSTEM, prompt, max_tokens=900)
+            task = Task(
+                "librarian",
+                prompt_chars=len(prompt),
+                evidence=len(sources),
+                repos=len({s["repo_id"] for s in sources if s.get("repo_id")}) or 1,
+            )
+            res = llm.complete("librarian", ASK_SYSTEM, prompt, max_tokens=900, task=task)
             cited = set(re.findall(r"\[S(\d+)\]", res.text))
             unknown = sorted(f"S{n}" for n in cited if not 1 <= int(n) <= len(sources))
             db.add(
@@ -329,7 +341,20 @@ def ask(
                 )
             )
             db.commit()
-            return {**base, "answer": res.text, "mode": "llm", "cached": False, "unknown_citations": unknown}
+            out = {**base, "answer": res.text, "mode": "llm", "cached": False, "unknown_citations": unknown}
+            if res.route:
+                out["route"] = res.route
+            answer_memory.remember(
+                db,
+                org,
+                "ask",
+                query,
+                mem_key,
+                fp,
+                {k: out[k] for k in ("answer", "sources", "connections", "unknown_citations")},
+                res.input_tokens + res.output_tokens,
+            )
+            return out
         except (BudgetExceeded, LLMUnavailable):
             pass
         except Exception:  # provider error -> extractive fallback; failure is already in usage events

@@ -185,6 +185,32 @@ class KnowledgeQuery(BaseModel):
     repo_ids: list[str] = []
     k: int = Field(default=10, ge=1, le=30)
     kinds: list[str] = Field(default_factory=list)
+    fresh: bool = False  # skip the answer memory and ask the model again
+
+
+class ModelSpec(BaseModel):
+    model: str = Field(min_length=1, max_length=100, pattern=r"^[\w.:/\-]+$")
+    tier: str = Field(default="standard", pattern="^(light|standard|strong)$")
+    input_price: float | None = Field(default=None, ge=0, le=10_000)
+    output_price: float | None = Field(default=None, ge=0, le=10_000)
+
+
+class ConnectionIn(BaseModel):
+    provider: str = Field(pattern="^(anthropic|openai|gemini)$")
+    api_key: str = Field(default="", max_length=500)  # blank = keep the stored key
+    base_url: str = Field(default="", max_length=500)
+    models: list[ModelSpec] = Field(min_length=1, max_length=40)
+
+
+class ModelPatch(BaseModel):
+    tier: str | None = Field(default=None, pattern="^(light|standard|strong)$")
+    enabled: bool | None = None
+    input_price: float | None = Field(default=None, ge=0, le=10_000)
+    output_price: float | None = Field(default=None, ge=0, le=10_000)
+
+
+class RoutingIn(BaseModel):
+    savings_mode: bool
 
 
 class LLMCheckIn(BaseModel):
@@ -319,3 +345,4 @@ class WikiAskIn(BaseModel):
     query: str = Field(min_length=2, max_length=2000)
     repo_ids: list[str] = Field(default_factory=list, max_length=100)
     k: int = Field(default=8, ge=1, le=10)
+    fresh: bool = False

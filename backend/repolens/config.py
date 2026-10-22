@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     embedding_base_url: str = "https://api.openai.com/v1"
     embedding_api_key: str = ""
     embedding_send_dimensions: bool = True  # some providers (e.g. Voyage) reject the OpenAI `dimensions` field
+    # Answer memory: re-worded repeats of a question are answered from what the model already said (no tokens)
+    answer_memory_enabled: bool = True
+    answer_memory_threshold: float = 0.92  # cosine similarity of the two questions
+    answer_memory_ttl_hours: int = 72
+    answer_memory_max_entries: int = 2000
     # Second-stage reranking of search results: "none" | "lexical" (offline) | "api" (Cohere/Jina/Voyage-style /rerank)
     rerank_provider: str = "lexical"
     rerank_base_url: str = ""

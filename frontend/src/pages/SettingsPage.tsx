@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
 import LanguageModelCard from "@/components/LanguageModelCard";
+import ModelRoutingCard, { MemoryCard } from "@/components/ModelRoutingCard";
 import { Badge, PageHeader } from "@/components/ui";
 import { api, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +30,8 @@ export default function SettingsPage() {
         {tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
           <div className="space-y-4">
             <LanguageModelCard admin={admin} />
+            <ModelRoutingCard admin={admin} />
+            <MemoryCard admin={admin} />
             <RetrievalCard />
           </div>)}
       </div>

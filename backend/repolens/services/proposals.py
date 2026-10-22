@@ -19,6 +19,7 @@ from ..models import Change, CodeChunk, DocProposal, Document, DriftAlert, Inves
 from ..security import redact_secrets, redact_stored
 from . import confluence as cf
 from .llm import LLMClient, LLMUnavailable
+from .llm_router import Task
 
 log = logging.getLogger("repolens.proposals")
 MAX_PAGE = 60_000
@@ -108,7 +109,15 @@ def draft_update(db: Session, org_id: str, user_id: str, alert: DriftAlert) -> D
             f"RECENT COMMITS:\n{chr(10).join(commits) or '(none)'}\n"
         )
         try:
-            text = _strip_fence(llm.complete("doc-updater", UPDATE_SYSTEM, prompt, max_tokens=4000).text)
+            text = _strip_fence(
+                llm.complete(
+                    "doc-updater",
+                    UPDATE_SYSTEM,
+                    prompt,
+                    max_tokens=4000,
+                    task=Task("doc-updater", prompt_chars=len(prompt), evidence=len(alert.symbols)),
+                ).text
+            )
             if 0.5 * len(original) <= len(text) <= 3 * len(original) + 500:
                 proposed, by = text, "llm"
             else:
@@ -179,7 +188,18 @@ def draft_runbook(db: Session, org_id: str, user_id: str, inv: Investigation, co
     body, by = None, "template"
     if llm is not None:
         try:
-            body, by = _strip_fence(llm.complete("runbook-writer", RUNBOOK_SYSTEM, facts, max_tokens=2500).text), "llm"
+            body, by = (
+                _strip_fence(
+                    llm.complete(
+                        "runbook-writer",
+                        RUNBOOK_SYSTEM,
+                        facts,
+                        max_tokens=2500,
+                        task=Task("runbook-writer", prompt_chars=len(facts), evidence=len(refs)),
+                    ).text
+                ),
+                "llm",
+            )
         except Exception as e:  # noqa: BLE001
             log.warning("model runbook failed (%s); using the template", type(e).__name__)
     if body is None:

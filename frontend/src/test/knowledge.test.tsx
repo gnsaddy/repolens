@@ -38,6 +38,30 @@ function renderPage(url: string) {
 const me = { id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" };
 
 describe("Knowledge page", () => {
+  it("labels answers served from memory and can ask the model again", async () => {
+    const bodies: unknown[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.endsWith("/knowledge/ask")) {
+        const b = JSON.parse(String(init?.body));
+        bodies.push(b);
+        return json({ query: "q", mode: "llm", answer: b.fresh ? "Fresh answer." : "Remembered answer.", sources: [], connections: [], ...(b.fresh ? {} : { memory: { similarity: 0.97, asked: "earlier question", tokens_saved: 1234 } }) });
+      }
+      if (u.endsWith("/knowledge/search")) return json([]);
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=ask");
+    await userEvent.type(await screen.findByLabelText("Question"), "How are deleted users handled?");
+    await userEvent.click(screen.getByRole("button", { name: /Ask/ }));
+    expect(await screen.findByText(/From memory/)).toHaveTextContent("1,234 tokens");
+    await userEvent.click(screen.getByRole("button", { name: "Answer again with the model" }));
+    expect(await screen.findByText("Fresh answer.")).toBeInTheDocument();
+    expect(screen.queryByText(/From memory/)).not.toBeInTheDocument();
+    expect(bodies).toMatchObject([{ fresh: false }, { fresh: true }]);
+  });
+
   it("asks a question and shows the answer, sources and graph connections", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const u = String(input);

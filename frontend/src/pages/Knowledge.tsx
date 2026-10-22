@@ -54,9 +54,9 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
   const [q, setQ] = useState("");
   const [repoId, setRepoId] = useState("");
   const [kind, setKind] = useState<"" | "doc" | "code" | "pr">("");
-  const ask = useMutation({ mutationFn: () => api<AskResult>("/knowledge/ask", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [] } }) });
+  const ask = useMutation({ mutationFn: (fresh: boolean = false) => api<AskResult>("/knowledge/ask", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [], fresh } }) });
   const search = useMutation({ mutationFn: () => api<KnowledgeHit[]>("/knowledge/search", { method: "POST", json: { query: q, repo_ids: repoId ? [repoId] : [], kinds: kind ? [kind] : [], k: 10 } }) });
-  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { ask.mutate(); search.mutate(); } };
+  const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { ask.mutate(false); search.mutate(); } };
   const a = ask.data;
   return (
     <div className="space-y-4">
@@ -73,8 +73,10 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
         <Card>
           <CardTitle right={<div className="flex gap-1">
             <Badge tone={a.mode === "llm" ? "brand" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
-            {a.cached && <Badge tone="green">cached</Badge>}</div>}>Answer</CardTitle>
+            {a.memory ? <Badge tone="green" title={`Matched an earlier question: "${a.memory.asked}"`}>From memory · saved ~{a.memory.tokens_saved.toLocaleString()} tokens</Badge> : a.cached && <Badge tone="green">cached</Badge>}
+            {a.route && <Badge tone="gray" title={a.route.why}>{a.route.model}</Badge>}</div>}>Answer</CardTitle>
           <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
+          {(a.memory || a.cached) && <button type="button" className="mt-2 text-xs text-brand hover:underline" disabled={ask.isPending} onClick={() => ask.mutate(true)}>Answer again with the model</button>}
           {!!a.unknown_citations?.length && <p className="mt-2 text-xs text-amber-700">The model cited unknown sources ({a.unknown_citations.join(", ")}) — treat those claims as unverified.</p>}
           {!!a.connections.length && (<div className="mt-4 border-t border-line pt-3">
             <div className="mb-1 text-xs font-medium text-muted">Connections found in the graph</div>

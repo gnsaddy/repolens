@@ -98,7 +98,7 @@ def test_model_draft_is_used_when_configured_and_implausible_output_is_discarded
         def __init__(self, reply):
             self.reply = reply
 
-        def complete(self, agent, system, prompt, max_tokens=0):
+        def complete(self, agent, system, prompt, max_tokens=0, **kw):
             assert "handling fee" in prompt and "compute_total" in prompt
             return type("R", (), {"text": self.reply})()
 

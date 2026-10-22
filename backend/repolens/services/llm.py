@@ -20,6 +20,7 @@ class LLMResult:
     input_tokens: int
     output_tokens: int
     cached_input_tokens: int = 0
+    route: dict | None = None  # which model answered and why (set by LLMClient)
 
 
 @dataclass
@@ -226,36 +227,60 @@ def _check(r: httpx.Response, who: str) -> None:
 
 
 class LLMClient:
+    """Calls the organisation's models. With several configured, each call goes to the cheapest model that is good
+    enough for the task (see llm_router), falling back to the next one if a model fails."""
+
     def __init__(
         self, db: Session, org_id: str, workflow: str = "rca", workflow_id: str = "", jira_issue_key: str | None = None
     ):
+        from . import llm_router
+
         self.db, self.org_id, self.workflow, self.workflow_id = db, org_id, workflow, workflow_id
         self.jira_issue_key = jira_issue_key
-        self.cfg = resolve_config(db, org_id)
+        self._routes = llm_router.all_routes(db, org_id)
+        self._savings = llm_router.savings_mode(db, org_id)
+        default = next((r for r in self._routes if r.tier == "standard"), self._routes[0] if self._routes else None)
+        self.cfg = default.cfg if default else resolve_config(db, org_id)
         self.provider, self.model = self.cfg.provider, self.cfg.model
 
     @property
     def offline(self) -> bool:
-        return self.provider not in CHAT_PROVIDERS
+        return not self._routes
 
-    def complete(self, agent: str, system: str, prompt: str, max_tokens: int = 1500) -> LLMResult:
-        if self.offline:
-            raise LLMUnavailable("no hosted LLM configured")
-        usage.check_budget(self.db, self.org_id)  # may raise BudgetExceeded
-        prompt = redact_secrets(prompt)
+    @property
+    def cache_id(self) -> str:
+        """Stable id for answer caches: the model when there is one, otherwise 'auto' (the router picks per task)."""
+        return (
+            f"{self.provider}/{self.model}"
+            if len(self._routes) <= 1
+            else "auto:" + ",".join(sorted(r.cfg.model for r in self._routes))
+        )
+
+    def decide(self, task):
+        from . import llm_router
+
+        low = False
+        try:
+            low = usage.budget_low(self.db, self.org_id)
+        except Exception:  # an advisory signal must never block a call
+            low = False
+        return llm_router.decide(self._routes, task, self._savings, low)
+
+    def _call(self, route, agent: str, system: str, prompt: str, max_tokens: int) -> LLMResult:
+        cfg = route.cfg
         started = time.time()
         try:
             call = (
-                _anthropic_call if self.provider == "anthropic" else _openai_call
-            )  # github-models and gemini speak the OpenAI chat-completions protocol
-            res = call(system, prompt, max_tokens, self.cfg)
+                _anthropic_call if cfg.provider == "anthropic" else _openai_call
+            )  # gemini and github-models speak OpenAI chat
+            res = call(system, prompt, max_tokens, cfg)
         except Exception as e:
             usage.record_event(
                 self.db,
                 self.org_id,
                 agent=agent,
-                provider=self.provider,
-                model=self.model,
+                provider=cfg.provider,
+                model=cfg.model,
                 workflow=self.workflow,
                 workflow_id=self.workflow_id,
                 latency_ms=int((time.time() - started) * 1000),
@@ -268,8 +293,8 @@ class LLMClient:
             self.db,
             self.org_id,
             agent=agent,
-            provider=self.provider,
-            model=self.model,
+            provider=cfg.provider,
+            model=cfg.model,
             workflow=self.workflow,
             workflow_id=self.workflow_id,
             input_tokens=res.input_tokens,
@@ -277,6 +302,55 @@ class LLMClient:
             cached_input_tokens=res.cached_input_tokens,
             latency_ms=int((time.time() - started) * 1000),
             jira_issue_key=self.jira_issue_key,
-            pricing_override=self.cfg.pricing,
+            pricing_override=cfg.pricing,
         )
         return res
+
+    def complete(
+        self, agent: str, system: str, prompt: str, max_tokens: int = 1500, task=None, validate=None
+    ) -> LLMResult:
+        """`task` describes how hard this is (defaults to the agent name); `validate(text)` lets the caller reject an
+        unusable answer, in which case one stronger model is tried before giving up."""
+        from . import llm_router
+
+        if self.offline:
+            raise LLMUnavailable("no hosted LLM configured")
+        usage.check_budget(self.db, self.org_id)  # may raise BudgetExceeded
+        prompt = redact_secrets(prompt)
+        task = task or llm_router.Task(agent, prompt_chars=len(prompt))
+        decision = self.decide(task)
+        last: Exception | None = None
+        for i, route in enumerate(decision.chain):
+            try:
+                res = self._call(route, agent, system, prompt, max_tokens)
+            except Exception as e:  # rate limit, outage, unknown model: try the next model
+                last = e
+                continue
+            info = {
+                "model": route.cfg.model,
+                "provider": route.cfg.provider,
+                "tier": route.tier,
+                "why": decision.why,
+                "fallbacks": i,
+                "escalated": False,
+            }
+            if validate is not None and not validate(res.text):
+                up = llm_router.stronger(decision.chain, route)
+                if up is not None:
+                    try:
+                        res2 = self._call(up, agent, system, prompt, max_tokens)
+                        res2.route = {
+                            **info,
+                            "model": up.cfg.model,
+                            "provider": up.cfg.provider,
+                            "tier": up.tier,
+                            "escalated": True,
+                            "why": [*decision.why, f"{route.cfg.model} gave an unusable answer"],
+                        }
+                        return res2
+                    except Exception as e:
+                        last = e
+            res.route = info
+            return res
+        assert last is not None
+        raise last

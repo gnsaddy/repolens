@@ -115,6 +115,18 @@ def check_budget(db: Session, org_id: str) -> None:
         raise BudgetExceeded("monthly budget exceeded")
 
 
+def budget_low(db: Session, org_id: str, fraction: float = 0.9) -> bool:
+    """True when 90% or more of a configured budget is already spent: a signal to prefer cheaper models."""
+    s = get_settings()
+    now = datetime.now(UTC)
+    if s.daily_budget_usd > 0 and spend_since(db, org_id, now - timedelta(days=1)) >= fraction * s.daily_budget_usd:
+        return True
+    return (
+        s.monthly_budget_usd > 0
+        and spend_since(db, org_id, now - timedelta(days=30)) >= fraction * s.monthly_budget_usd
+    )
+
+
 def summarize(db: Session, org_id: str, days: int = 30) -> dict:
     since = datetime.now(UTC) - timedelta(days=days)
     prev_since = since - timedelta(days=days)

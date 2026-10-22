@@ -356,6 +356,55 @@ class LLMSetting(Base):
     output_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_by: Mapped[str] = mapped_column(String(32), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+    savings_mode: Mapped[bool] = mapped_column(Boolean, default=True)  # route simple tasks to cheaper models
+
+
+class LLMConnection(Base):
+    """One provider account (a key) in the multi-model registry. The key is Fernet-encrypted and never returned."""
+
+    __tablename__ = "llm_connections"
+    __table_args__ = (UniqueConstraint("org_id", "provider", "base_url"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(20))  # anthropic | openai | gemini
+    base_url: Mapped[str] = mapped_column(String(500), default="")
+    api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class LLMModel(Base):
+    """A model enabled for routing, with the tier it serves: light (cheap, fast), standard, strong (hard problems)."""
+
+    __tablename__ = "llm_models"
+    __table_args__ = (UniqueConstraint("connection_id", "model"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    connection_id: Mapped[str] = mapped_column(ForeignKey("llm_connections.id", ondelete="CASCADE"), index=True)
+    model: Mapped[str] = mapped_column(String(100))
+    tier: Mapped[str] = mapped_column(String(10), default="standard")  # light | standard | strong
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    input_price: Mapped[float | None] = mapped_column(Float, nullable=True)  # USD per 1M tokens
+    output_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AnswerMemory(Base):
+    """Answers the model already gave, kept locally so a repeated or re-worded question costs no tokens."""
+
+    __tablename__ = "answer_memory"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(20), default="ask", index=True)
+    scope_key: Mapped[str] = mapped_column(String(64), index=True)  # who could see what when it was answered
+    query: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list | None] = mapped_column(EmbeddingType, nullable=True)
+    answer: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_state: Mapped[dict] = mapped_column(JSON, default=dict)  # {repo_id: indexed_sha} the answer relied on
+    tokens: Mapped[int] = mapped_column(Integer, default=0)  # input + output tokens this answer cost once
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_saved: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_hit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class GithubConnection(Base):

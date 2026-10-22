@@ -663,4 +663,6 @@ def ask(body: WikiAskIn, p: Principal = Depends(current_principal), db: Session 
     """Ask the wiki: answers come from documentation first (cited), with the code they connect to listed alongside."""
     scope = scope_for(db, p)
     ids = scope.resolve(body.repo_ids)
-    return kb.ask(db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, kinds=["doc"])
+    return kb.ask(
+        db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, kinds=["doc"], fresh=body.fresh
+    )

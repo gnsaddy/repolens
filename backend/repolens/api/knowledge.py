@@ -161,7 +161,7 @@ def knowledge_search(body: KnowledgeQuery, p: Principal = Depends(current_princi
 def knowledge_ask(body: KnowledgeQuery, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     scope = scope_for(db, p)
     ids = scope.resolve(body.repo_ids)
-    return kb.ask(db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope)
+    return kb.ask(db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, fresh=body.fresh)
 
 
 # ---------------------------------------------------------------------------------------------- graph

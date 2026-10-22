@@ -82,6 +82,20 @@ Ownership is derived from indexed commits: each author scores per file from the 
 
 Settings > AI & search: **Anthropic Claude**, **Google Gemini**, any **OpenAI-compatible** service (OpenAI, Azure, vLLM, Ollama, Groq, OpenRouter...), or offline. Gemini uses Google's OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai`), which is fixed so the key only ever goes to Google; create a key at aistudio.google.com/apikey. Its free tier is rate limited and Google may use free-tier requests to improve its products, so avoid it for private code. Model names are free text. **Test connection** then lists the models the saved key can actually use (for Gemini, Anthropic and OpenAI-compatible services; Gemini's list is limited to chat-capable models), flags a configured model that is not on the list, and lets you click one to use it. A 404 on chat now says the model was not found instead of a raw HTTP error. Gemini embeddings can be used too through the embedding settings (`EMBEDDING_BASE_URL` set to the same endpoint), untested.
 
+## Multiple models and routing
+
+Settings → AI & search → **Models and routing** lets you connect several models, even from different providers (Gemini, Claude, any OpenAI-compatible endpoint). After **Test connection** you tick the models to use and give each a tier: *light* (quick, cheap), *standard* or *strong* (hard problems). Tiers are guessed from the model name.
+
+Each task picks a tier from what it needs. Answering a question and connection tests start light; root-cause write-ups, doc updates and runbooks start standard. Signals such as a long prompt, a stack trace, a lot of evidence, several repositories or low confidence push a task up a tier. **Savings mode** (on by default) sends plain tasks one tier down. When the monthly budget is nearly used, everything goes to the cheapest tier.
+
+If a model fails, the next one in the chain answers. If a model returns an answer that cannot be used (for example malformed JSON), one stronger model is tried. A single configured model is used for everything, exactly as before. The routing plan on the page shows which model each kind of task uses right now, and every answer records which model produced it.
+
+## Answer memory
+
+Answers are remembered on the server. A repeated or re-worded question is matched by local embedding similarity (92% by default), and is answered from memory with no model call. The answer shows **From memory · saved ~N tokens** and **Answer again with the model** to bypass it.
+
+An entry is only reused while the repositories and wiki pages it was based on are unchanged, so a re-index or edit retires it. Entries are keyed by the repositories the asker can see, so answers never cross access boundaries, and expire after 72 hours. Settings shows entries, reuse count and tokens saved, and admins can clear it. Tune with `REPOLENS_ANSWER_MEMORY_ENABLED`, `_THRESHOLD`, `_TTL_HOURS` and `_MAX_ENTRIES`.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.
