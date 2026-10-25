@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Modal from "@/components/Modal";
 import { Badge, Button, ErrorNote, Spinner } from "@/components/ui";
 import { api, type JiraAnalysis, type JiraClaim, type JiraDetail } from "@/lib/api";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, timeAgo, safeHref } from "@/lib/utils";
 
 const KIND_TONE: Record<string, "green" | "amber" | "blue" | "brand" | "gray"> = { fix: "green", cause: "brand", workaround: "amber", tried: "gray", repro: "blue", question: "blue", note: "gray" };
 
@@ -37,7 +37,7 @@ export default function JiraIssuePanel({ issueKey, canInvestigate, onClose }: { 
             <div className="ml-auto flex gap-2">
               {d.investigation_id ? <Link className="inline-flex h-8 items-center rounded-md border border-line px-3 text-sm text-brand hover:bg-slate-50" to={`/investigations/${d.investigation_id}`}>View RCA<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
                 : canInvestigate && <Button size="sm" disabled={investigate.isPending} onClick={() => investigate.mutate()}><Microscope className="h-4 w-4" />{investigate.isPending ? "Starting…" : "Investigate"}</Button>}
-              <a className="inline-flex h-8 items-center rounded-md border border-line px-3 text-sm hover:bg-slate-50" href={d.url} target="_blank" rel="noopener noreferrer">Open in Jira</a>
+              <a className="inline-flex h-8 items-center rounded-md border border-line px-3 text-sm hover:bg-slate-50" href={safeHref(d.url)} target="_blank" rel="noopener noreferrer">Open in Jira</a>
             </div>
           </div>
           <ErrorNote error={analysis.error ?? investigate.error} />

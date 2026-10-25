@@ -7,7 +7,7 @@ import StoragePanel from "@/components/StoragePanel";
 import { api, type BranchList, type GithubConn, type IndexRunRow, type PullRow, type FileView, type PathOwners, type Repo, type SearchHit } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import AccessPanel from "@/components/AccessPanel";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, safeHref } from "@/lib/utils";
 
 export default function Repositories() {
   const ask = useConfirm();
@@ -139,7 +139,7 @@ export default function Repositories() {
                     {gh.data?.connected && !pulls.data?.length && <Empty>No pull requests synced yet.</Empty>}
                     <ul className="space-y-2 text-sm">{pulls.data?.slice(0, 10).map((p) => (
                       <li key={p.number} className="flex items-center gap-2"><Badge tone={p.state === "merged" ? "green" : p.state === "open" ? "blue" : "gray"}>{p.state}</Badge>
-                        <span className="text-xs text-muted">#{p.number}</span><a className="flex-1 truncate text-brand hover:underline" href={p.url} target="_blank" rel="noreferrer">{p.title}</a>
+                        <span className="text-xs text-muted">#{p.number}</span><a className="flex-1 truncate text-brand hover:underline" href={safeHref(p.url)} target="_blank" rel="noreferrer">{p.title}</a>
                         {p.jira_keys.map((k) => <Badge key={k} tone="brand">{k}</Badge>)}<span className="text-xs text-muted">{p.files} files</span></li>))}</ul>
                   </Card>)}
                 <Card><CardTitle>Recent commits</CardTitle>

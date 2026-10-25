@@ -41,7 +41,30 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
   skills are redacted for secrets.
 - Investigations have a time limit and a sweep that fails stuck runs, so a hung provider call cannot hold work forever.
 
-Known gaps: no multi-factor authentication; the sign-in limiter is in-process per worker (put a gateway rate limit in front
-for several replicas); tokens issued before server-side sessions existed cannot be revoked individually (they expire);
-remembered answers are stored in the database unencrypted (they are redacted for secrets and scoped by access, but protect the
-database itself); generated-code execution sandbox is not yet implemented (the fix-generation agents are out of MVP scope).
+- Edge protections (`backend/repolens/middleware.py`, applied to every request before routing): security headers on every API
+  answer (`nosniff`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`, no referrer, `Cache-Control: no-store`); request bodies over
+  32 MB are refused (declared and streamed size); rate limits per address (600/min overall, 20/min for sign-in, registration and
+  SSO discovery), per session (1200/min) and a tighter one for model-backed and indexing calls (30/min), answered with 429 and
+  `Retry-After`. Health checks are exempt. All limits are settings (`REPOLENS_RATE_LIMIT_*`, `REPOLENS_MAX_BODY_MB`).
+- The client address cannot be chosen by the client: `REPOLENS_TRUSTED_PROXY_HOPS` says how many proxies in front of the API
+  append to `X-Forwarded-For`, and the address is read from the matching position from the right. With 0 (default) the header is
+  ignored. Kubernetes sets 2 (ingress + web).
+- Server limits: uvicorn drops idle keep-alive connections after 10 s, caps concurrent requests at 200 and limits header size; nginx
+  drops slow headers/bodies (15 s / 30 s), caps bodies at 33 MB, hides its version, and sends a strict Content-Security-Policy
+  (scripts only from the app itself, no plugins, no framing, forms and base URI locked), HSTS and a permissions policy.
+- Passwords: at least 8 characters, at most 72 bytes, not on a list of common passwords, not just repeated characters, and not
+  containing the e-mail name; enforced on registration, user creation and password change. Failed sign-ins for a known account are
+  written to the audit log (never the password). In production the signing secret must be at least 32 characters.
+- `/docs`, `/redoc` and `/openapi.json` exist only when `REPOLENS_ENV=dev`. `/metrics` can require a bearer token
+  (`REPOLENS_METRICS_TOKEN`); in Kubernetes it is not reachable from outside the namespace anyway.
+- The UI only turns `http(s)` addresses into links (`safeHref`), renders Markdown without raw HTML, and loads pages on demand.
+- An automated audit (`tests/test_security_edge.py`) fails the build if any endpoint other than the deliberate public ones works
+  without a session, if a state-changing endpoint lacks a policy check, or if a viewer can change anything.
+
+Known gaps: no multi-factor authentication; the rate limits are in-process per worker (put a gateway limit in front for several
+replicas); the session token is kept in the browser's local storage, so it relies on the strict Content-Security-Policy and the
+absence of raw HTML rendering to stay out of reach of injected scripts (an HttpOnly cookie would remove that dependence at the cost
+of CSRF handling); tokens issued before server-side sessions existed cannot be revoked individually (they expire); there is no
+password reset by e-mail (an admin sets a new password); remembered answers are stored in the database unencrypted (redacted and
+access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
+once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).

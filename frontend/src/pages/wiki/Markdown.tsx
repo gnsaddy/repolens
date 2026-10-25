@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import { safeHref } from "@/lib/utils";
 
 export const slug = (text: string) => text.toLowerCase().replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
 const textOf = (node: ReactNode): string => (typeof node === "string" ? node : Array.isArray(node) ? node.map(textOf).join("") : node && typeof node === "object" && "props" in node ? textOf((node as { props: { children?: ReactNode } }).props.children) : "");
@@ -20,7 +21,7 @@ export default function Markdown({ text, onOpen }: { text: string; onOpen: (repo
               const i = target.indexOf("/");
               return <a href={`#${target}`} onClick={(e) => { e.preventDefault(); onOpen(target.slice(0, i), target.slice(i + 1), anchor); }}>{children}</a>;
             }
-            return <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>;
+            return <a href={safeHref(href)} target="_blank" rel="noopener noreferrer">{children}</a>;
           },
         }}
       >{text}</ReactMarkdown>

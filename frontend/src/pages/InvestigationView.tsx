@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Badge, Button, Card, Input, CardTitle, CodeBlock, ConfidenceBar, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
 import { api, type EvidenceItem, type Investigation, type ProposalDetail } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, timeAgo, safeHref } from "@/lib/utils";
 
 const TABS = ["Overview", "Timeline", "Findings", "Evidence", "Report"] as const;
 type Tab = (typeof TABS)[number];
@@ -185,13 +185,13 @@ function EvidenceCard({ e }: { e: EvidenceItem }) {
   if (e.type === "code")
     return (
       <Card>
-        <CardTitle right={<Badge>{e.provenance}</Badge>}><ExtLink href={e.url}><code className="text-xs">{e.repo}:{e.file}</code></ExtLink> <span className="font-normal text-muted">lines {e.start_line}–{e.end_line}{e.symbol ? ` · ${e.symbol}` : ""}</span></CardTitle>
+        <CardTitle right={<Badge>{e.provenance}</Badge>}><ExtLink href={safeHref(e.url)}><code className="text-xs">{e.repo}:{e.file}</code></ExtLink> <span className="font-normal text-muted">lines {e.start_line}–{e.end_line}{e.symbol ? ` · ${e.symbol}` : ""}</span></CardTitle>
         <CodeBlock code={e.snippet ?? ""} startLine={e.start_line} />
       </Card>);
   if (e.type === "commit")
     return (
       <Card>
-        <CardTitle right={<Badge>{e.provenance}</Badge>}><span className="flex items-center gap-2"><GitCommit className="h-4 w-4" /><ExtLink href={e.url}><code className="text-xs">{e.sha?.slice(0, 10)}</code></ExtLink> {e.message?.split("\n")[0]}</span></CardTitle>
+        <CardTitle right={<Badge>{e.provenance}</Badge>}><span className="flex items-center gap-2"><GitCommit className="h-4 w-4" /><ExtLink href={safeHref(e.url)}><code className="text-xs">{e.sha?.slice(0, 10)}</code></ExtLink> {e.message?.split("\n")[0]}</span></CardTitle>
         <div className="mb-2 text-xs text-muted">{e.author} · {timeAgo(e.committed_at)} · {e.files?.map((f) => `${f.path} (+${f.additions}/-${f.deletions})`).join(", ")}</div>
         {e.diff_excerpt && <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs leading-5">{e.diff_excerpt.split("\n").map((l, i) => (
           <div key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "bg-emerald-100/70" : l.startsWith("-") && !l.startsWith("---") ? "bg-red-100/70" : ""}>{l || " "}</div>))}</pre>}
@@ -201,14 +201,14 @@ function EvidenceCard({ e }: { e: EvidenceItem }) {
       <Card>
         <CardTitle right={<div className="flex gap-1">{e.jira_keys?.map((k) => <Badge key={k} tone="brand">{k}</Badge>)}<Badge tone={statusTone(e.state === "merged" ? "completed" : "queued")}>{e.state}</Badge></div>}>
           <span className="flex items-center gap-2"><GitPullRequest className="h-4 w-4" />PR #{e.number}: {e.title}</span></CardTitle>
-        <div className="mb-2 text-xs text-muted">by {e.author} · <Badge>{e.provenance}</Badge>{e.url && <> · <a className="text-brand hover:underline" href={e.url} target="_blank" rel="noreferrer">open on GitHub</a></>}</div>
+        <div className="mb-2 text-xs text-muted">by {e.author} · <Badge>{e.provenance}</Badge>{e.url && <> · <a className="text-brand hover:underline" href={safeHref(e.url)} target="_blank" rel="noreferrer">open on GitHub</a></>}</div>
         {e.body && <p className="whitespace-pre-wrap text-sm text-slate-700">{e.body.slice(0, 500)}</p>}
       </Card>);
   if (e.type === "doc")
     return (
       <Card>
         <CardTitle right={<Badge tone="blue">{e.relation?.toLowerCase().replace("_", " ")}</Badge>}><span className="flex items-center gap-2"><FileText className="h-4 w-4" />Documentation: {e.title}</span></CardTitle>
-        <div className="mb-2 text-xs text-muted"><ExtLink href={e.url}><code>{e.repo}:{e.file}</code></ExtLink> lines {e.start_line}–{e.end_line} · mentions <code>{e.symbol}</code></div>
+        <div className="mb-2 text-xs text-muted"><ExtLink href={safeHref(e.url)}><code>{e.repo}:{e.file}</code></ExtLink> lines {e.start_line}–{e.end_line} · mentions <code>{e.symbol}</code></div>
         <CodeBlock code={e.snippet ?? ""} startLine={e.start_line} />
       </Card>);
   if (e.type === "test")

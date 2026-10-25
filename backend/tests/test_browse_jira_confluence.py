@@ -72,9 +72,9 @@ def test_confluence_browse_errors_validation_and_roles(client, auth, monkeypatch
     p = client.get("/api/wiki/confluence/spaces/ENG/pages", headers=auth).json()["pages"][0]
     assert p["import_url"].startswith("https://fake.corp.io/pages/viewpage.action?pageId=")
     client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert client.get("/api/wiki/confluence/spaces", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403
@@ -113,9 +113,9 @@ def test_jira_projects_for_cloud_and_server(client, auth, monkeypatch):
 def test_jira_can_be_disconnected_by_an_admin_only(client, auth):
     configure_jira(client, auth)
     client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert client.delete("/api/jira/connection", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403

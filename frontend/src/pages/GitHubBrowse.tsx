@@ -6,7 +6,7 @@ import { useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner } from "@/components/ui";
 import { api, type GhBranch, type GhIssue, type GhPull, type GhRepo, type GhRepoPage, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, timeAgo, safeHref } from "@/lib/utils";
 
 const PAGE = 25;
 const STATE_TONE: Record<string, "green" | "blue" | "gray" | "brand"> = { open: "green", merged: "brand", closed: "gray" };
@@ -76,7 +76,7 @@ function RepoDetail({ repo, writable, provider }: { repo: GhRepo; writable: bool
   const branches = useQuery({ queryKey: [`${provider}-branches`, repo.full_name], enabled: tab === "branches", retry: false, queryFn: () => api<GhBranch[]>(`${base}/branches`) });
   return (
     <Card>
-      <CardTitle right={<a className="inline-flex items-center gap-1 text-xs text-brand hover:underline" href={repo.html_url} target="_blank" rel="noopener noreferrer">Open on {P.label}<ExternalLink className="h-3 w-3" /></a>}>
+      <CardTitle right={<a className="inline-flex items-center gap-1 text-xs text-brand hover:underline" href={safeHref(repo.html_url)} target="_blank" rel="noopener noreferrer">Open on {P.label}<ExternalLink className="h-3 w-3" /></a>}>
         <span className="flex items-center gap-2">{repo.full_name}{repo.private && <Badge tone="amber">private</Badge>}{repo.fork && <Badge>fork</Badge>}{repo.archived && <Badge>archived</Badge>}</span></CardTitle>
       <p className="text-sm text-muted">{repo.description || "No description"}</p>
       <p className="mt-1 text-xs text-muted">default branch {repo.default_branch} · {repo.language || "unknown language"} · {repo.open_issues} open issues and PRs</p>
@@ -92,13 +92,13 @@ function RepoDetail({ repo, writable, provider }: { repo: GhRepo; writable: bool
         {tab === "pulls" && (pulls.isLoading ? <Spinner /> : pulls.error ? <ErrorNote error={pulls.error} /> : !pulls.data?.length ? <Empty>No {state === "all" ? "" : state} pull requests.</Empty> : (
           <ul className="divide-y divide-line">{pulls.data.map((p) => (
             <li key={p.number} className="flex items-start gap-2 py-2 text-sm"><Badge tone={STATE_TONE[p.state] ?? "gray"}>{p.draft ? "draft" : p.state}</Badge>
-              <div className="min-w-0 flex-1"><a className="font-medium text-brand hover:underline" href={p.url} target="_blank" rel="noopener noreferrer">#{p.number} {p.title}</a>
+              <div className="min-w-0 flex-1"><a className="font-medium text-brand hover:underline" href={safeHref(p.url)} target="_blank" rel="noopener noreferrer">#{p.number} {p.title}</a>
                 <div className="text-xs text-muted">{p.author} · {p.head} → {p.base} · updated {timeAgo(p.updated_at)}</div></div>
               {p.labels.slice(0, 3).map((l) => <Badge key={l} tone="blue">{l}</Badge>)}</li>))}</ul>))}
         {tab === "issues" && (issues.isLoading ? <Spinner /> : issues.error ? <ErrorNote error={issues.error} /> : !issues.data?.length ? <Empty>No {state === "all" ? "" : state} issues.</Empty> : (
           <ul className="divide-y divide-line">{issues.data.map((i) => (
             <li key={i.number} className="flex items-start gap-2 py-2 text-sm"><Badge tone={STATE_TONE[i.state] ?? "gray"}>{i.state}</Badge>
-              <div className="min-w-0 flex-1"><a className="font-medium text-brand hover:underline" href={i.url} target="_blank" rel="noopener noreferrer">#{i.number} {i.title}</a>
+              <div className="min-w-0 flex-1"><a className="font-medium text-brand hover:underline" href={safeHref(i.url)} target="_blank" rel="noopener noreferrer">#{i.number} {i.title}</a>
                 <div className="text-xs text-muted">{i.author} · {i.comments} comments · updated {timeAgo(i.updated_at)}</div></div>
               {i.labels.slice(0, 3).map((l) => <Badge key={l} tone="blue">{l}</Badge>)}</li>))}</ul>))}
         {tab === "branches" && (branches.isLoading ? <Spinner /> : branches.error ? <ErrorNote error={branches.error} /> : (

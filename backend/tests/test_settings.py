@@ -279,10 +279,10 @@ def test_model_listing_for_gemini_filters_to_chat_models_and_keeps_the_key_out_o
         client.get("/api/settings/llm/models", headers=auth).json()["current_found"] is False
     )  # the saved model is not on the list
     member = client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
     assert member.status_code == 201
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert client.get("/api/settings/llm/models", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403
@@ -474,10 +474,10 @@ def test_check_validates_inputs_scrubs_errors_and_is_admin_only(client, auth, mo
     r = client.post("/api/settings/llm/check", headers=auth, json={"provider": "gemini", "api_key": key}).json()
     assert r["ok"] is False and key not in json.dumps(r) and "rejected the key" in r["error"]
     member = client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
     assert member.status_code == 201
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert (

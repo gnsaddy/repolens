@@ -18,3 +18,6 @@ export const fmtTokens = (n: number): string =>
 export const fmtCost = (n: number): string => `$${n.toFixed(n < 1 ? 4 : 2)}`;
 
 export const pct = (n: number | null | undefined): string => (n == null ? "—" : `${Math.round(n * 100)}%`);
+
+/** Only http(s) addresses become links, so a stored `javascript:` or `data:` URL can never run when clicked. */
+export const safeHref = (url?: string | null): string | undefined => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : undefined);

@@ -189,12 +189,14 @@ def test_registry_is_admin_only_and_isolated(client, auth):
     assert client.put(f"/api/settings/models/{mid}", headers=other, json={"enabled": False}).status_code == 404
     assert client.delete(f"/api/settings/models/{mid}", headers=other).status_code == 404
     member = client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
     assert member.status_code == 201
     mtok = {
         "Authorization": "Bearer "
-        + client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()["access_token"]
+        + client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
+            "access_token"
+        ]
     }
     assert (
         client.post(

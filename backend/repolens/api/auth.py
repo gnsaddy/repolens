@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
-from ..models import Organization, User, UserSession
+from ..models import AuditEvent, Organization, User, UserSession
 from ..schemas import LoginIn, PasswordChange, ProfilePatch, RegisterIn, TokenOut, UserCreate, UserOut
 from ..security import hash_password, verify_password
 from ..services import ratelimit, sessions
+from ..services.clientip import client_ip
+from ..services.passwords import check_password
 from ..services.policy import authorize
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -16,11 +18,18 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _DUMMY_HASH = hash_password("dummy-password-for-timing")
 
 
+def _strong(password: str, email: str) -> None:
+    problem = check_password(password, email)
+    if problem:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, problem)
+
+
 @router.post("/register", response_model=TokenOut, status_code=201)
 def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
     if not get_settings().allow_registration:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Registration is disabled")
     email = body.email.lower()
+    _strong(body.password, email)
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     org = Organization(name=body.organization)
@@ -35,7 +44,7 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenOut)
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     cfg = get_settings()
-    key = f"{body.email.lower()}|{request.client.host if request.client else ''}"
+    key = f"{body.email.lower()}|{client_ip(request)}"
     wait = ratelimit.blocked_for(key, cfg.login_max_failures, cfg.login_window_seconds)
     if wait:
         raise HTTPException(
@@ -47,6 +56,18 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     ok = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
     if not user or not ok or not user.active:
         ratelimit.fail(key, cfg.login_window_seconds)
+        if user:  # a trail for investigating guessing; the password itself is never recorded
+            db.add(
+                AuditEvent(
+                    org_id=user.org_id,
+                    actor_id=user.id,
+                    action="auth.login_failed",
+                    target=user.email[:200],
+                    allowed=False,
+                    detail={"ip": client_ip(request), "active": user.active},
+                )
+            )
+            db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     ratelimit.clear(key)
     return TokenOut(access_token=sessions.start(db, user, request), user=UserOut.model_validate(user))
@@ -65,6 +86,7 @@ def list_users(p: Principal = Depends(current_principal), db: Session = Depends(
 @router.post("/users", response_model=UserOut, status_code=201)
 def create_user(body: UserCreate, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "user.create", body.email)
+    _strong(body.password, body.email)
     if db.scalar(select(User).where(User.email == body.email.lower())):
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     u = User(
@@ -97,6 +119,7 @@ def change_password(body: PasswordChange, p: Principal = Depends(current_princip
         raise HTTPException(400, "Your account signs in through single sign-on; there is no password to change")
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(400, "Current password is incorrect")
+    _strong(body.new_password, user.email)
     user.password_hash = hash_password(body.new_password)
     db.commit()
     sessions.revoke_others(db, user.id, p.session_id)

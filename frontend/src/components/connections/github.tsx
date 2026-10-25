@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { safeHref } from "@/lib/utils";
 import { Copy, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { selectCls } from "@/components/ConnectionCard";
@@ -83,7 +84,7 @@ export function GithubForm({ onDone }: { onDone: () => void }) {
         <button type="button" className="text-sm text-brand hover:underline" onClick={() => setShowToken((v) => !v)} aria-expanded={!showToken}>{showToken ? "Or sign in with GitHub (device flow)" : "Hide device flow"}</button>
         {!showToken && (flow ? (
           <div className="mt-3 rounded-lg border border-line bg-slate-50 p-4" role="status">
-            <p className="text-sm">1. Open <a className="inline-flex items-center gap-1 font-medium text-brand hover:underline" href={flow.verification_uri} target="_blank" rel="noreferrer">{flow.verification_uri}<ExternalLink className="h-3 w-3" /></a></p>
+            <p className="text-sm">1. Open <a className="inline-flex items-center gap-1 font-medium text-brand hover:underline" href={safeHref(flow.verification_uri)} target="_blank" rel="noreferrer">{flow.verification_uri}<ExternalLink className="h-3 w-3" /></a></p>
             <p className="mt-2 text-sm">2. Enter this code:</p>
             <div className="my-2 flex items-center gap-2">
               <code className="rounded bg-white px-3 py-2 text-xl font-semibold tracking-widest" aria-label="Device code">{flow.user_code}</code>

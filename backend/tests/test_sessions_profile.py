@@ -11,7 +11,7 @@ def login(client, email, password):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
-def make_user(client, auth, email="s@acme.io", password="Password123!"):
+def make_user(client, auth, email="s@acme.io", password="Maple-Orbit-2026"):
     assert (
         client.post(
             "/api/auth/users", headers=auth, json={"email": email, "password": password, "role": "member"}

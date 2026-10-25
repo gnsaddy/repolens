@@ -1,9 +1,11 @@
 import asyncio
+import hmac
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from .api import (
@@ -27,6 +29,7 @@ from .api import (
 )
 from .config import get_settings
 from .db import create_all, get_engine
+from .middleware import EdgeGuard
 from .telemetry import setup_logging, setup_telemetry
 
 
@@ -105,8 +108,8 @@ async def _investigation_reaper(seconds: float = 60.0) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
-    if s.env != "dev" and s.jwt_secret.startswith("dev-insecure"):
-        raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev")
+    if s.env != "dev" and (s.jwt_secret.startswith("dev-insecure") or len(s.jwt_secret) < 32):
+        raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev, and be at least 32 characters")
     if s.env == "dev":  # other environments run `alembic upgrade head` (see Dockerfile entrypoint)
         create_all()
     tasks = [asyncio.create_task(_source_scheduler()), asyncio.create_task(_investigation_reaper())]
@@ -119,7 +122,16 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     setup_logging()
-    app = FastAPI(title="RepoLens AI", version="0.1.0", lifespan=lifespan)
+    prod = get_settings().env != "dev"  # the API schema and interactive docs are for development only
+    app = FastAPI(
+        title="RepoLens AI",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None if prod else "/docs",
+        redoc_url=None if prod else "/redoc",
+        openapi_url=None if prod else "/openapi.json",
+    )
+    app.add_middleware(EdgeGuard)  # inside CORS, so its 413/429 answers still carry CORS headers
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_origins,
@@ -149,6 +161,15 @@ def create_app() -> FastAPI:
         wiki.router,
     ):
         app.include_router(r)
+
+    @app.middleware("http")
+    async def protect_metrics(request, call_next):  # optional bearer token for the Prometheus endpoint
+        token = get_settings().metrics_token
+        if token and request.url.path == "/metrics":
+            sent = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+            if not hmac.compare_digest(sent, token):
+                return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
 
     @app.get("/healthz", include_in_schema=False)
     def healthz():

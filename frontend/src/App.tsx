@@ -10,19 +10,19 @@ import { Spinner } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import Login, { SsoComplete } from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Repositories from "./pages/Repositories";
-import Knowledge from "./pages/Knowledge";
-import Risk from "./pages/Risk";
-import SettingsPage from "./pages/SettingsPage";
-import Investigations from "./pages/Investigations";
-import InvestigationView from "./pages/InvestigationView";
+const Repositories = lazy(() => import("./pages/Repositories"));
+const Knowledge = lazy(() => import("./pages/Knowledge"));
+const Risk = lazy(() => import("./pages/Risk"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const Investigations = lazy(() => import("./pages/Investigations"));
+const InvestigationView = lazy(() => import("./pages/InvestigationView"));
 const TokenUsage = lazy(() => import("./pages/TokenUsage"));
-import Wiki from "./pages/Wiki";
-import Ownership from "./pages/Ownership";
-import RepoBrowser from "./pages/GitHubBrowse";
-import JiraPage from "./pages/JiraPage";
-import Profile from "./pages/Profile";
-import Insights from "./pages/Insights";
+const Wiki = lazy(() => import("./pages/Wiki"));
+const Ownership = lazy(() => import("./pages/Ownership"));
+const RepoBrowser = lazy(() => import("./pages/GitHubBrowse"));
+const JiraPage = lazy(() => import("./pages/JiraPage"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Insights = lazy(() => import("./pages/Insights"));
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -86,7 +86,7 @@ function Shell() {
             <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("whitespace-nowrap rounded-full border border-line px-3 py-1 text-xs", isActive && "bg-brand text-white")}>{label}</NavLink>
           ))}
         </nav>
-        <ErrorBoundary resetKey={loc.pathname + loc.search}><Outlet /></ErrorBoundary>
+        <ErrorBoundary resetKey={loc.pathname + loc.search}><Suspense fallback={<div className="py-10"><Spinner /></div>}><Outlet /></Suspense></ErrorBoundary>
       </main>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </div>

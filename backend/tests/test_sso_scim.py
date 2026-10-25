@@ -168,7 +168,7 @@ def test_full_sign_in_provisions_a_viewer_and_never_exposes_the_secret(client, a
 def test_existing_member_keeps_their_role_and_admin_is_never_granted(client, auth, idp, session):
     configure(client, auth, default_role="member")
     client.post(
-        "/api/auth/users", headers=auth, json={"email": "ana@corp.io", "password": "Password123!", "role": "admin"}
+        "/api/auth/users", headers=auth, json={"email": "ana@corp.io", "password": "Maple-Orbit-2026", "role": "admin"}
     )
     out = complete(client, login(client, idp)[0]).json()
     assert out["user"]["role"] == "admin"  # linked to the existing account; its role is untouched
@@ -263,10 +263,10 @@ def test_expired_flows_and_pkce_binding(client, auth, idp, session):
 def test_admin_only_validation_and_domain_exclusivity(client, auth, idp):
     configure(client, auth)
     member = client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
     assert member.status_code == 201
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert client.get("/api/settings/sso", headers={"Authorization": f"Bearer {mtok}"}).status_code == 403

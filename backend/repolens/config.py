@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-change-me"
     jwt_ttl_minutes: int = 60 * 12
     investigation_timeout_s: int = 300  # a run that takes longer is stopped and marked failed (0 = no limit)
+    # Where the client address comes from. 0 = the direct peer. Behind N trusted proxies that each append to
+    # X-Forwarded-For (ingress, web), set N so the address is read from the right place and cannot be spoofed.
+    trusted_proxy_hops: int = 0
+    rate_limit_enabled: bool = True
+    rate_limit_ip_per_minute: int = 600  # every /api call from one address
+    rate_limit_user_per_minute: int = 1200  # every call from one signed-in session
+    rate_limit_heavy_per_minute: int = 30  # model-backed and indexing calls, per session
+    rate_limit_auth_per_minute: int = 20  # sign-in, registration and single-sign-on discovery, per address
+    max_body_mb: int = 32  # larger request bodies are refused
+    metrics_token: str = ""  # when set, /metrics needs this bearer token
     session_idle_minutes: int = 60 * 8  # a session unused this long is ended (0 = never)
     login_max_failures: int = 5  # wrong passwords per account and address before pausing
     login_window_seconds: int = 600

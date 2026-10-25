@@ -11,6 +11,7 @@ from tests.demo_repo import build_demo_repo
 def settings(monkeypatch, tmp_path):
     monkeypatch.setenv("REPOLENS_ENV", "dev")
     monkeypatch.setenv("REPOLENS_RUN_JOBS_INLINE", "true")
+    monkeypatch.setenv("REPOLENS_RATE_LIMIT_ENABLED", "false")  # tests that exercise limits turn it back on
     monkeypatch.setenv("REPOLENS_JWT_SECRET", "test-secret-test-secret-test-secret")
     monkeypatch.setenv("REPOLENS_LLM_PROVIDER", "heuristic")
     monkeypatch.setenv("REPOLENS_REPOS_DIR", str(tmp_path / "clones"))

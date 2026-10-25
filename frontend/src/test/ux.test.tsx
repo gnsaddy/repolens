@@ -130,3 +130,17 @@ describe("dashboard getting started", () => {
     expect(card).toHaveTextContent("Add documentation");
   });
 });
+
+describe("safeHref", () => {
+  it("only lets http(s) addresses become links", async () => {
+    const { safeHref } = await import("@/lib/utils");
+    expect(safeHref("https://github.com/a/b")).toBe("https://github.com/a/b");
+    expect(safeHref("http://localhost:3000/x")).toBe("http://localhost:3000/x");
+    expect(safeHref("javascript:alert(1)")).toBeUndefined();
+    expect(safeHref("  JaVaScRiPt:alert(1)")).toBeUndefined();
+    expect(safeHref("data:text/html,<script>alert(1)</script>")).toBeUndefined();
+    expect(safeHref("//evil.example/x")).toBeUndefined();
+    expect(safeHref("")).toBeUndefined();
+    expect(safeHref(null)).toBeUndefined();
+  });
+});

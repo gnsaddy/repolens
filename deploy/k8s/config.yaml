@@ -9,3 +9,4 @@ data:
   REPOLENS_ALLOW_REGISTRATION: "true"
   REPOLENS_OTLP_ENDPOINT: ""
   REPOLENS_CORS_ORIGINS: '["https://repolens.example.com"]'
+  REPOLENS_TRUSTED_PROXY_HOPS: "2"   # ingress + web: the client address is the 3rd entry from the right (see docs)

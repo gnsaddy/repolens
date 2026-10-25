@@ -36,10 +36,10 @@ def test_github_check_does_not_save_and_saving_records_the_login(client, auth, m
         client.post("/api/github/check", headers=other, json=body).status_code == 200
     )  # an admin of their own org may try tokens
     member = client.post(
-        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Password123!", "role": "member"}
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "Maple-Orbit-2026", "role": "member"}
     )
     assert member.status_code == 201
-    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Password123!"}).json()[
+    mtok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "Maple-Orbit-2026"}).json()[
         "access_token"
     ]
     assert client.post("/api/github/check", headers={"Authorization": f"Bearer {mtok}"}, json=body).status_code == 403
