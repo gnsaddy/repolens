@@ -95,6 +95,9 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
   image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR and rolls out (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).
 
+## License
+Apache License 2.0, copyright 2026 Aditya Raj (gnsaddy). See [`LICENSE`](LICENSE).
+
 ## Changelog
 Every notable change has an entry in [`changelog/`](changelog/README.md) (`make changelog title="..."` adds one); behaviour and design changes also update `docs/`.
 

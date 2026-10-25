@@ -29,3 +29,6 @@ Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 
 ## Commit messages
 Plain and descriptive, one idea per commit.
+
+## License
+By contributing you agree your work is licensed under the Apache License 2.0 (see `LICENSE`).
