@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str = "dev-insecure-change-me"
     jwt_ttl_minutes: int = 60 * 12
+    investigation_timeout_s: int = 300  # a run that takes longer is stopped and marked failed (0 = no limit)
     session_idle_minutes: int = 60 * 8  # a session unused this long is ended (0 = never)
     login_max_failures: int = 5  # wrong passwords per account and address before pausing
     login_window_seconds: int = 600

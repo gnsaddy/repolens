@@ -13,7 +13,7 @@ from ..models import Investigation, MemoryEntry, Repository
 from ..schemas import CiLogIn, CiStartIn, InvestigationCreate, InvestigationOut, InvestigationSummary, ReviewIn
 from ..services import ci_logs
 from ..services.access import can_view_investigation, scope_for
-from ..services.investigations import create_investigation, submit
+from ..services.investigations import create_investigation, rerun, submit
 from ..services.policy import authorize
 from ..telemetry import INVESTIGATIONS
 
@@ -102,6 +102,19 @@ def delete(inv_id: str, p: Principal = Depends(current_principal), db: Session =
     authorize(db, p, "investigation.delete", inv.id)
     db.delete(inv)
     db.commit()
+
+
+@router.post("/{inv_id}/rerun", response_model=InvestigationSummary, status_code=202)
+def run_again(inv_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Retry an investigation that failed or was interrupted."""
+    inv = get_inv(db, p, inv_id)
+    authorize(db, p, "investigation.create", inv.id, op="rerun")
+    if inv.status != "failed":
+        raise HTTPException(409, "Only a failed investigation can be run again")
+    INVESTIGATIONS.labels("started").inc()
+    rerun(db, inv)
+    db.refresh(inv)
+    return inv
 
 
 @router.post("/{inv_id}/review", response_model=InvestigationOut)

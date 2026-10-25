@@ -27,6 +27,10 @@ export default function InvestigationView() {
     mutationFn: () => api<ProposalDetail>("/wiki/proposals/from-incident", { method: "POST", json: { investigation_id: id } }),
     onSuccess: (p) => nav(`/wiki?tab=proposals&id=${p.id}`),
   });
+  const rerun = useMutation({
+    mutationFn: () => api<Investigation>(`/investigations/${id}/rerun`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["investigation", id] }),
+  });
   const review = useMutation({
     mutationFn: (outcome: "confirmed" | "rejected") => api<Investigation>(`/investigations/${id}/review`, { method: "POST", json: { outcome } }),
     onSuccess: (d) => qc.setQueryData(["investigation", id], d),
@@ -80,7 +84,13 @@ export default function InvestigationView() {
             <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setPub(false)}>Cancel</Button><Button disabled={!key.trim() || publish.isPending}>{publish.isPending ? "Publishing…" : "Publish"}</Button></div>
           </form>
         </Modal>)}
-      {inv.status === "failed" && <ErrorNote error={inv.error ?? "Investigation failed"} />}
+      {inv.status === "failed" && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <span className="min-w-0 flex-1">{inv.error ?? "Investigation failed"}</span>
+          {canWrite(user) && <Button size="sm" variant="outline" disabled={rerun.isPending} onClick={() => rerun.mutate()}>{rerun.isPending ? "Starting…" : "Run again"}</Button>}
+        </div>)}
+      {running && Date.now() - new Date(inv.created_at).getTime() > 3 * 60_000 && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">This is taking longer than usual. It stops by itself after a few minutes and can then be run again.</p>}
+      <ErrorNote error={rerun.error} />
 
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {TABS.map((t) => (

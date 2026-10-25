@@ -2,8 +2,9 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..agents.workflow import Ctx, Features, run_workflow
@@ -49,6 +50,36 @@ def submit(inv_id: str) -> None:
         _pool.submit(run_investigation, inv_id)
 
 
+def reap_stuck(db: Session, restart: bool = False) -> int:
+    """Mark runs that can no longer finish as failed. After a restart every unfinished run is dead (the work queue
+    lives in memory); while running, a run is stuck once it is well past the time limit (a hung provider call)."""
+    limit = get_settings().investigation_timeout_s
+    grace = 120 if restart else max(limit * 2, 600)
+    cutoff = datetime.now(UTC) - timedelta(seconds=grace if limit else 24 * 3600)
+    n = 0
+    for inv in db.scalars(select(Investigation).where(Investigation.status.in_(("queued", "running")))):
+        started = inv.created_at if inv.created_at.tzinfo else inv.created_at.replace(tzinfo=UTC)
+        if started < cutoff:
+            inv.status = "failed"
+            inv.error = (
+                "Interrupted by a restart before it finished. Run it again."
+                if restart
+                else f"Did not finish within {limit} s and was stopped. Run it again."
+            )
+            inv.finished_at = datetime.now(UTC)
+            n += 1
+    if n:
+        db.commit()
+    return n
+
+
+def rerun(db: Session, inv: Investigation) -> None:
+    """Start a failed investigation again from scratch."""
+    inv.status, inv.error, inv.timeline, inv.finished_at = "queued", None, [], None
+    db.commit()
+    submit(inv.id)
+
+
 def run_investigation(inv_id: str, features: Features | None = None) -> None:
     db = session_factory()()
     try:
@@ -64,7 +95,11 @@ def run_investigation(inv_id: str, features: Features | None = None) -> None:
         if inv.repo_ids and not repo_ids:
             raise PermissionError("none of the selected repositories are accessible")
 
+        limit = get_settings().investigation_timeout_s
+
         def on_step(node: str, agent: str, summary: str, ms: int) -> None:
+            if limit and (datetime.now(UTC) - started).total_seconds() > limit:
+                raise TimeoutError(f"The investigation took longer than {limit} s and was stopped")
             fresh = db.get(Investigation, inv_id)
             fresh.timeline = [
                 *fresh.timeline,

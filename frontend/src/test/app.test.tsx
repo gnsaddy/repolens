@@ -115,4 +115,19 @@ describe("InvestigationView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(posted).toEqual([{ investigation_id: "abcdef123456", issue_key: "REP-1", approved: true }]));
   });
+
+  it("offers to run a failed investigation again", async () => {
+    localStorage.setItem("repolens.token", "tok");
+    const posts: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const u = String(input);
+      if (init?.method === "POST") posts.push(u);
+      if (u.endsWith("/auth/me")) return json(user);
+      return json({ ...inv, status: "failed", error: "Did not finish within 300 s and was stopped. Run it again.", hypotheses: [], timeline: [] });
+    });
+    wrap(<Routes><Route path="/investigations/:id" element={<InvestigationView />} /></Routes>, "/investigations/abcdef123456");
+    expect(await screen.findByText(/Did not finish within 300 s/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Run again" }));
+    await waitFor(() => expect(posts.some((u) => u.endsWith("/investigations/abcdef123456/rerun"))).toBe(true));
+  });
 });

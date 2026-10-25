@@ -80,6 +80,28 @@ async def _source_scheduler(minutes: float = 5.0) -> None:
         await asyncio.sleep(minutes * 60)
 
 
+async def _investigation_reaper(seconds: float = 60.0) -> None:
+    """Fail investigations left 'running' by a restart or a hung call, so they never spin forever."""
+    from .db import session_factory
+    from .services import investigations as inv_svc
+
+    def sweep(restart: bool) -> None:
+        with session_factory()() as db:
+            n = inv_svc.reap_stuck(db, restart=restart)
+            if n:
+                logging.getLogger("repolens.investigations").warning("stopped %d stuck investigation(s)", n)
+
+    first = True
+    await asyncio.sleep(5)  # let the app finish starting
+    while True:
+        try:
+            await asyncio.to_thread(sweep, first)
+        except Exception:
+            logging.getLogger("repolens.investigations").exception("investigation sweep failed")
+        first = False
+        await asyncio.sleep(seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
@@ -87,7 +109,7 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev")
     if s.env == "dev":  # other environments run `alembic upgrade head` (see Dockerfile entrypoint)
         create_all()
-    tasks = [asyncio.create_task(_source_scheduler())]
+    tasks = [asyncio.create_task(_source_scheduler()), asyncio.create_task(_investigation_reaper())]
     if s.checkout_ttl_days > 0:
         tasks.append(asyncio.create_task(_checkout_janitor()))
     yield
