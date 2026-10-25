@@ -6,7 +6,8 @@ import { Meter, Spark } from "@/components/charts";
 import { Badge, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
 import { api, type Calibration, type FeedbackSummary, type MetricsOverview, type SysMetrics } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens } from "@/lib/utils";
+import { Link } from "react-router-dom";
+import { dailyTokenSeries, fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens } from "@/lib/utils";
 
 const n = (v: number) => v.toLocaleString();
 
@@ -40,7 +41,7 @@ export default function Insights() {
         <section aria-label="AI utilisation" className="space-y-4">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Kpi icon={<Sparkles className="h-4 w-4" />} label="Tokens used" value={fmtTokens(m.ai.tokens)} hint={`${n(m.ai.requests)} model requests${m.ai.errors ? ` · ${m.ai.errors} failed` : ""}`} />
-            <Kpi icon={<Gauge className="h-4 w-4" />} label="Spend" value={fmtCost(m.ai.cost)} hint={m.ai.cost === 0 && m.ai.tokens > 0 ? "no prices set for these models" : `last ${days} days`} />
+            <Kpi icon={<Gauge className="h-4 w-4" />} label="Spend" value={fmtCost(m.ai.cost)} hint={m.ai.cost === 0 && m.ai.tokens > 0 ? <>no prices set; <Link className="underline" to="/settings?tab=ai">add them in Settings</Link></> : `last ${days} days`} />
             <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Tokens avoided" value={fmtTokens(m.ai.tokens_avoided)} tone="text-emerald-600" hint={`${Math.round(m.ai.savings_rate * 100)}% of what would have been used`} />
             <Kpi icon={<Database className="h-4 w-4" />} label="Answers from memory" value={n(m.memory.hits)} tone="text-violet-600" hint={`${n(m.memory.stored)} remembered`} />
           </div>
@@ -69,7 +70,7 @@ export default function Insights() {
           <div className="grid gap-4 lg:grid-cols-5">
             <Card className="lg:col-span-3"><CardTitle>Tokens per day</CardTitle>
               {!m.ai.daily.length ? <Empty>No model calls in this period.</Empty> : (
-                <div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={m.ai.daily.map((d) => ({ date: d.date.slice(5), tokens: d.input_tokens + d.output_tokens }))}>
+                <div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={dailyTokenSeries(m.ai.daily)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} /><XAxis dataKey="date" fontSize={11} tickLine={false} /><YAxis fontSize={11} tickFormatter={fmtTokens} tickLine={false} axisLine={false} width={44} />
                   <Tooltip formatter={(v) => [fmtTokens(Number(v)), "tokens"]} /><Area type="monotone" dataKey="tokens" stroke="#4f46e5" fill="#c7d2fe" /></AreaChart></ResponsiveContainer></div>)}</Card>
             <Card className="lg:col-span-2"><CardTitle>Which models did the work</CardTitle>

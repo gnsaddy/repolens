@@ -36,3 +36,12 @@ export const pct = (n: number | null | undefined): string => (n == null ? "—" 
 
 /** Only http(s) addresses become links, so a stored `javascript:` or `data:` URL can never run when clicked. */
 export const safeHref = (url?: string | null): string | undefined => (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : undefined);
+
+/** Points for the "tokens per day" chart. The server sends one `tokens` figure per day; older shapes sent input and output
+ *  separately. A missing number must never reach the chart as NaN. */
+export function dailyTokenSeries(daily: { date: string; tokens?: number; input_tokens?: number; output_tokens?: number }[]) {
+  return (Array.isArray(daily) ? daily : []).map((d) => {
+    const n = d.tokens ?? (d.input_tokens ?? 0) + (d.output_tokens ?? 0);
+    return { date: d.date.slice(5), tokens: Number.isFinite(n) ? n : 0 };
+  });
+}

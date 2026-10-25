@@ -227,7 +227,7 @@ export interface MetricsOverview {
   days: number;
   content: { repositories: number; doc_collections: number; pages: number; chunks: number; graph_nodes: number; graph_edges: number; indexing_errors: number };
   work: { investigations: number; completed: number; failed: number; confirmed: number; avg_minutes: number | null; proposals_pending: number; proposals_applied: number; drift_open: number };
-  ai: { requests: number; tokens: number; cost: number; errors: number; cache_hits: number; tokens_avoided: number; savings_rate: number; by_model: UsageGroup[]; by_agent: UsageGroup[]; daily: { date: string; input_tokens: number; output_tokens: number; cost: number }[] };
+  ai: { requests: number; tokens: number; cost: number; errors: number; cache_hits: number; tokens_avoided: number; savings_rate: number; by_model: UsageGroup[]; by_agent: UsageGroup[]; daily: { date: string; tokens: number; cost: number }[] };
   memory: { enabled: boolean; entries: number; hits: number; tokens_saved: number; stored: number };
   team: { users: number; active_sessions: number; active_users_period: number };
 }

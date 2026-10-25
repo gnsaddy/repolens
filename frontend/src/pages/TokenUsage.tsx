@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardTitle, Empty, PageHeader, Stat } from "@/components/ui";
 import { api, type UsageGroup, type UsageSummary } from "@/lib/api";
@@ -42,7 +43,7 @@ export default function TokenUsage() {
         <Stat label="Cache hit rate" value={pct(t?.cache_hit_rate)} hint={t ? `~${fmtTokens(t.tokens_avoided)} tokens avoided (estimate)` : undefined} />
         <Stat label="Cost / successful RCA" value={t?.cost_per_successful_rca != null ? fmtCost(t.cost_per_successful_rca) : "—"} hint={t ? `${t.successful_investigations} completed · ${pct(t.error_rate)} errors` : undefined} />
       </div>
-      {unpriced && <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no pricing is configured for these models. Set <code>REPOLENS_PRICING_JSON</code> to enable cost estimates.</div>}
+      {unpriced && <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no price is set for these models. Add each model's price per 1M tokens in <Link className="font-medium underline" to="/settings?tab=ai">Settings → AI &amp; search</Link>, or ask whoever runs the server to set <code>REPOLENS_PRICING_JSON</code>. Prices apply to new usage from then on.</div>}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardTitle>Tokens per day</CardTitle>
           {!data?.daily.length ? <Empty>No data yet.</Empty> : (
