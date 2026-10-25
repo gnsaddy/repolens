@@ -1,7 +1,10 @@
-.PHONY: e2e help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
+.PHONY: sample e2e help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
 .DEFAULT_GOAL := help
 
 VENV = cd backend && . .venv/bin/activate
+
+sample:    ## create ./sample-repo, a small repository with a known bug, to try the app
+	$(VENV) && python -m repolens.devtools.sample_repo ../sample-repo
 
 help:      ## list the targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'

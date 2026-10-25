@@ -24,3 +24,5 @@ LEARNINGS.md
 frontend/test-results/
 frontend/playwright-report/
 backups/
+
+/sample-repo/

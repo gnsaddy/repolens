@@ -21,6 +21,29 @@ requests into one hybrid index and a typed knowledge graph (calls, imports, test
 similarity, PR↔commit↔file). See [`docs/architecture.md`](docs/architecture.md), the feature checklist in [`docs/features.md`](docs/features.md) and the
 benchmark in [`evals/`](evals/README.md).
 
+## How it fits together
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    G[Git repositories]:::s --- D[Docs, wiki, Confluence]:::s --- T[Jira, GitHub PRs, CI logs]:::s
+  end
+  Sources --> I[Indexer<br/>chunks, symbols, commits]
+  I --> K[(PostgreSQL + pgvector<br/>hybrid index + knowledge graph)]
+  K --> R[Retrieval<br/>keyword + vector + graph]
+  R --> A[Agents<br/>investigate, rank, verify citations]
+  A --> M{{Model router<br/>your models, by task difficulty}}
+  A --> UI[Web app, MCP server, GitHub Action]
+  M -.optional.-> A
+  UI --> H[Human review]
+  H --> F[Reports, runbooks, draft fix PRs]
+  classDef s fill:#eef,stroke:#99c
+```
+
+Everything left of the model router works offline. A model only improves wording; people confirm findings before anything is published or proposed.
+
+**New here?** Follow the [five-minute quickstart](docs/quickstart.md). **Contributing?** See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Highlights
 
 * **Investigations** from a bug report, a CI log or a Jira ticket: ranked causes with cited code, commits and pull requests, an error-against-code reading (KeyError, None, index, divide-by-zero), human review, and reports you approve before they reach Jira.
@@ -28,6 +51,8 @@ benchmark in [`evals/`](evals/README.md).
 * **Models and routing**: connect several models and providers, test each, and give each a tier. Plain tasks go to cheaper models, hard ones to stronger models, with fallback and one-step escalation.
 * **Answer memory**: earlier answers to similar questions are shown first and reused when the sources have not changed.
 * **DeepMind Wiki**: search by meaning, edit pages in place, a per-repository code atlas, and an at-a-glance card (kind, owner, warnings, commands) for every page.
+* **Suggested fixes**: a drafted patch for a confirmed cause that a person approves before a draft pull request is opened; never merged.
+* **Editor and CI**: an MCP server for Claude Code, Cursor and others, and a GitHub Action that comments change risk on every pull request.
 * **Accounts**: profile, device sessions you can end, idle timeout, sign-in rate limiting, and an Insights page for utilisation and AI savings.
 
 ## DeepMind Wiki

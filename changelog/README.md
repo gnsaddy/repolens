@@ -14,6 +14,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 - 2026-10-25 · [Suggested fixes with human approval](2026-10-25-suggested-fixes.md)
 - 2026-10-25 · [Security hardening, Insights, evaluation suites and feedback](2026-10-25-security-insights-evals.md)
 - 2026-10-25 · [Retention sweep and workspace deletion](2026-10-25-retention-and-cleanup.md)
+- 2026-10-25 · [Project polish: diagram, quickstart, contributing](2026-10-25-project-polish.md)
 - 2026-10-25 · [People moved into Settings; log rotation and cleaner logs](2026-10-25-people-in-settings-and-log-rotation.md)
 - 2026-10-25 · ["What leaves this server" panel](2026-10-25-outbound-panel.md)
 - 2026-10-25 · [Night mode](2026-10-25-night-mode.md)
