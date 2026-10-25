@@ -402,7 +402,10 @@ def test_github_webhook_signature(client, monkeypatch):
 
 
 def test_health_and_metrics(client):
-    assert client.get("/healthz").json() == {"status": "ok"}
+    assert client.get("/healthz").json() == {
+        "status": "ok",
+        "version": "v0.1-beta",
+    }  # the version is also checked in test_version.py
     assert client.get("/readyz").json() == {"status": "ready"}
     client.get("/healthz")
     assert "repolens_http_requests_total" in client.get("/metrics").text
