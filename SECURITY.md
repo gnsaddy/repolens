@@ -28,5 +28,20 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
   instructions, and ranking/citation checks are deterministic, not LLM-driven.
 - Containers run as non-root with read-only root FS (k8s), dropped capabilities and default-deny NetworkPolicies.
 
-Known gaps: no rate limiting on `/auth/login`; no token revocation list; generated-code execution sandbox is not yet
-implemented (the fix-generation agents are out of MVP scope).
+- Sessions: every sign-in is a server-side session carried in the token. People can list and end their sessions, sign-out
+  ends the session on the server, a password change ends all other sessions, and a session unused for 8 hours
+  (`REPOLENS_SESSION_IDLE_MINUTES`) ends by itself.
+- Sign-in rate limiting: five wrong passwords for one account from one address pause sign-in for ten minutes
+  (`REPOLENS_LOGIN_MAX_FAILURES`, `REPOLENS_LOGIN_WINDOW_SECONDS`); responses do not reveal whether the account exists.
+- Model provider keys (Anthropic, Gemini, OpenAI-compatible), Bitbucket, Jira, Confluence and other connector credentials
+  are Fernet-encrypted at rest and never returned; provider error text is scrubbed of the key before it reaches the browser.
+  Adding a model requires a live test with the key on the server.
+- Answer memory is keyed by the repositories the asker can see and is retired when the indexed sources change, so a remembered
+  answer is never served to someone with less access. Browsing it shows members only answers made for their own scope; exported
+  skills are redacted for secrets.
+- Investigations have a time limit and a sweep that fails stuck runs, so a hung provider call cannot hold work forever.
+
+Known gaps: no multi-factor authentication; the sign-in limiter is in-process per worker (put a gateway rate limit in front
+for several replicas); tokens issued before server-side sessions existed cannot be revoked individually (they expire);
+remembered answers are stored in the database unencrypted (they are redacted for secrets and scoped by access, but protect the
+database itself); generated-code execution sandbox is not yet implemented (the fix-generation agents are out of MVP scope).
