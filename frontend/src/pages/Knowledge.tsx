@@ -1,19 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Network, Search, Sparkles, Trash2, Upload } from "lucide-react";
+import { Brain, FileText, Network, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
+import MemoryBrowser from "@/components/MemoryBrowser";
 import SimilarAnswers from "@/components/SimilarAnswers";
-import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
+import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type MemoryStats, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const TABS = [["ask", "Ask & Search", Sparkles], ["graph", "Graph", Network], ["docs", "Documents", FileText]] as const;
+const TABS = [["ask", "Ask & Search", Sparkles], ["graph", "Graph", Network], ["docs", "Documents", FileText], ["memory", "Memory", Brain]] as const;
 type TabKey = (typeof TABS)[number][0];
 
 export default function Knowledge() {
+  const { user } = useAuth();
   const [sp, setSp] = useSearchParams();
   const tab = (sp.get("tab") as TabKey) || "ask";
   const go = (t: TabKey, extra: Record<string, string> = {}) => setSp({ tab: t, ...extra });
@@ -31,6 +33,7 @@ export default function Knowledge() {
       {tab === "ask" && <AskTab repos={repos.data ?? []} openNode={(id) => go("graph", { node: id })} />}
       {tab === "graph" && <GraphTab repos={repos.data ?? []} initialNode={sp.get("node")} />}
       {tab === "docs" && <DocsTab repos={repos.data ?? []} />}
+      {tab === "memory" && <MemoryTab admin={user?.role === "admin"} />}
     </div>
   );
 }
@@ -47,6 +50,19 @@ function ConnectionChips({ conns, onOpen }: { conns: Connection[]; onOpen: (id: 
           <span className="h-2 w-2 rounded-full" style={{ background: REL_COLORS[c.rel] }} />
           <span className="text-muted">{c.label}</span><span className="max-w-[16rem] truncate font-medium">{c.node.qualname || c.node.name}</span>
         </button>))}
+    </div>
+  );
+}
+
+function MemoryTab({ admin }: { admin: boolean }) {
+  const stats = useQuery({ queryKey: ["answer-memory"], queryFn: () => api<MemoryStats>("/settings/memory") });
+  const d = stats.data;
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted">Everything RepoLens has answered and kept. A repeated or re-worded question is answered from here, with no model call. Search questions and answers, then turn what you find into a skill.</p>
+      {d?.entries !== undefined && (
+        <div className="grid grid-cols-3 gap-4"><Stat label="Remembered answers" value={d.entries} /><Stat label="Times reused" value={d.hits} /><Stat label="Tokens saved" value={d.tokens_saved.toLocaleString()} hint={d.enabled ? "memory is on" : "memory is off"} /></div>)}
+      <Card><MemoryBrowser admin={admin} /></Card>
     </div>
   );
 }

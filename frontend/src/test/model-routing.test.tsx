@@ -99,21 +99,11 @@ describe("Settings: answer memory", () => {
   });
 });
 
-describe("Settings: browsing memory", () => {
-  it("searches remembered answers and turns the selection into a skill file", async () => {
-    const calls = setup();
-    await userEvent.click(await screen.findByRole("button", { name: /Browse and search memory/ }));
-    const dlg = await screen.findByRole("dialog");
-    const list = await within(dlg).findByRole("list", { name: "Remembered answers" });
-    expect(within(list).getByText("How many times does the service retry?")).toBeInTheDocument();
-    await userEvent.type(within(dlg).getByLabelText("Search memory"), "retries three");
-    await userEvent.click(within(dlg).getByRole("button", { name: "Search" }));
-    await waitFor(() => expect(calls.length >= 0).toBe(true));
-    await userEvent.click(within(dlg).getByRole("checkbox", { name: /Select How many times/ }));
-    await userEvent.click(within(dlg).getByRole("button", { name: /Create skill from selected/ }));
-    const file = await within(dlg).findByLabelText("Skill file");
-    expect(file).toHaveTextContent("name: payment-retries");
-    expect(within(dlg).getByRole("button", { name: /Download SKILL.md/ })).toBeInTheDocument();
-    expect(calls.find((c) => c.url.endsWith("/settings/memory/skill"))?.body).toEqual({ entry_ids: ["e1"] });
+describe("Memory", () => {
+  it("the Settings card links to the Memory tab instead of opening a dialog", async () => {
+    setup();
+    const link = await screen.findByRole("link", { name: /Browse and search memory/ });
+    expect(link).toHaveAttribute("href", "/knowledge?tab=memory");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
