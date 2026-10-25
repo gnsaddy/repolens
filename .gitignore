@@ -26,3 +26,5 @@ frontend/playwright-report/
 backups/
 
 /sample-repo/
+
+/.claude/

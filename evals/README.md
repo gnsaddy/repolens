@@ -149,20 +149,24 @@ File names in the report are masked so the question is not trivial. No language 
 
 Measured on this project's own history (10 usable fix commits, offline, 2026-10-25; `evals/results/bugs-repolens-own-history.json`):
 
-| | retrieval | investigation |
-|---|---|---|
-| true file in top 1 | 10% | 20% |
-| top 3 | 30% (95% CI 11-60%) | 40% (CI 17-69%) |
-| top 5 | 60% | 40% |
-| MRR | 0.26 | 0.30 |
-| picking files at random, top 3 | 2% | 2% |
+| | retrieval | investigation, first version | investigation, after the ranking fix |
+|---|---|---|---|
+| true file in top 1 | 10% | 20% | 40% |
+| top 3 | 30% (95% CI 11-60%) | 40% | 50% (CI 24-76%) |
+| top 5 | 60% | 40% | 60% |
+| MRR | 0.26 | 0.30 | 0.47 |
+| picking files at random, top 3 | 2% | 2% | 2% |
 
-How to read it honestly: ten cases is a small sample, so the intervals are wide; the report is a commit message, tidier than a real
-ticket; and the repository is the one this software was built in. It is clearly far better than chance, and it is **not** good enough
-to trust blindly: in six of ten cases the right file is not in the investigation's top 3. Two leads from the table: raw retrieval finds the
-right file in the top 5 more often than the investigation's shortlist does (60% against 40%), so the shortlist is dropping good
-candidates, and commits that only change configuration or tests are never found. Re-run it on your own repositories and quote your
-numbers, not these.
+**What was wrong and what changed.** Retrieval already had the right file in its top 5 for 60% of cases, but the investigation's shortlist held
+only 40%: it was topped by docs, changelogs, tests, `Makefile` and `SECURITY.md`, because any commit that touched lines in a frequently edited file
+earned a large bonus whether or not the commit had anything to do with the report, and several functions of one file filled several slots.
+The fix (in `agents/workflow.py`, nothing tied to file names): a commit that shares no words with the report counts for much less; docs, tests,
+changelogs and similar context files lose 40% of their confidence unless they appear in a stack trace; and the shortlist keeps one suspect per file.
+
+How to read it honestly: ten cases is a small sample and the intervals overlap, so the gain is two or three cases; **the ranking was tuned and
+scored on these same ten cases**, so the improvement is likely optimistic until it is re-measured on other repositories; the report is a commit message,
+tidier than a real ticket; and three of the ten cases are still never found (commits that change only configuration or a file the index skips).
+It is far better than chance and it is **not** good enough to trust blindly. Re-run it on your own repositories and quote your numbers, not these.
 
 ## Is the confidence score trustworthy? (calibration)
 

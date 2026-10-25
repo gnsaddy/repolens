@@ -11,14 +11,14 @@
       0.108,
       0.603
     ],
-    "investigation_top1": 0.2,
-    "investigation_top3": 0.4,
-    "investigation_top5": 0.4,
-    "investigation_top10": 0.4,
-    "investigation_mrr": 0.3,
+    "investigation_top1": 0.4,
+    "investigation_top3": 0.5,
+    "investigation_top5": 0.6,
+    "investigation_top10": 0.6,
+    "investigation_mrr": 0.47,
     "investigation_top3_ci95": [
-      0.168,
-      0.687
+      0.237,
+      0.763
     ],
     "rows": [
       {
@@ -28,7 +28,7 @@
           "frontend/src/App.tsx"
         ],
         "retrieval_rank": 16,
-        "investigation_rank": null
+        "investigation_rank": 2
       },
       {
         "commit": "671596d7",
@@ -49,7 +49,7 @@
           "backend/repolens/main.py"
         ],
         "retrieval_rank": 5,
-        "investigation_rank": null
+        "investigation_rank": 5
       },
       {
         "commit": "6b5b9e8f",
@@ -78,7 +78,7 @@
           "frontend/src/components/connections/bitbucket.tsx"
         ],
         "retrieval_rank": 3,
-        "investigation_rank": 2
+        "investigation_rank": 1
       },
       {
         "commit": "e9ac492a",
@@ -107,7 +107,7 @@
           "backend/repolens/services/llm.py"
         ],
         "retrieval_rank": 4,
-        "investigation_rank": 2
+        "investigation_rank": 1
       },
       {
         "commit": "36f78562",

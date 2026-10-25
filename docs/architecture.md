@@ -182,7 +182,7 @@ endpoint answers `409` for a public target unless the body has `confirm_public: 
 variant of the pull request comment (score, signal names and the pull request's own files only), chosen by the Action's `public` flag.
 
 ## Real-bug evaluation, calibration and injection tests
-`evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose
+`agents/workflow.py` ranks suspects with one entry per file, down-weights commits that share no words with the report and context files (docs, tests, changelogs) unless a stack trace names them. `evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose
 only reachable history ends there), indexes it with the offline stack and scores retrieval and the investigation shortlist against the
 files the fix changed, with Wilson intervals and a random-ranking comparison. `services/calibration.py` compares investigation
 confidence with confirmed/rejected reviews (bands, Brier, ECE, pool-adjacent-violators curve once 20 reviews exist) behind

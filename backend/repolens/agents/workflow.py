@@ -29,6 +29,7 @@ from ..services.usage import BudgetExceeded
 
 PROMPT_VERSION = "rca-synth-v1"
 SCHEMA_VERSION = "1"
+SHORTLIST_SIZE = 5  # hypotheses kept after ranking; one per distinct file
 
 SYSTEM_PROMPT = (
     "You are RepoLens, a debugging assistant. You receive an incident description and EVIDENCE retrieved from "
@@ -308,12 +309,17 @@ def build_graph(ctx: Ctx):
                 diff_words = set(retrieval.tokenize(c.get("diff_excerpt", "")))
                 msg_overlap = len(terms & msg_words) / max(len(terms), 1)
                 diff_overlap = len(terms & diff_words) / max(len(terms), 1)
-                val = 0.10 + 0.22 * min(msg_overlap * 2, 1.0) + 0.12 * min(diff_overlap * 2, 1.0) + 0.16 * c["recency"]
+                relevant = msg_overlap > 0 or diff_overlap > 0
+                # a commit that shares no words with the report only says "this file changes often": weak evidence
+                val = (
+                    (0.10 if relevant else 0.03) + 0.22 * min(msg_overlap * 2, 1.0) + 0.12 * min(diff_overlap * 2, 1.0)
+                )
+                val += (0.16 if relevant else 0.05) * c["recency"]
                 if not c.get("parent"):  # a file-creating commit is weak evidence of a regression
                     val *= 0.4
                 edited = _touches_lines(c, h["file"], h["start_line"], h["end_line"])
                 if edited:  # the commit changed lines inside THIS chunk, not just elsewhere in the file
-                    val += 0.30
+                    val += 0.30 if relevant else 0.08  # ...but an unrelated edit is mostly just churn
                 if c.get("blame", {}).get(h["chunk_id"]):  # git blame of the failing line points at this commit
                     val += 0.25
                 if val > best:
@@ -327,14 +333,23 @@ def build_graph(ctx: Ctx):
             if any(m["similarity"] > 0.4 for m in state.get("memory", [])):
                 conf += 0.05
                 reasons.append("resembles a previously recorded incident")
+            if _is_context_file(h["file"]) and not (frames or h.get("stack_frame")):
+                conf *= 0.6  # docs, tests and changelogs explain a defect far more often than they contain it
+                reasons.append("documentation/test/changelog file: context rather than a likely origin")
             suspects[key] = {
                 "key": key,
+                "order": len(suspects),
                 "hit": h,
                 "commit": best_commit,
                 "confidence": min(conf, 0.92),
                 "reasons": reasons,
             }
-        ordered = sorted(suspects.values(), key=lambda s: s["confidence"], reverse=True)[:5]
+        # One suspect per file: several functions of one file would otherwise fill the shortlist with the same file
+        # and push other candidate files out. The file's best-scoring chunk represents it (ties: better retrieval rank).
+        by_file: dict[tuple[str, str], dict] = {}
+        for s in sorted(suspects.values(), key=lambda s: (-s["confidence"], s["order"])):
+            by_file.setdefault((s["key"][0], s["key"][1]), s)
+        ordered = sorted(by_file.values(), key=lambda s: (-s["confidence"], s["order"]))[:SHORTLIST_SIZE]
         hyps = []
         for i, s in enumerate(ordered, 1):
             h, c = s["hit"], s["commit"]
@@ -688,6 +703,18 @@ def _pull_for(ctx: Ctx, repo_id: str, number: int) -> dict | None:
         "jira_keys": pr.jira_keys,
         "provenance": "github",
     }
+
+
+_CONTEXT_PATH = re.compile(
+    r"(^|/)(tests?|__tests__|e2e|docs?|changelog|examples?|fixtures?)(/|$)|\.(test|spec)\.|(^|/)test_[^/]*$|_test\.[a-z]+$"
+    r"|\.(md|rst|txt)$|(^|/)(makefile|license[^/]*|security\.md)$",
+    re.I,
+)
+
+
+def _is_context_file(path: str) -> bool:
+    """Documentation, tests, changelogs: evidence about a defect, rarely its location."""
+    return bool(_CONTEXT_PATH.search(path))
 
 
 def _touches_lines(c: dict, file: str, start: int, end: int) -> bool:
