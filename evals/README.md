@@ -85,3 +85,51 @@ temporary commit (the first “0/6 commit attribution” was that bug, not the p
 * Python only, one regression per repository, small repositories (~10 files), n = 20 per seed: intervals are wide.
 * Offline mode: no LLM tokens or cost were measured (the harness records them when a model is configured); no human
   verification or acceptance rates; **fix-generation metrics are not applicable** (fix generation is not built).
+
+
+## Suites for documents, answer memory and routing
+
+`python -m repolens.evals.suites` (about two seconds, offline) measures what people use every day, and is the quality gate in CI
+(`make eval`; the baseline is `evals/baselines/suites.json`, record a new one with `make eval-baseline` only after an
+improvement you have reviewed).
+
+* **docs**: 24 documentation pages and 72 questions in three styles (`exact` words from the page, `paraphrase` in different words,
+  `confusable` a different question about the same page), plus 8 questions the docs cannot answer. Reports top-1/3, recall@5, MRR,
+  per-style results, and how well a signal separates answerable from unanswerable questions (AUC).
+* **memory**: 120 question pairs (re-typings and re-wordings that should reuse an answer, different questions that must not);
+  precision and recall at the shipped thresholds, and the best thresholds that keep precision at 95%.
+* **routing**: 42 task shapes against three virtual models with realistic prices; cost against "always the strongest model" and
+  how often a hard task lands on a weaker model (gated at zero). It does not measure answer quality: that needs a real model.
+
+### Comparing embedders
+
+```bash
+# local server (Ollama): ollama pull nomic-embed-text
+python -m repolens.evals.suites --suite docs,memory --embedder http --name nomic-embed-text \
+  --embed-base-url http://localhost:11434/v1 --embed-model nomic-embed-text --embed-dim 768 --embed-no-dimensions
+# hosted: the key is read from an environment variable, never from an argument
+OPENAI_API_KEY=... python -m repolens.evals.suites --suite docs,memory --embedder http --name openai-small \
+  --embed-base-url https://api.openai.com/v1 --embed-model text-embedding-3-small --embed-key-env OPENAI_API_KEY --embed-dim 256
+```
+
+Measured here (24 pages, 72 questions, offline, 2026-10-25; full numbers in `evals/results/embedders/`):
+
+| | local hash (default) | nomic-embed-text (Ollama, 768 d) |
+|---|---|---|
+| top-1 | 79.2% | 83.3% |
+| top-3 / recall@5 | 88.9% / 90.3% | 93.1% / 97.2% |
+| MRR | 0.843 | 0.889 |
+| paraphrased questions, top-1 | 41.7% | 54.2% |
+| memory recall at the shipped thresholds (precision 100%) | 51.4% | 66.7% |
+| memory F1 | 0.68 | 0.80 |
+
+The model is better on every measure, most clearly where the question is worded differently from the page. With 72 questions the
+top-1 difference is inside the confidence interval; the recall@5, paraphrase and memory differences are larger than the noise but
+the set is small, so treat this as "clearly helps on re-wordings", not a precise figure. A hosted model was not run (it needs your
+key). Neither embedder can tell an unanswerable question from an answerable one by the fused score (AUC about 0.5); the share of
+the question's words found in the best passage does better (AUC about 0.75), which is recorded as `coverage_auc`.
+
+**Default:** it stays the local hash embedder, because the default has to work with nothing installed and nothing sent out. To use
+a model, set `REPOLENS_EMBEDDING_PROVIDER=openai` with the base URL, model and dimension, then run
+`python -m repolens.devtools.reembed` (resizes the vector columns, clears the answer memory and marks repositories for
+re-indexing). Settings → AI & search warns when the stored vectors came from a different model.

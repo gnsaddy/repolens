@@ -87,7 +87,9 @@ class Embedder:
             batch = [t[:8000] for t in texts[i : i + 64]]
             r = httpx.post(
                 f"{s.embedding_base_url.rstrip('/')}/embeddings",
-                headers={"Authorization": f"Bearer {s.embedding_api_key}"},
+                headers={"Authorization": f"Bearer {s.embedding_api_key}"}
+                if s.embedding_api_key
+                else {},  # local servers need no key
                 json={
                     "model": s.embedding_model,
                     "input": batch,

@@ -67,3 +67,30 @@ def test_a_change_of_embedding_model_is_noticed_and_the_reembed_tool_resets_it(
     )["stale"]
     lines = reembed.run(dry=True)  # on SQLite there is nothing to resize; a dry run changes nothing
     assert any("SQLite" in x for x in lines)
+
+
+def test_embeddings_work_with_keyless_local_servers(monkeypatch):
+    import httpx
+
+    from repolens import config
+    from repolens.services import embeddings
+
+    seen = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        seen["headers"] = headers
+        req = httpx.Request("POST", url)
+        return httpx.Response(
+            200, json={"data": [{"embedding": [0.1, 0.2, 0.3]} for _ in json["input"]], "usage": {}}, request=req
+        )
+
+    monkeypatch.setenv("REPOLENS_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setenv("REPOLENS_EMBEDDING_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("REPOLENS_EMBEDDING_API_KEY", "")
+    config.get_settings.cache_clear()
+    monkeypatch.setattr(embeddings.httpx, "post", fake_post)
+    assert embeddings.Embedder().embed(["a", "b"]) and seen["headers"] == {}  # no "Bearer " header with an empty key
+    monkeypatch.setenv("REPOLENS_EMBEDDING_API_KEY", "k-123")
+    config.get_settings.cache_clear()
+    embeddings.Embedder().embed(["a"])
+    assert seen["headers"] == {"Authorization": "Bearer k-123"}
