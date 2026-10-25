@@ -33,7 +33,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
       <ConnectionCard icon={Layers} tint="indigo" title="Models and routing" status={<StatusPill on={data.active > 0} onLabel={`${data.active} model${data.active === 1 ? "" : "s"} active`} offLabel="No model" />}
         description="Add several models, even from different providers. Each task uses the cheapest one that can do it, and moves up only when it is hard."
         footer={admin ? <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Add models</Button> : undefined}>
-        {data.connections.length === 0 ? <p className="text-sm text-muted">{admin ? "Connect a language model above, or add models here." : "No models configured."}</p> : (
+        {data.connections.length === 0 ? <p className="text-sm text-muted">{admin ? "Add a model to get AI-written answers; everything also works without one." : "No models configured."}</p> : (
           <div className="space-y-4">
             {data.connections.map((c) => (
               <section key={c.id} aria-label={`${providerLabel(c.provider)} models`} className="rounded-lg border border-line">

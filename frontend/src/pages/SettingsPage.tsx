@@ -6,7 +6,7 @@ import IntegrationsPanel from "@/components/IntegrationsPanel";
 import LanguageModelCard from "@/components/LanguageModelCard";
 import ModelRoutingCard, { MemoryCard } from "@/components/ModelRoutingCard";
 import { Badge, PageHeader } from "@/components/ui";
-import { api, type RetrievalStatus } from "@/lib/api";
+import { api, type ModelRegistry, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const admin = user?.role === "admin";
   const [sp, setSp] = useSearchParams();
   const tab = sp.get("tab") === "ai" ? "ai" : "integrations";
+  const registry = useQuery({ queryKey: ["model-registry"], queryFn: () => api<ModelRegistry>("/settings/models") });
+  const managed = !!registry.data?.connections?.some((c) => !c.legacy); // once models are managed below, one card is enough
 
   return (
     <div>
@@ -29,7 +31,7 @@ export default function SettingsPage() {
       <div className="max-w-4xl">
         {tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
           <div className="space-y-4">
-            <LanguageModelCard admin={admin} />
+            {!managed && <LanguageModelCard admin={admin} />}
             <ModelRoutingCard admin={admin} />
             <MemoryCard admin={admin} />
             <RetrievalCard />

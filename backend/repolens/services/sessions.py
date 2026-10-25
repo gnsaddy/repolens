@@ -6,6 +6,7 @@ from fastapi import Request
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..models import User, UserSession, _now
 from ..security import create_token
 
@@ -28,6 +29,11 @@ def check(db: Session, sid: str, user_id: str) -> bool:
     if row is None or row.user_id != user_id or row.revoked_at is not None:
         return False
     seen = row.last_seen_at if row.last_seen_at.tzinfo else row.last_seen_at.replace(tzinfo=_now().tzinfo)
+    idle = get_settings().session_idle_minutes
+    if idle and _now() - seen > timedelta(minutes=idle):  # nobody used this sign-in for too long
+        row.revoked_at = _now()
+        db.commit()
+        return False
     if _now() - seen > TOUCH_EVERY:
         row.last_seen_at = _now()
         db.commit()

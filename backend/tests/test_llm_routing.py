@@ -79,6 +79,49 @@ def test_plan_lists_every_kind_with_the_model_it_would_use():
 
 
 # ------------------------------------------------------------------------------------------------ registry API
+@pytest.fixture(autouse=True)
+def reachable_models(monkeypatch):
+    """Adding a model runs a live test; here every model answers unless its name starts with "bad"."""
+    from repolens.api import settings as settings_api
+
+    def fake_ping(cfg):
+        if cfg.model.startswith("bad"):
+            raise RuntimeError(f"model {cfg.model} not found, key {cfg.api_key}")
+        return {"model": cfg.model, "latency_ms": 5, "input_tokens": 3}
+
+    monkeypatch.setattr(settings_api, "ping", fake_ping)
+
+
+def test_models_are_tested_on_the_server_before_they_are_saved(client, auth, session):
+    r = client.post(
+        "/api/settings/models/connections",
+        headers=auth,
+        json={"provider": "gemini", "api_key": KEY_G, "models": [{"model": "good-1"}, {"model": "bad-2"}]},
+    )
+    assert r.status_code == 400 and "bad-2" in r.text and "nothing was saved" in r.text and KEY_G not in r.text
+    assert (
+        client.get("/api/settings/models", headers=auth).json()["connections"] == []
+    )  # the good one was not saved either
+    add(client, auth, "gemini", KEY_G, [{"model": "good-1"}])
+    # changing the tier of a working model does not re-test it; a new bad one still fails
+    assert (
+        client.post(
+            "/api/settings/models/connections",
+            headers=auth,
+            json={"provider": "gemini", "models": [{"model": "good-1", "tier": "strong"}]},
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/settings/models/connections",
+            headers=auth,
+            json={"provider": "gemini", "models": [{"model": "bad-3"}]},
+        ).status_code
+        == 400
+    )
+
+
 def add(client, auth, provider, key, models, **kw):
     r = client.post(
         "/api/settings/models/connections",

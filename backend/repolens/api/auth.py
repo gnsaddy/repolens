@@ -8,7 +8,7 @@ from ..deps import Principal, current_principal
 from ..models import Organization, User, UserSession
 from ..schemas import LoginIn, PasswordChange, ProfilePatch, RegisterIn, TokenOut, UserCreate, UserOut
 from ..security import hash_password, verify_password
-from ..services import sessions
+from ..services import ratelimit, sessions
 from ..services.policy import authorize
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -34,10 +34,21 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenOut)
 def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    cfg = get_settings()
+    key = f"{body.email.lower()}|{request.client.host if request.client else ''}"
+    wait = ratelimit.blocked_for(key, cfg.login_max_failures, cfg.login_window_seconds)
+    if wait:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Too many failed sign-ins. Try again in {max(1, wait // 60)} min.",
+            headers={"Retry-After": str(wait)},
+        )
     user = db.scalar(select(User).where(User.email == body.email.lower()))
     ok = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
     if not user or not ok or not user.active:
+        ratelimit.fail(key, cfg.login_window_seconds)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    ratelimit.clear(key)
     return TokenOut(access_token=sessions.start(db, user, request), user=UserOut.model_validate(user))
 
 

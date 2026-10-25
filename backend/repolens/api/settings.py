@@ -348,6 +348,27 @@ def get_registry(p: Principal = Depends(current_principal), db: Session = Depend
     return _registry_view(db, p.org_id)
 
 
+def _verify_new_models(db: Session, org_id: str, body: ConnectionIn, base: str, conn: LLMConnection | None) -> None:
+    """A model is only saved after it answered a live test with this key, whatever the client did before."""
+    key = body.api_key.strip() or (decrypt_secret(conn.api_key_encrypted) if conn and conn.api_key_encrypted else "")
+    known = {m.model for m in db.scalars(select(LLMModel).where(LLMModel.connection_id == conn.id))} if conn else set()
+    failed = []
+    for spec in body.models:
+        if spec.model in known and not body.api_key.strip():
+            continue  # already working; only its tier or price is changing
+        if not key:
+            continue  # the "key required" error below is clearer
+        try:
+            ping(LLMConfig(body.provider, spec.model, GEMINI_URL if body.provider == "gemini" else base, key, "org"))
+        except Exception as e:  # noqa: BLE001 - any provider error means the model is not usable
+            text = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {e}"
+            failed.append(f"{spec.model}: {_scrub(text, key)[:160]}")
+    if failed:
+        raise HTTPException(
+            400, "These models did not answer a test message, so nothing was saved. " + "; ".join(failed)
+        )
+
+
 @router.post("/models/connections", status_code=201)
 def save_connection(body: ConnectionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Add or update a provider and the models to route to. Models not listed are left as they are."""
@@ -359,6 +380,12 @@ def save_connection(body: ConnectionIn, p: Principal = Depends(current_principal
             validate_base_url(base)
         except JiraError as e:
             raise HTTPException(400, str(e).replace("Jira URL", "Base URL")) from e
+    conn = db.scalar(
+        select(LLMConnection).where(
+            LLMConnection.org_id == p.org_id, LLMConnection.provider == body.provider, LLMConnection.base_url == base
+        )
+    )
+    _verify_new_models(db, p.org_id, body, base, conn)
     _adopt_legacy(db, p.org_id)
     conn = db.scalar(
         select(LLMConnection).where(

@@ -110,3 +110,40 @@ def test_metrics_overview_summarises_the_workspace(client, auth, demo_repo):
         ]
         == 0
     )
+
+
+def test_repeated_wrong_passwords_pause_sign_in_for_that_account_only(client, auth):
+    email, pw = make_user(client, auth)
+    for _ in range(5):
+        assert client.post("/api/auth/login", json={"email": email, "password": "wrong-password-1"}).status_code == 401
+    r = client.post("/api/auth/login", json={"email": email, "password": pw})
+    assert (
+        r.status_code == 429 and "Too many failed sign-ins" in r.json()["detail"] and int(r.headers["retry-after"]) > 0
+    )
+    other, other_pw = make_user(client, auth, "t@acme.io")
+    assert client.post("/api/auth/login", json={"email": other, "password": other_pw}).status_code == 200
+
+
+def test_a_successful_sign_in_forgives_earlier_mistakes(client, auth):
+    email, pw = make_user(client, auth)
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": email, "password": "wrong-password-1"})
+    assert client.post("/api/auth/login", json={"email": email, "password": pw}).status_code == 200
+    for _ in range(4):
+        client.post("/api/auth/login", json={"email": email, "password": "wrong-password-1"})
+    assert client.post("/api/auth/login", json={"email": email, "password": pw}).status_code == 200
+
+
+def test_idle_sessions_end_on_their_own(client, auth, session, monkeypatch):
+    from datetime import timedelta
+
+    from repolens.models import UserSession, _now
+
+    email, pw = make_user(client, auth)
+    a = login(client, email, pw)
+    assert client.get("/api/auth/me", headers=a).status_code == 200
+    row = session.query(UserSession).filter_by(revoked_at=None).order_by(UserSession.created_at.desc()).first()
+    row.last_seen_at = _now() - timedelta(hours=9)
+    session.commit()
+    r = client.get("/api/auth/me", headers=a)
+    assert r.status_code == 401 and "ended" in r.json()["detail"]

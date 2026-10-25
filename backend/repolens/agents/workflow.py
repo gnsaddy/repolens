@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import CacheEntry, Change, CodeChunk, PullRequest, Repository
-from ..services import retrieval, usage
+from ..services import cause_hints, retrieval, usage
 from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
@@ -424,11 +424,13 @@ def build_graph(ctx: Ctx):
                 "no evidence to synthesize",
             )
         top = hyps[0]
-        deterministic = _deterministic_narrative(top)
+        deterministic = _deterministic_narrative(top, state["query"], hyps)
         if ctx.llm.offline:
             return {"narrative": deterministic, "llm_used": False}, "offline mode: deterministic narrative"
         evidence_txt = _evidence_prompt(hyps[:3])
         prompt = f"INCIDENT:\n{state['query'][:4000]}\n\nEVIDENCE:\n{evidence_txt}"
+        if deterministic["root_cause"] != _deterministic_narrative(top)["root_cause"]:  # a code-level reading exists
+            prompt += f"\n\nSTATIC ANALYSIS (verified against the lines above):\n{deterministic['explanation'][:700]}"
         shas = sorted(
             f"{r.id}:{r.indexed_sha}"
             for r in ctx.db.scalars(select(Repository).where(Repository.org_id == ctx.org_id)).all()
@@ -764,7 +766,8 @@ def _commit_dict(ch: Change, names: dict[str, str], score: float) -> dict:
     }
 
 
-def _deterministic_narrative(top: dict) -> dict:
+def _deterministic_narrative(top: dict, query: str = "", hyps: list[dict] | None = None) -> dict:
+    found = cause_hints.hint(query, [e for h in (hyps or [top])[:3] for e in h["evidence"]]) if query else None
     code = next((e for e in top["evidence"] if e["type"] == "code"), None)
     commit = next((e for e in top["evidence"] if e["type"] == "commit"), None)
     loc = f"{code['file']}:{code['start_line']}" if code else "the retrieved code"
@@ -775,6 +778,13 @@ def _deterministic_narrative(top: dict) -> dict:
             f'Review the diff of {commit["sha"][:8]} ("{commit["message"].splitlines()[0][:80]}") '
             "and add a regression test before deciding between a targeted fix and a revert."
         )
+    if found:
+        sites = "; ".join(f"{x['file']}:{x['line']} `{x['text']}`" for x in found["sites"])
+        return {
+            "root_cause": found["summary"],
+            "explanation": f"{found['explanation']} Lines: {sites}. {top['explanation']}",
+            "suggested_fix": " ".join([found["fix"], *fix]),
+        }
     return {"root_cause": root, "explanation": top["explanation"], "suggested_fix": " ".join(fix)}
 
 

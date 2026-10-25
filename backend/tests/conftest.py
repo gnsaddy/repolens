@@ -15,6 +15,9 @@ def settings(monkeypatch, tmp_path):
     monkeypatch.setenv("REPOLENS_LLM_PROVIDER", "heuristic")
     monkeypatch.setenv("REPOLENS_REPOS_DIR", str(tmp_path / "clones"))
     config.get_settings.cache_clear()
+    from repolens.services import ratelimit
+
+    ratelimit.reset()
     yield
     config.get_settings.cache_clear()
 

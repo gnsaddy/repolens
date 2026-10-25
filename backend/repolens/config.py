@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: str = "dev-insecure-change-me"
     jwt_ttl_minutes: int = 60 * 12
+    session_idle_minutes: int = 60 * 8  # a session unused this long is ended (0 = never)
+    login_max_failures: int = 5  # wrong passwords per account and address before pausing
+    login_window_seconds: int = 600
     allow_registration: bool = True
     # Externally visible base URL (https://repolens.example.com), used for the SSO redirect URI.
     public_url: str = ""
