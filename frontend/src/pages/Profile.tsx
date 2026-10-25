@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, KeyRound, Laptop, LogOut, Monitor, Moon, ShieldCheck, Smartphone, Sun, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import AccessTokens from "@/components/AccessTokens";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
 import { api, type SessionRow, type TotpSetup, type User } from "@/lib/api";
@@ -73,6 +74,8 @@ export default function Profile() {
         </Card>
 
         {user.auth_source === "password" && <TwoFactor enabled={!!user.totp_enabled} onChange={(on) => setUser({ ...user, totp_enabled: on })} />}
+
+        <AccessTokens canWrite={user.role !== "viewer"} />
 
         <Card className="lg:col-span-2">
           <CardTitle right={(sessions.data?.length ?? 0) > 1 ? <Button size="sm" variant="outline" disabled={others.isPending} onClick={async () => { if (await ask({ title: "Sign out everywhere else?", message: "Every other browser and device is signed out. This one stays signed in.", confirmLabel: "Sign out others", danger: true })) others.mutate(); }}>Sign out other devices</Button> : undefined}><ShieldCheck className="mr-1.5 inline h-4 w-4" />Where you are signed in</CardTitle>

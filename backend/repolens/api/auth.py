@@ -121,8 +121,15 @@ def create_user(body: UserCreate, p: Principal = Depends(current_principal), db:
     return u
 
 
+def _session_only(p: Principal) -> None:
+    """Account security (password, sessions, profile) needs a real sign-in; a personal access token is for tools."""
+    if p.token_scope:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in to change account settings; access tokens cannot")
+
+
 @router.patch("/me", response_model=UserOut)
 def update_profile(body: ProfilePatch, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    _session_only(p)
     user = db.get(User, p.user_id)
     assert user is not None
     user.name = body.name.strip()
@@ -133,6 +140,7 @@ def update_profile(body: ProfilePatch, p: Principal = Depends(current_principal)
 @router.post("/password", status_code=204)
 def change_password(body: PasswordChange, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Change your password. Every other session is signed out."""
+    _session_only(p)
     user = db.get(User, p.user_id)
     assert user is not None
     if user.auth_source != "password":
@@ -159,11 +167,13 @@ def _session_view(s: UserSession, current: str | None) -> dict:
 
 @router.get("/sessions")
 def my_sessions(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    _session_only(p)
     return [_session_view(s, p.session_id) for s in sessions.active(db, p.user_id)]
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
 def end_session(session_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    _session_only(p)
     if not sessions.revoke(db, p.user_id, session_id):
         raise HTTPException(404, "Session not found")
 
@@ -177,4 +187,5 @@ def logout(p: Principal = Depends(current_principal), db: Session = Depends(get_
 @router.post("/logout-others")
 def logout_others(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Sign out everywhere except this device."""
+    _session_only(p)
     return {"ended": sessions.revoke_others(db, p.user_id, p.session_id)}

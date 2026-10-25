@@ -158,6 +158,8 @@ OWN_ACCOUNT_OR_READ = {  # POSTs that read, or act only on the caller's own acco
     "/api/knowledge/ask",
     "/api/knowledge/search",
     "/api/knowledge/similar",
+    "/api/mcp",  # every tool runs its own policy check and audit entry
+    "/api/auth/api-tokens/{token_id}",  # a person revokes only their own
     "/api/wiki/ask",
     "/api/wiki/similar",
 }

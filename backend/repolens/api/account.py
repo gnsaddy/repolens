@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import Principal, audit, audit_user, current_principal
-from ..models import User
-from ..schemas import InviteIn, ResetIn, TotpDisableIn, TotpEnableIn
+from ..models import ApiToken, User
+from ..schemas import ApiTokenIn, InviteIn, ResetIn, TotpDisableIn, TotpEnableIn
 from ..security import decrypt_secret, encrypt_secret, hash_password, secrets_random_password, verify_password
-from ..services import account_mfa, auth_tokens, ratelimit, sessions, totp
+from ..services import account_mfa, api_tokens, auth_tokens, ratelimit, sessions, totp
 from ..services.clientip import client_ip
 from ..services.passwords import check_password
 from ..services.policy import authorize
@@ -119,6 +119,7 @@ def totp_setup(
     body: TotpDisableIn | None = None, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     """Start enabling an authenticator app: returns the secret to add to it. Nothing changes until a code is confirmed."""
+    _not_via_token(p)
     u = db.get(User, p.user_id)
     assert u is not None
     if u.auth_source != "password":
@@ -134,6 +135,7 @@ def totp_setup(
 @router.post("/totp/enable")
 def totp_enable(body: TotpEnableIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Confirm with a code from the app; returns eight one-time recovery codes, shown only now."""
+    _not_via_token(p)
     u = db.get(User, p.user_id)
     assert u is not None
     if not u.totp_secret_encrypted or u.totp_enabled:
@@ -151,6 +153,7 @@ def totp_enable(body: TotpEnableIn, p: Principal = Depends(current_principal), d
 @router.post("/totp/disable", status_code=204)
 def totp_disable(body: TotpDisableIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Turn the authenticator off. Needs the password and a current code (or a recovery code)."""
+    _not_via_token(p)
     u = db.get(User, p.user_id)
     assert u is not None
     if not verify_password(body.password, u.password_hash):
@@ -160,3 +163,55 @@ def totp_disable(body: TotpDisableIn, p: Principal = Depends(current_principal),
     u.totp_enabled, u.totp_secret_encrypted, u.recovery_codes, u.totp_last_step = False, "", [], 0
     db.commit()
     audit(db, p, "auth.mfa_disabled", u.email)
+
+
+# ------------------------------------------------------------------------------------------------ personal access tokens
+def _token_view(t: ApiToken) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "prefix": t.prefix,
+        "scope": t.scope,
+        "created_at": t.created_at,
+        "expires_at": t.expires_at,
+        "last_used_at": t.last_used_at,
+        "revoked": t.revoked_at is not None,
+    }
+
+
+def _not_via_token(p: Principal) -> None:
+    if p.token_scope:  # a token must not be able to mint more tokens
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Sign in to manage access tokens; a token cannot create tokens")
+
+
+@router.get("/api-tokens")
+def list_tokens(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Your own access tokens (never the secret itself)."""
+    _not_via_token(p)
+    rows = db.scalars(select(ApiToken).where(ApiToken.user_id == p.user_id).order_by(ApiToken.created_at.desc()))
+    return [_token_view(t) for t in rows]
+
+
+@router.post("/api-tokens", status_code=201)
+def create_token(body: ApiTokenIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Create a token for scripts, CI or an editor. It is shown once. `read` can search and ask; `write` can also start
+    investigations; neither can change settings or people."""
+    _not_via_token(p)
+    authorize(db, p, "token.create", body.name, scope=body.scope)
+    user = db.get(User, p.user_id)
+    assert user is not None
+    if body.scope == "write" and p.role == "viewer":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Viewers can only create read tokens")
+    token, row = api_tokens.create(db, user, body.name, body.scope, body.days)
+    return {**_token_view(row), "token": token}
+
+
+@router.delete("/api-tokens/{token_id}", status_code=204)
+def revoke_token(token_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    _not_via_token(p)
+    row = db.get(ApiToken, token_id)
+    if row is None or row.user_id != p.user_id:
+        raise HTTPException(404, "Token not found")
+    row.revoked_at = datetime.now(UTC)
+    db.commit()
+    audit(db, p, "token.revoke", row.name)

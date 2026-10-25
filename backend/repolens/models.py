@@ -58,6 +58,24 @@ class User(Base):
     recovery_codes: Mapped[list] = mapped_column(JSON, default=list)  # sha256 of unused one-time recovery codes
 
 
+class ApiToken(Base):
+    """A personal access token for scripts, CI and editor tools (MCP). Only a hash is stored; it acts as its owner with
+    reduced power: `read` tokens are viewers, `write` tokens are at most members, never admins."""
+
+    __tablename__ = "api_tokens"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    prefix: Mapped[str] = mapped_column(String(12))  # the first characters, so a person can recognise their token
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    scope: Mapped[str] = mapped_column(String(8), default="read")  # read | write
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AuthToken(Base):
     """A one-time link to set a password: an invitation for a new person, or a reset an admin hands to someone."""
 

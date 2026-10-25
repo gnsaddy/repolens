@@ -270,3 +270,5 @@ export interface DashInsights {
   activity: { at: string; who: string; what: string; target: string }[];
   week: { started: number; failed: number; confirmed: number };
 }
+
+export interface AccessToken { id: string; name: string; prefix: string; scope: "read" | "write"; created_at: string; expires_at: string | null; last_used_at: string | null; revoked: boolean }

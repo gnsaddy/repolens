@@ -402,3 +402,9 @@ class TotpEnableIn(BaseModel):
 class TotpDisableIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
     code: str = Field(min_length=6, max_length=32)
+
+
+class ApiTokenIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    scope: str = Field(default="read", pattern="^(read|write)$")
+    days: int | None = Field(default=90, ge=1, le=730)  # None = never expires

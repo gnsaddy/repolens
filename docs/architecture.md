@@ -161,6 +161,11 @@ authenticator endpoints; `api/audit.py` serves the admin audit log.
 `services/retention.py` is the daily sweep (background task in `main.py`, also `POST /api/settings/retention/run`);
 `devtools/delete_workspace.py` removes one workspace and everything that references it.
 
+`services/mcp_server.py` is a small Model Context Protocol server (initialize, ping, tools/list, tools/call, batches, notifications)
+whose tools call the existing endpoint functions in-process with the caller's `Principal`, so permissions, repository scope and
+audit are the same as in the web app. `services/api_tokens.py` and `ApiToken` back personal access tokens (`rlp_` prefix, hash only);
+`current_principal` maps a read token to the viewer role and a write token to at most member.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

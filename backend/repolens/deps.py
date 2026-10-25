@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import AuditEvent, User
 from .security import decode_token
-from .services import sessions
+from .services import api_tokens, sessions
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -20,6 +20,7 @@ class Principal:
     role: str
     email: str = ""
     session_id: str | None = None
+    token_scope: str = ""  # "read" | "write" when the caller used a personal access token
 
 
 def current_principal(
@@ -27,6 +28,13 @@ def current_principal(
 ) -> Principal:
     if creds is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
+    if creds.credentials.startswith(api_tokens.PREFIX):  # a personal access token, not a sign-in
+        found = api_tokens.authenticate(db, creds.credentials)
+        if found is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid, expired or revoked access token")
+        tok, tuser = found
+        role = "viewer" if tok.scope == "read" else ("member" if tuser.role == "admin" else tuser.role)
+        return Principal(tuser.id, tuser.org_id, role, tuser.email, token_scope=tok.scope)
     try:
         data = decode_token(creds.credentials)
     except jwt.PyJWTError:

@@ -18,7 +18,7 @@ access_log = logging.getLogger("repolens.access")
 _AUTH = re.compile(r"^/api/auth/(login|register|reset|sso/(discover|start|exchange))$")
 # calls that spend tokens, clone repositories or fan out work
 _HEAVY = re.compile(
-    r"^/api/(knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"
+    r"^/api/(mcp|knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"
     r"|investigations(/ci/start|/[^/]+/rerun)?|jira/(investigate|issues/[^/]+/analyze)|repositories(/[^/]+/(index|reindex))?"
     r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*)$"
 )

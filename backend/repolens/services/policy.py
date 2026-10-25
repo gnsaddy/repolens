@@ -31,6 +31,9 @@ ACTION_MIN_ROLE = {
     "sso.configure": "admin",
     "wiki.propose": "member",
     "feedback.give": "viewer",
+    "token.create": "viewer",
+    "mcp.read": "viewer",
+    "mcp.investigate": "member",
     "wiki.decide": "member",
     "wiki.publish": "admin",
 }
