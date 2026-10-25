@@ -13,6 +13,12 @@
     "coverage_unanswerable_max": 0.2,
     "mean_top_score_answerable": 0.945,
     "mean_top_score_unanswerable": 0.9656,
+    "refuse_below_0.15_wrongly_refused": 0.146,
+    "refuse_below_0.15_paraphrase_wrongly_refused": 0.25,
+    "refuse_below_0.15_unanswerable_caught": 0.125,
+    "refuse_below_0.25_wrongly_refused": 0.312,
+    "refuse_below_0.25_paraphrase_wrongly_refused": 0.583,
+    "refuse_below_0.25_unanswerable_caught": 0.875,
     "top1_ci95": [
       0.684,
       0.869

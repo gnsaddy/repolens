@@ -129,6 +129,11 @@ the set is small, so treat this as "clearly helps on re-wordings", not a precise
 key). Neither embedder can tell an unanswerable question from an answerable one by the fused score (AUC about 0.5); the share of
 the question's words found in the best passage does better (AUC about 0.75), which is recorded as `coverage_auc`.
 
+**Refusing weak matches** ("the documents do not cover this") was measured and not shipped. Refusing when under a quarter of the question's
+words are found in the best three passages catches 88% of unanswerable questions but wrongly refuses 58% of re-worded ones (31% of all
+valid questions); at 15% it wrongly refuses 25% of re-worded questions and catches only 12%. The suite reports these rates
+(`refuse_below_*`) so the idea can be re-tested with a different embedder.
+
 **Default:** it stays the local hash embedder, because the default has to work with nothing installed and nothing sent out. To use
 a model, set `REPOLENS_EMBEDDING_PROVIDER=openai` with the base URL, model and dimension, then run
 `python -m repolens.devtools.reembed` (resizes the vector columns, clears the answer memory and marks repositories for

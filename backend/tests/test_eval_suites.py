@@ -49,3 +49,10 @@ def test_current_results_pass_the_committed_baseline():
     )
     res = {"docs": docs.run(), "memory": memory.run(), "routing": routing.run()}
     assert suites.compare(res, json.loads(BASELINE.read_text())) == []
+
+
+def test_refusing_weak_matches_is_measured_and_is_not_safe_with_the_local_embedder():
+    """Why 'the docs do not cover this' is not a hard refusal: it would reject many valid re-worded questions."""
+    r = docs.run()
+    assert r["refuse_below_0.25_unanswerable_caught"] >= 0.7  # it does catch most uncovered questions...
+    assert r["refuse_below_0.25_paraphrase_wrongly_refused"] >= 0.3  # ...at the price of refusing many real ones

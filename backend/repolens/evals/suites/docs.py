@@ -56,6 +56,7 @@ def run(spec: EmbedderSpec = HASH, rerank: str = "lexical", mode: str = "hybrid"
     ranks: dict[str, list[int | None]] = {st: [] for st in STYLES}
     top_scores_ok: list[float] = []
     cov_ok: list[float] = []
+    cov3: dict[str, list[float]] = {st: [] for st in ("exact", "paraphrase")}
     for t in TOPICS:
         for st in STYLES:
             q = getattr(t, st)
@@ -68,12 +69,15 @@ def run(spec: EmbedderSpec = HASH, rerank: str = "lexical", mode: str = "hybrid"
             if st != "confusable" and hits:
                 top_scores_ok.append(hits[0].score)
                 cov_ok.append(retrieval.coverage(q, hits[0]))
+                cov3[st].append(max(retrieval.coverage(q, h) for h in hits[:3]))
     top_scores_no = []
     cov_no = []
+    cov3_no: list[float] = []
     for q in UNANSWERABLE:
         hits = retrieval.search_chunks(s, org, q, k=10, embedder=embedder, mode=mode, rerank=rerank)
         top_scores_no.append(hits[0].score if hits else 0.0)
         cov_no.append(retrieval.coverage(q, hits[0]) if hits else 0.0)
+        cov3_no.append(max((retrieval.coverage(q, h) for h in hits[:3]), default=0.0))
     s.close()
     allr = [r for st in STYLES for r in ranks[st]]
     out: dict = {
@@ -91,6 +95,16 @@ def run(spec: EmbedderSpec = HASH, rerank: str = "lexical", mode: str = "hybrid"
         "mean_top_score_answerable": round(mean(top_scores_ok), 4),
         "mean_top_score_unanswerable": round(mean(top_scores_no), 4),
     }
+    # What refusing weak matches would do: share of real questions wrongly refused vs. unanswerable ones caught
+    answerable3 = [c for v in cov3.values() for c in v]
+    for thr in (0.15, 0.25):
+        out[f"refuse_below_{thr}_wrongly_refused"] = round(
+            sum(c < thr for c in answerable3) / max(len(answerable3), 1), 3
+        )
+        out[f"refuse_below_{thr}_paraphrase_wrongly_refused"] = round(
+            sum(c < thr for c in cov3["paraphrase"]) / max(len(cov3["paraphrase"]), 1), 3
+        )
+        out[f"refuse_below_{thr}_unanswerable_caught"] = round(sum(c < thr for c in cov3_no) / max(len(cov3_no), 1), 3)
     lo, hi = wilson(sum(1 for r in allr if r == 1), len(allr))
     out["top1_ci95"] = [round(lo, 3), round(hi, 3)]
     for st in STYLES:
