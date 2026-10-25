@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { useTheme } from "@/lib/theme";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Moon, Sun, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -45,6 +46,7 @@ const nav = [
 
 function Shell() {
   const loc = useLocation();
+  const theme = useTheme();
   const { user, loading, logout } = useAuth();
   const [palette, setPalette] = useState(false);
   const drift = useQuery({ queryKey: ["drift-count"], enabled: !!user, queryFn: () => api<{ open: number }>("/wiki/drift/count"), refetchInterval: 60_000 });
@@ -78,7 +80,10 @@ function Shell() {
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</span>
             <span className="min-w-0"><span className="block truncate text-slate-200">{user.name || user.email}</span><span className="block truncate text-slate-400">{user.role}</span></span>
           </NavLink>
-          <button onClick={logout} className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10">
+          <button onClick={theme.toggle} aria-label={theme.dark ? "Switch to day mode" : "Switch to night mode"} className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10">
+            {theme.dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{theme.dark ? "Day mode" : "Night mode"}
+          </button>
+          <button onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10">
             <LogOut className="h-4 w-4" />Sign out
           </button>
         </div>

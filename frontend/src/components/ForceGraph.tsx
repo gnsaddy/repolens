@@ -131,7 +131,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
                 markerEnd={DIRECTED.has(e.rel) && (on || !focus) ? `url(#arrow-${e.rel})` : undefined}
                 strokeWidth={on ? 2.5 : 1} strokeDasharray={e.provenance === "semantic" ? "4 3" : undefined}
                 opacity={on ? 0.95 : focus ? 0.12 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${e.rel} (${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
-              {on && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} stroke="#fff" strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
+              {on && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
             </g>);
         })}
         {nodes.map((n) => {
@@ -143,9 +143,9 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
             <g key={n.id} transform={`translate(${p.x} ${p.y})`} opacity={near(n.id) ? 1 : 0.25} className="cursor-pointer"
               onClick={(ev) => { ev.stopPropagation(); onSelect(n.id); }} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
               onMouseDown={(ev) => ev.stopPropagation()} role="button" aria-label={`${n.type} ${n.qualname || n.name}`}>
-              <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : (NODE_COLORS[n.type] ?? "#94a3b8")} stroke={sel ? "#0f172a" : highlight?.has(n.id) ? "#ec4899" : "#fff"} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
+              <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : (NODE_COLORS[n.type] ?? "#94a3b8")} style={{ stroke: sel ? "var(--color-ink)" : highlight?.has(n.id) ? "#ec4899" : "var(--color-surface)" }} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
               <title>{`${n.type} ${n.qualname || n.name}\n${n.degree} connections${heat && n.id in heat ? `\nheat ${Math.round(heat[n.id] * 100)}%` : ""}`}</title>
-              {showLabel && <text y={-radius(n) - 4} textAnchor="middle" fontSize={10} fill="#0f172a" stroke="#fff" strokeWidth={3} paintOrder="stroke">{n.name.length > 28 ? n.name.slice(0, 27) + "…" : n.name}</text>}
+              {showLabel && <text y={-radius(n) - 4} textAnchor="middle" fontSize={10} style={{ fill: "var(--color-ink)", stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{n.name.length > 28 ? n.name.slice(0, 27) + "…" : n.name}</text>}
             </g>
           );
         })}

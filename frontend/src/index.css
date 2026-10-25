@@ -13,6 +13,33 @@
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
 }
 
+/* Night mode: `html.dark` re-points the colour tokens that components already use (surface, ink, slate and the tinted
+   badge colours). White text on brand buttons and the always-dark sidebar are left as they are. */
+.dark {
+  color-scheme: dark;
+  --color-canvas: #0b1120; --color-surface: #111827; --color-ink: #e5e7eb; --color-muted: #94a3b8; --color-line: #263247;
+  --color-slate-50: #162032; --color-slate-100: #1c2840; --color-slate-200: #2b3a52; --color-slate-300: #41526b; --color-slate-400: #7a8aa3;
+  --color-slate-500: #94a3b8; --color-slate-600: #b0bccd; --color-slate-700: #cbd5e1; --color-slate-800: #e2e8f0; --color-slate-900: #f1f5f9;
+  --color-indigo-50: #1e2247; --color-indigo-100: #2a2f63; --color-indigo-200: #3d4490; --color-indigo-400: #a5b4fc; --color-indigo-700: #a5b4fc; --color-indigo-900: #c7d2fe;
+  --color-emerald-50: #0d2a22; --color-emerald-100: #12382d; --color-emerald-200: #1d5a47; --color-emerald-600: #34d399; --color-emerald-700: #6ee7b7; --color-emerald-900: #a7f3d0;
+  --color-amber-50: #2d2308; --color-amber-100: #3b2e0a; --color-amber-600: #fbbf24; --color-amber-700: #fcd34d; --color-amber-800: #fde68a; --color-amber-900: #fef3c7;
+  --color-red-50: #2e1216; --color-red-100: #3f171d; --color-red-200: #5b2128; --color-red-600: #f87171; --color-red-700: #fca5a5; --color-red-800: #fecaca;
+  --color-blue-50: #0f2540; --color-blue-700: #93c5fd; --color-violet-50: #25173f; --color-violet-600: #c4b5fd; --color-violet-700: #c4b5fd;
+  --color-sky-600: #38bdf8;
+}
+.dark .bg-white { background-color: var(--color-surface); }
+.dark .bg-slate-900 { background-color: #020617; }           /* code blocks and tooltips stay dark */
+.dark .text-slate-100, .dark .text-slate-200 { color: #e2e8f0; }
+.dark input, .dark select, .dark textarea { color: var(--color-ink); }
+.dark input::placeholder, .dark textarea::placeholder { color: #7a8aa3; }
+.dark aside { /* the sidebar is dark in both modes: restore the light-mode slate values inside it */
+  --color-slate-100: #f1f5f9; --color-slate-200: #e2e8f0; --color-slate-300: #cbd5e1; --color-slate-400: #94a3b8; --color-slate-700: #334155; --color-ink: #0f172a;
+}
+.dark .text-brand, .dark .hover\:text-brand:hover { color: #a5b4fc; }   /* links and active tabs: the brand blue is too dark on a dark card */
+.dark .border-brand { border-color: #818cf8; }
+.dark .recharts-cartesian-grid line { stroke: #263247; }
+.dark .recharts-text, .dark .recharts-cartesian-axis-tick-value { fill: #94a3b8; }
+
 body { @apply bg-canvas text-ink antialiased; }
 .prose-report h2 { @apply text-lg font-semibold mt-0 mb-2; }
 .prose-report h3 { @apply text-sm font-semibold mt-4 mb-1; }

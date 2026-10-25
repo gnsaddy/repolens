@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Laptop, LogOut, ShieldCheck, Smartphone, UserRound } from "lucide-react";
+import { Copy, KeyRound, Laptop, LogOut, Monitor, Moon, ShieldCheck, Smartphone, Sun, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
 import { api, type SessionRow, type TotpSetup, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useTheme, type ThemePref } from "@/lib/theme";
 import { timeAgo } from "@/lib/utils";
 
 const ROLE_HELP: Record<string, string> = { admin: "Can configure integrations, models and access, and approve changes.", member: "Can add repositories, investigate and propose edits.", viewer: "Can read and search; cannot change anything." };
@@ -14,6 +15,7 @@ export default function Profile() {
   const qc = useQueryClient();
   const toast = useToast();
   const ask = useConfirm();
+  const theme = useTheme();
   const [name, setName] = useState(user?.name ?? "");
   const [pw, setPw] = useState({ current: "", next: "", again: "" });
   const rename = useMutation({ mutationFn: () => api<User>("/auth/me", { method: "PATCH", json: { name } }), onSuccess: (u) => { setUser(u); toast("Profile saved"); } });
@@ -45,6 +47,15 @@ export default function Profile() {
             <ErrorNote error={rename.error} />
             <Button disabled={!name.trim() || name.trim() === user.name || rename.isPending}>Save</Button>
           </form>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardTitle><Moon className="mr-1.5 inline h-4 w-4" />Appearance</CardTitle>
+          <div role="radiogroup" aria-label="Colour theme" className="inline-flex rounded-lg bg-slate-100 p-1 text-sm">
+            {([["system", "Match my device", Monitor], ["light", "Day", Sun], ["dark", "Night", Moon]] as [ThemePref, string, typeof Sun][]).map(([v, label, Icon]) => (
+              <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
+          </div>
+          <p className="mt-2 text-xs text-muted">Saved in this browser only.</p>
         </Card>
 
         <Card>

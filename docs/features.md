@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Night mode
+
+Use the **Night mode** button at the bottom of the sidebar, or pick "Match my device", "Day" or "Night" on your Profile. The default follows your device; your choice is kept in this browser. Colours come from the same design tokens in both modes (see `frontend/src/index.css`), so new screens get night mode without extra work as long as they use the existing colour classes.
+
 ## Jira: find, analyse and investigate tickets
 
 The Jira page lists tickets of every type (filter by project, type, status, assignee and text; 25 to 100 at a time, newest update first). Open a ticket to read it with its comments and run an analysis. Tick up to ten tickets and **Analyse together** to see what they share (errors, files, symbols, components), which look like duplicates, and what each says about its cause, or **Investigate all** to start one investigation per ticket. A ticket that already has an investigation keeps it. The Investigations page has **Start from Jira** (only when Jira is connected) with the same search and actions. Publishing a report back to Jira is still a separate, approved step.

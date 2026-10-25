@@ -6,6 +6,9 @@ import App from "./App";
 import { FeedbackProvider } from "./components/feedback";
 import { AuthProvider } from "./lib/auth";
 import "./index.css";
+import { initTheme } from "./lib/theme";
+
+initTheme(); // before the first paint of the app, so a saved night-mode choice does not flash light
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
