@@ -53,6 +53,16 @@ def require_role(minimum: str):
     return dep
 
 
+def audit_user(db: Session, user: User, action: str, allowed: bool = True, **detail) -> None:
+    """Record something that happened to or by a person who is not signed in (a failed code, a link being used)."""
+    db.add(
+        AuditEvent(
+            org_id=user.org_id, actor_id=user.id, action=action, target=user.email[:200], allowed=allowed, detail=detail
+        )
+    )
+    db.commit()
+
+
 def audit(db: Session, p: Principal | None, action: str, target: str = "", allowed: bool = True, **detail):
     db.add(
         AuditEvent(

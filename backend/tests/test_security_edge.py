@@ -140,6 +140,7 @@ def test_metrics_can_require_a_bearer_token(client, monkeypatch):
 PUBLIC = {
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/register"),
+    ("POST", "/api/auth/reset"),  # the one-time link is the credential
     ("GET", "/api/auth/sso/discover"),
     ("GET", "/api/auth/sso/start"),
     ("GET", "/api/auth/sso/callback"),

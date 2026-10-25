@@ -59,13 +59,13 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
   (`REPOLENS_METRICS_TOKEN`); in Kubernetes it is not reachable from outside the namespace anyway.
 - The UI only turns `http(s)` addresses into links (`safeHref`), renders Markdown without raw HTML, and loads pages on demand.
 - Admins can read the audit trail in the app (Audit log), filtered and exportable; it covers allowed and refused actions and failed sign-ins.
+- Optional authenticator-app sign-in (RFC 6238, one use per 30-second step, encrypted secret, hashed one-time recovery codes); invitations and password resets are one-time links stored as hashes, expire, replace each other and end the person's other sessions; open registration can be closed so people join by invitation.
 - An automated audit (`tests/test_security_edge.py`) fails the build if any endpoint other than the deliberate public ones works
   without a session, if a state-changing endpoint lacks a policy check, or if a viewer can change anything.
 
-Known gaps: no multi-factor authentication; the rate limits are in-process per worker (put a gateway limit in front for several
+Known gaps: multi-factor authentication is optional per person, not enforceable for a workspace; there is no e-mail delivery, so invitation and reset links are handed over by an admin; the rate limits are in-process per worker (put a gateway limit in front for several
 replicas); the session token is kept in the browser's local storage, so it relies on the strict Content-Security-Policy and the
 absence of raw HTML rendering to stay out of reach of injected scripts (an HttpOnly cookie would remove that dependence at the cost
-of CSRF handling); tokens issued before server-side sessions existed cannot be revoked individually (they expire); there is no
-password reset by e-mail (an admin sets a new password); remembered answers are stored in the database unencrypted (redacted and
+of CSRF handling); tokens issued before server-side sessions existed cannot be revoked individually (they expire); remembered answers are stored in the database unencrypted (redacted and
 access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
 once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).

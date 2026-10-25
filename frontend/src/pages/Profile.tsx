@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Laptop, LogOut, ShieldCheck, UserRound } from "lucide-react";
+import { Copy, KeyRound, Laptop, LogOut, ShieldCheck, Smartphone, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader } from "@/components/ui";
-import { api, type SessionRow, type User } from "@/lib/api";
+import { api, type SessionRow, type TotpSetup, type User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 
@@ -61,6 +61,8 @@ export default function Profile() {
             </form>)}
         </Card>
 
+        {user.auth_source === "password" && <TwoFactor enabled={!!user.totp_enabled} onChange={(on) => setUser({ ...user, totp_enabled: on })} />}
+
         <Card className="lg:col-span-2">
           <CardTitle right={(sessions.data?.length ?? 0) > 1 ? <Button size="sm" variant="outline" disabled={others.isPending} onClick={async () => { if (await ask({ title: "Sign out everywhere else?", message: "Every other browser and device is signed out. This one stays signed in.", confirmLabel: "Sign out others", danger: true })) others.mutate(); }}>Sign out other devices</Button> : undefined}><ShieldCheck className="mr-1.5 inline h-4 w-4" />Where you are signed in</CardTitle>
           {!sessions.data?.length ? <Empty>No active sessions.</Empty> : (
@@ -75,5 +77,48 @@ export default function Profile() {
         </Card>
       </div>
     </div>
+  );
+}
+
+
+/** Optional second step at sign-in: a six-digit code from an authenticator app. */
+function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boolean) => void }) {
+  const toast = useToast();
+  const [setup, setSetup] = useState<TotpSetup | null>(null);
+  const [code, setCode] = useState("");
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [off, setOff] = useState({ open: false, password: "", code: "" });
+  const start = useMutation({ mutationFn: () => api<TotpSetup>("/auth/totp/setup", { method: "POST" }), onSuccess: setSetup });
+  const confirm = useMutation({ mutationFn: () => api<{ recovery_codes: string[] }>("/auth/totp/enable", { method: "POST", json: { code } }), onSuccess: (r) => { setCodes(r.recovery_codes); setSetup(null); setCode(""); onChange(true); } });
+  const disable = useMutation({ mutationFn: () => api("/auth/totp/disable", { method: "POST", json: { password: off.password, code: off.code } }), onSuccess: () => { setOff({ open: false, password: "", code: "" }); onChange(false); toast("Authenticator turned off"); } });
+  return (
+    <Card>
+      <CardTitle right={enabled ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}><Smartphone className="mr-1.5 inline h-4 w-4" />Authenticator app</CardTitle>
+      <p className="mb-3 text-sm text-muted">Ask for a six-digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
+      {codes ? (
+        <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 text-sm">
+          <p className="font-medium text-emerald-900">Save these recovery codes now. Each works once if you lose your phone; they are not shown again.</p>
+          <pre aria-label="Recovery codes" className="rounded bg-white p-2 font-mono text-xs">{codes.join("\n")}</pre>
+          <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(codes.join("\n")); toast("Copied"); }}><Copy className="h-3.5 w-3.5" />Copy</Button><Button size="sm" onClick={() => setCodes(null)}>I have saved them</Button></div>
+        </div>
+      ) : enabled ? (off.open ? (
+        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); disable.mutate(); }}>
+          <Input type="password" aria-label="Your password to confirm" placeholder="Your password" value={off.password} onChange={(e) => setOff({ ...off, password: e.target.value })} />
+          <Input aria-label="Code to confirm" placeholder="A current code or a recovery code" value={off.code} onChange={(e) => setOff({ ...off, code: e.target.value })} />
+          <ErrorNote error={disable.error} />
+          <div className="flex gap-2"><Button size="sm" variant="danger" disabled={!off.password || !off.code || disable.isPending}>Turn off</Button><Button size="sm" type="button" variant="outline" onClick={() => setOff({ open: false, password: "", code: "" })}>Cancel</Button></div>
+        </form>) : <Button variant="outline" size="sm" onClick={() => setOff({ ...off, open: true })}>Turn off…</Button>
+      ) : setup ? (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); confirm.mutate(); }}>
+          <p className="text-sm">1. In your app choose “add account” and enter this key (or open the link on your phone):</p>
+          <code aria-label="Setup key" className="block break-all rounded bg-slate-100 p-2 text-sm">{setup.secret}</code>
+          <a className="text-xs text-brand hover:underline" href={setup.uri}>Open in an authenticator app</a>
+          <p className="text-sm">2. Enter the six-digit code it shows:</p>
+          <Input aria-label="Six-digit code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
+          <ErrorNote error={confirm.error} />
+          <div className="flex gap-2"><Button size="sm" disabled={code.replace(/\D/g, "").length !== 6 || confirm.isPending}>Turn on</Button><Button size="sm" type="button" variant="outline" onClick={() => setSetup(null)}>Cancel</Button></div>
+        </form>
+      ) : <><Button size="sm" disabled={start.isPending} onClick={() => start.mutate()}>Set up</Button><ErrorNote error={start.error} /></>}
+    </Card>
   );
 }

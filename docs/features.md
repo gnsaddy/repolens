@@ -135,6 +135,12 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## People, invitations and authenticator sign-in
+
+Admins open **People** to see everyone in the workspace and how they sign in. **Invite someone** creates the account and a one-time link the person uses to choose their own password; **Reset password** makes a fresh link for someone who forgot theirs (the old password keeps working until the link is used, and using it signs out their other devices). Links are handed over by you, nothing is sent by e-mail.
+
+Anyone can add an **authenticator app** on their Profile (optional): after the password, sign-in asks for a six-digit code, with eight recovery codes shown once for a lost phone. Admins can remove a lost authenticator. Turn off open registration with `REPOLENS_ALLOW_REGISTRATION=false` once your workspace exists; people then join by invitation.
+
 ## Audit log
 
 Admins get an **Audit log** page: every sensitive action (who, what, on which target), everything that was refused with the reason, and failed sign-ins. Filter by area, outcome, person or text, page through it, and download a CSV. Secrets are masked, spreadsheet formulas are neutralised in the export, and reading the log is recorded too.

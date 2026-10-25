@@ -11,7 +11,7 @@ from .config import get_settings
 from .services import ratelimit, sysmetrics
 
 _EXEMPT = ("/healthz", "/readyz", "/metrics")
-_AUTH = re.compile(r"^/api/auth/(login|register|sso/(discover|start|exchange))$")
+_AUTH = re.compile(r"^/api/auth/(login|register|reset|sso/(discover|start|exchange))$")
 # calls that spend tokens, clone repositories or fan out work
 _HEAVY = re.compile(
     r"^/api/(knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"

@@ -52,6 +52,25 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)  # false = deprovisioned: cannot sign in or use a token
     auth_source: Mapped[str] = mapped_column(String(10), default="password")  # password | sso | scim
     external_id: Mapped[str] = mapped_column(String(200), default="")  # the identity provider's subject / SCIM id
+    totp_secret_encrypted: Mapped[str] = mapped_column(String(300), default="")  # app secret, pending until confirmed
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=0)  # last accepted 30-second step: a code works once
+    recovery_codes: Mapped[list] = mapped_column(JSON, default=list)  # sha256 of unused one-time recovery codes
+
+
+class AuthToken(Base):
+    """A one-time link to set a password: an invitation for a new person, or a reset an admin hands to someone."""
+
+    __tablename__ = "auth_tokens"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # invite | reset
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # only a hash is stored
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class FeedbackEvent(Base):

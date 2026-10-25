@@ -143,6 +143,10 @@ everywhere else, and change their password (which ends the other sessions) under
 sign-in after repeated failures per account and address. `/api/metrics/overview` aggregates content, work done, AI use,
 savings and activity for the Insights page.
 
+`services/totp.py` implements RFC 6238; `services/account_mfa.py` accepts a code or a recovery code at sign-in; `services/auth_tokens.py`
+issues and redeems invitation and reset links (`auth_tokens`, hash only); `api/account.py` holds People, invitations, resets and the
+authenticator endpoints; `api/audit.py` serves the admin audit log.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

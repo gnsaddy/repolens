@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, ScrollText, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, ScrollText, UserCog, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -24,6 +24,8 @@ const JiraPage = lazy(() => import("./pages/JiraPage"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Insights = lazy(() => import("./pages/Insights"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
+const People = lazy(() => import("./pages/People"));
+import ResetPassword from "./pages/ResetPassword";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -38,6 +40,7 @@ const nav = [
   { to: "/jira", label: "Jira", icon: Ticket },
   { to: "/insights", label: "Insights", icon: Gauge },
   { to: "/usage", label: "Token Usage", icon: BarChart3 },
+  { to: "/people", label: "People", icon: UserCog, adminOnly: true },
   { to: "/audit", label: "Audit log", icon: ScrollText, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -100,6 +103,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/sso-complete" element={<SsoComplete />} />
+      <Route path="/reset" element={<ResetPassword />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="investigations" element={<Investigations />} />
@@ -116,6 +120,7 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="insights" element={<Insights />} />
         <Route path="audit" element={<AuditLog />} />
+        <Route path="people" element={<People />} />
         <Route path="usage" element={<Suspense fallback={<Spinner />}><TokenUsage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

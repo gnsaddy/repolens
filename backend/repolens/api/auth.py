@@ -8,7 +8,7 @@ from ..deps import Principal, current_principal
 from ..models import AuditEvent, Organization, User, UserSession
 from ..schemas import LoginIn, PasswordChange, ProfilePatch, RegisterIn, TokenOut, UserCreate, UserOut
 from ..security import hash_password, verify_password
-from ..services import ratelimit, sessions
+from ..services import account_mfa, ratelimit, sessions
 from ..services.clientip import client_ip
 from ..services.passwords import check_password
 from ..services.policy import authorize
@@ -26,8 +26,9 @@ def _strong(password: str, email: str) -> None:
 
 @router.post("/register", response_model=TokenOut, status_code=201)
 def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
-    if not get_settings().allow_registration:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Registration is disabled")
+    first = db.scalar(select(User.id).limit(1)) is None  # the very first workspace can always be created
+    if not first and not get_settings().allow_registration:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Registration is closed. Ask an admin for an invitation.")
     email = body.email.lower()
     _strong(body.password, email)
     if db.scalar(select(User).where(User.email == email)):
@@ -69,6 +70,25 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
             )
             db.commit()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    if user.totp_enabled:  # second step: an authenticator code, or one of the one-time recovery codes
+        if not body.code.strip():
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Authentication code required")
+        if not account_mfa.accept(db, user, body.code):
+            ratelimit.fail(key, cfg.login_window_seconds)
+            db.add(
+                AuditEvent(
+                    org_id=user.org_id,
+                    actor_id=user.id,
+                    action="auth.mfa_failed",
+                    target=user.email[:200],
+                    allowed=False,
+                    detail={"ip": client_ip(request)},
+                )
+            )
+            db.commit()
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "That code is not valid. Try the next one or a recovery code."
+            )
     ratelimit.clear(key)
     return TokenOut(access_token=sessions.start(db, user, request), user=UserOut.model_validate(user))
 

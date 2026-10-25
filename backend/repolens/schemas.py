@@ -17,6 +17,7 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: str
     password: str
+    code: str = Field(default="", max_length=32)  # authenticator code or a recovery code, when the account uses one
 
 
 class ProfilePatch(BaseModel):
@@ -36,6 +37,7 @@ class UserOut(ORM):
     org_id: str
     active: bool = True
     auth_source: str = "password"
+    totp_enabled: bool = False
 
 
 class TokenOut(BaseModel):
@@ -375,3 +377,23 @@ class WikiAskIn(BaseModel):
     repo_ids: list[str] = Field(default_factory=list, max_length=100)
     k: int = Field(default=8, ge=1, le=10)
     fresh: bool = False
+
+
+class InviteIn(BaseModel):
+    email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    name: str = Field(default="", max_length=200)
+    role: str = Field(default="member", pattern="^(admin|member|viewer)$")
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class TotpEnableIn(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+class TotpDisableIn(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+    code: str = Field(min_length=6, max_length=32)

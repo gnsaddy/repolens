@@ -1,4 +1,4 @@
-export interface User { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; org_id: string; auth_source?: string }
+export interface User { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; org_id: string; auth_source?: string; totp_enabled?: boolean }
 export interface Repo {
   id: string; name: string; source: "local" | "git" | "docs"; url: string; default_branch: string; branch?: string; indexed_sha: string | null; web_url?: string; visibility?: "org" | "restricted";
   status: "pending" | "indexing" | "ready" | "error"; file_count: number; chunk_count: number; updated_at: string;
@@ -248,3 +248,6 @@ export interface Outbound { items: OutboundItem[]; external: number; summary: st
 export interface AuditRow { id: string; at: string; actor: string; action: string; target: string; allowed: boolean; detail: Record<string, string> }
 export interface AuditPage { total: number; items: AuditRow[] }
 export interface AuditFacets { groups: string[]; users: { id: string; email: string }[]; denied: number }
+
+export interface Person { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; active: boolean; auth_source: string; totp_enabled: boolean; pending: "invite" | "reset" | null; created_at: string }
+export interface TotpSetup { secret: string; uri: string }

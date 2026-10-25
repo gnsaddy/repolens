@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth";
 export default function Login() {
   const { user, login, register } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [f, setF] = useState({ email: "", password: "", org: "", name: "" });
+  const [f, setF] = useState({ email: "", password: "", org: "", name: "", code: "" });
+  const [needCode, setNeedCode] = useState(false);
   const [err, setErr] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [sp] = useSearchParams();
@@ -29,9 +30,11 @@ export default function Login() {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      if (mode === "login") await login(f.email, f.password);
+      if (mode === "login") await login(f.email, f.password, f.code);
       else await register(f.email, f.password, f.org || "My Organization", f.name);
-    } catch (x) { setErr(x); } finally { setBusy(false); }
+    } catch (x) {
+      if (x instanceof Error && /Authentication code required/.test(x.message)) { setNeedCode(true); setErr(null); } else setErr(x);
+    } finally { setBusy(false); }
   }
   return (
     <div className="grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -54,6 +57,7 @@ export default function Login() {
           </>)}
           <label className="block"><Label>Email</Label><Input type="email" required autoComplete="username" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
           <label className="block"><Label>Password</Label><Input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></label>
+          {needCode && <label className="block"><Label>Authentication code</Label><Input autoFocus inputMode="numeric" autoComplete="one-time-code" aria-label="Authentication code" placeholder="6-digit code, or a recovery code" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /><span className="mt-1 block text-xs text-muted">Open your authenticator app. Lost your phone? Use a recovery code, or ask an admin to reset it.</span></label>}
           <ErrorNote error={err} />
           {ssoError && <p role="alert" className="text-sm text-red-600">{ssoError}</p>}
           {sso && <Button type="button" variant="outline" className="w-full" onClick={() => { window.location.href = `/api/auth/sso/start?email=${encodeURIComponent(f.email)}`; }}>Continue with single sign-on{sso.organization ? ` (${sso.organization})` : ""}</Button>}
