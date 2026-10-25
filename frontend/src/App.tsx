@@ -59,7 +59,7 @@ function Shell() {
   if (!user) return <Navigate to="/login" replace />;
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col bg-sidebar p-3 text-slate-300 md:flex">
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto bg-sidebar p-3 text-slate-300 md:flex">
         <div className="mb-6 flex items-center gap-2 px-2 pt-2 text-white">
           <Activity className="h-5 w-5 text-indigo-400" /><span className="font-semibold">RepoLens AI</span>
         </div>

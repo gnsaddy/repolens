@@ -46,7 +46,7 @@ test("the wiki finds, edits and answers from a page", async ({ page, request }) 
   await page.getByLabel("Question").fill("How many times does the payment service retry?");
   await page.getByRole("button", { name: /^Ask/ }).click();
   await expect(page.getByText("Answer", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Helpful" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Helpful", exact: true })).toBeVisible();
 });
 
 test("an investigation becomes a runbook proposal that can be reviewed (no blank page)", async ({ page, request }) => {
