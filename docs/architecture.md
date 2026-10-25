@@ -1,13 +1,16 @@
 # Architecture
 
-Modular monolith, as recommended in `idea.md` §5.3: one FastAPI app, in-process background workers, PostgreSQL + pgvector.
+Modular monolith: one FastAPI app, in-process background workers, PostgreSQL + pgvector (SQLite in development).
 
 ```
 Vite/React SPA ──/api──▶ FastAPI ──▶ LangGraph RCA workflow ──▶ retrieval (pgvector + FTS + symbols + git history)
                            │                                   └▶ LLM adapter (optional) ─▶ usage events
                            ├▶ indexer (git → tree-sitter chunks → embeddings, incremental by content hash)
-                           ├▶ Jira client (read issues, publish approved RCA)
-                           └▶ policy gateway + audit log
+                           ├▶ Jira / Confluence / Bitbucket / GitHub / Slack / Notion connectors
+                           ├▶ model router ─▶ providers (Anthropic, Gemini, OpenAI-compatible) ─▶ usage events
+                           ├▶ answer memory + agent digests (cache table)
+                           ├▶ wiki (document intelligence, atlas, proposals, drift)
+                           └▶ sessions + policy gateway + audit log
 ```
 
 ## RCA workflow (`backend/repolens/agents/workflow.py`)
@@ -94,11 +97,59 @@ GitHub token, so no second key is needed; whether a given OAuth token is entitle
   token endpoint, which is undocumented and may breach GitHub's terms, so it is deliberately not implemented. GitHub
   Models is the supported way to use GitHub-hosted models.
 
-## Not in the MVP (per the product brief)
-Fix generation / Blue-Red-Judge agents, change-risk (Oracle) scoring, GitLab/Bitbucket,
-GitHub App installation flow (webhook receiver for `push` re-indexing is implemented), reranker model.
+## Model registry and routing
+`services/llm_router.py`, `services/llm.py`. An organisation can connect several providers (`llm_connections`, keys
+Fernet-encrypted) and several models per provider (`llm_models`, each with a tier: light, standard or strong, an enabled flag
+and optional prices). A model is saved only after it answered a live test on the server. Each call carries a `Task`
+(kind, prompt size, evidence count, stack trace, repositories, retrieval confidence). `decide()` starts from the kind's
+default tier, moves up one tier when the task scores two or more complexity points, moves down one tier in *savings mode*
+when it scores none, and uses the cheapest tier when the monthly budget is nearly spent. The result is an ordered chain: the
+wanted tier by price, then the nearest tiers preferring stronger. `LLMClient.complete` walks the chain on provider errors and,
+when a `validate` callback rejects an answer, retries once with the next stronger model. One model means no routing, so the
+original single-model behaviour is unchanged. Every call is a usage event with its own model and price.
+
+## Answer memory and shared context
+`services/answer_memory.py`. A model-written answer is stored (`answer_memory`) with the question's embedding, the answer
+and sources, and a *fingerprint* of the indexed sources it relied on (repository ids, indexed commit, chunk and file counts,
+document content hashes). Lookup matches a new question by embedding cosine (default 92%) or by overlap of content words
+(80%), only within the same access scope key and fingerprint, and only inside the time to live, so re-indexing or editing a
+page retires the entry. `similar()` returns near matches for the UI to show before the model answers. `browse()` lists and
+searches entries (deep search also reads the answer text); `build_skill()` packages a selection as a `SKILL.md` with secrets
+redacted. Retrieved context is condensed before it is sent (`services/context.py`: duplicates dropped, lines that match the
+question kept), and a finished investigation publishes a digest (`services/agent_context.py`) that the runbook writer reads
+instead of the whole evidence. Memory and digests live in the application database rather than Redis (see features).
+
+## Investigation lifecycle
+`services/investigations.py`. Runs execute in a thread pool. A run is stopped when it exceeds
+`REPOLENS_INVESTIGATION_TIMEOUT_S` (checked between workflow steps) and marked failed; a background sweep in `main.py` also
+fails runs left unfinished by a restart (the queue is in memory) or a hung call, and `POST /investigations/{id}/rerun` starts a
+failed one again. `services/cause_hints.py` reads KeyError, None/undefined attribute, IndexError and ZeroDivisionError
+messages against the retrieved code to name the exact lines and the producer that lacks the value, with no model; when a model
+is connected the finding is added to its prompt. `services/jira_analysis.py` distils a ticket's description and comments
+(signals, what was tried, proposed cause, workarounds, fixes, open questions, gaps) and seeds the investigation query.
+
+## DeepMind Wiki internals
+`services/docs.py` splits Markdown, RST and text by heading, then splits long sections at paragraph boundaries (never inside a
+fenced block or a table, repeating the last plain paragraph for context). `services/doc_intel.py` classifies each page
+(runbook, incident, decision record, API reference, design, how-to, changelog, README) from its name, title and body and extracts
+purpose, warnings, owners, commands, endpoints and settings. `services/wiki.py` builds the tree, page view, concept index,
+health report, search (`/wiki/search`) and the per-repository atlas (modules, most connected symbols, documentation coverage).
+Pages in documentation collections can be created and edited in place (`PUT /wiki/page`); synced pages stay read-only.
+
+## Accounts and sessions
+Every sign-in creates a `user_sessions` row and the token carries its id (`sid`). `current_principal` rejects a token whose
+session was revoked or has been idle past `REPOLENS_SESSION_IDLE_MINUTES`. People list and end their sessions, sign out
+everywhere else, and change their password (which ends the other sessions) under `/api/auth`. `services/ratelimit.py` pauses
+sign-in after repeated failures per account and address. `/api/metrics/overview` aggregates content, work done, AI use,
+savings and activity for the Insights page.
+
+## Not implemented
+Fix generation / Blue-Red-Judge agents and a generated-code execution sandbox, a GitHub App installation flow (the webhook
+receiver for `push` re-indexing is implemented), multi-factor authentication.
 
 ## Scaling notes
-Background jobs run in-process thread pools; a restart mid-index leaves a repo in `indexing` (re-index to recover).
-For multiple API replicas move to a queue/worker (the job entry points `index_repository` / `run_investigation` are
-already session-scoped functions) and RWX storage for clones.
+Background jobs run in-process thread pools. A restart mid-index leaves a repository in `indexing` (re-index to recover);
+unfinished investigations are failed by the startup sweep and can be run again. For multiple API replicas move to a
+queue/worker (the job entry points `index_repository` / `run_investigation` are already session-scoped functions), put a gateway
+rate limit in front of sign-in, and use RWX storage for clones. Move the answer memory to a shared cache only if several
+servers need one very hot cache; its lookup functions are isolated in `services/answer_memory.py`.

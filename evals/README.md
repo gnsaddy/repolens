@@ -1,7 +1,6 @@
 # Evaluation
 
-Measures whether each architectural component earns its place, using **known regressions** rather than impressions
-(`idea.md` §20). Everything runs offline and deterministically.
+Measures whether each architectural component earns its place, using **known regressions** rather than impressions. Everything runs offline and deterministically.
 
 ```bash
 cd backend

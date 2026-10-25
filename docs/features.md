@@ -94,34 +94,46 @@ If a model fails, the next one in the chain answers. If a model returns an answe
 
 Answers are remembered on the server. A repeated or re-worded question is matched by local embedding similarity (92% by default), and is answered from memory with no model call. The answer shows **From memory · saved ~N tokens** and **Answer again with the model** to bypass it.
 
-An entry is only reused while the repositories and wiki pages it was based on are unchanged, so a re-index or edit retires it. Entries are keyed by the repositories the asker can see, so answers never cross access boundaries, and expire after 72 hours. Settings shows entries, reuse count and tokens saved, and admins can clear it. Tune with `REPOLENS_ANSWER_MEMORY_ENABLED`, `_THRESHOLD`, `_TTL_HOURS` and `_MAX_ENTRIES`.
+An entry is only reused while the repositories and wiki pages it was based on are unchanged, so a re-index or edit retires it. Entries are keyed by the repositories the asker can see, so answers never cross access boundaries, and expire after 72 hours. **Knowledge → Memory** lists everything remembered, with a search that can also read the answers ("deep"), reuse counts and tokens saved; admins can forget single answers or clear all, and any selection can be exported as a Claude skill (`SKILL.md`, secrets removed). Members see only answers made for repositories they can access. Settings keeps the on/off status and a link. Tune with `REPOLENS_ANSWER_MEMORY_ENABLED`, `_THRESHOLD`, `_TTL_HOURS` and `_MAX_ENTRIES`.
 
-### DeepMind Wiki: search, edit and atlas
+## DeepMind Wiki: search, edit and atlas
 
 - **Search by meaning** across every page from the Browse tab (`GET /api/wiki/search`), one result per page with a snippet. Results respect repository access.
 - **Edit and create pages** in documentation collections without leaving the wiki (`PUT /api/wiki/page`). Saving redacts secrets, re-indexes and relinks the page to code. Pages synced from Confluence stay read-only here.
 - **Code atlas** (a tab per code repository): modules with file, class and function counts, their most connected symbols, and how much of each is explained by the wiki, so undocumented areas are easy to spot.
 
-### Asked before, and fewer tokens per answer
+## Asked before, and fewer tokens per answer
 
 When you ask, RepoLens first shows **Asked before**: earlier answers to similar questions (embedding similarity or the same content words, so re-wordings match). This is free and instant, and the model's answer follows. A close enough match (92% similar, or 80% of content words) is reused as the answer. Answers whose sources changed are never suggested.
 
 To cut tokens further, the context sent to a model is condensed to the lines that match the question, repeated passages are dropped, and savings mode uses a smaller budget. A light model answers first; if its answer cites nothing and does not say the sources lack the answer, one stronger model retries.
 
-### Why there is no Redis
+## Why there is no Redis
 
 The answer memory, shared agent digests and exact-prompt cache live in the application database (SQLite in development, PostgreSQL in production), next to the data they describe. That keeps them durable across restarts, lets them be invalidated in the same transaction as a re-index, and means one fewer service to run. A small in-process cache holds recent question embeddings. Redis becomes worthwhile only when several API servers need to share a very hot cache or you need sub-millisecond lookups at high request rates; the lookup functions are isolated in `services/answer_memory.py` for that day.
 
-### Agents share context
+## Agents share context
 
 When an investigation finishes it publishes a short digest (problem, root cause, fix, evidence references). The runbook writer reads that digest instead of the whole evidence again, so the same facts are not paid for twice. Digests expire after 30 days.
 
-### Jira, profile and insights
+## Jira, profile and insights
 
 - **Jira**: open a ticket to read its description and comments, run an analysis (error signatures, stack frames, files and symbols, what was tried, proposed cause, workarounds, fixes, unanswered questions, gaps) and start an investigation seeded with those signals.
 - **Profile**: display name, password, and every device you are signed in on, each of which can be ended. Signing out ends the session on the server.
 - **Insights**: AI utilisation per model and day, tokens avoided by routing and memory, work done, what is indexed and who is active.
 - **Documents**: pages show their kind, purpose, warnings, owners, commands, endpoints and settings at a glance; long sections split at paragraph boundaries and never cut a code block or table.
+
+## Investigation reliability
+
+- A run stops after `REPOLENS_INVESTIGATION_TIMEOUT_S` (300 s by default) and is marked failed with the reason. Runs left "running" by a restart are failed by a startup sweep. A failed investigation shows why and has **Run again**.
+- Errors such as `KeyError: 'name'`, `'NoneType' object has no attribute`, `IndexError` and divide-by-zero are read against the retrieved code: the report names the line that raises it and the code that builds the value without it, with no model needed.
+- Publishing to Jira asks for the issue key (taken from the title when present) and says when publishing is switched off.
+
+## Accounts and security
+
+- Sign-in is a server-side session: list and end your devices, sign out everywhere else, idle sessions end after 8 hours, a password change signs out other devices.
+- Five wrong passwords for one account from one address pause sign-in for ten minutes.
+- Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
 ## Search quality: embeddings and reranking
 

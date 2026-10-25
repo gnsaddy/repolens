@@ -1,6 +1,6 @@
 """Ablation harness: does each architectural component improve accuracy or cost?
 
-Configurations (idea.md §20): keyword search -> semantic RAG -> hybrid RAG -> + git history -> + dependency graph ->
+Configurations: keyword search -> semantic RAG -> hybrid RAG -> + git history -> + dependency graph ->
 full investigation with local memory. Everything runs offline against synthetic repositories with known regressions.
 """
 

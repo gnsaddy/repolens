@@ -1,7 +1,7 @@
 # RepoLens AI
 
-Repository intelligence and evidence-backed root-cause analysis. See [`idea.md`](idea.md) for the product vision and
-[`docs/architecture.md`](docs/architecture.md) for what is implemented.
+Repository intelligence and evidence-backed root-cause analysis. See [`docs/architecture.md`](docs/architecture.md) for how it
+works and [`docs/features.md`](docs/features.md) for what is implemented.
 
 **Stack:** FastAPI · LangGraph · PostgreSQL + pgvector · Tree-sitter · Vite + React + TypeScript + Tailwind ·
 OpenTelemetry/Prometheus · Docker · Kubernetes · GitHub Actions.
@@ -51,6 +51,8 @@ narrative synthesis (and `REPOLENS_PRICING_JSON` for cost estimates).
 ```bash
 cd backend  && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]" && pytest
 make dev-api      # SQLite, auto-reload       |  make dev-web   # Vite on :5173, proxies /api
+make run          # whole stack on PostgreSQL     |  make help      # every target
+make check        # what CI runs: lint, types, tests
 ```
 
 Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://... pytest` (pgvector); `npm test` for the UI.
