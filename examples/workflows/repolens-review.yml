@@ -1,0 +1,19 @@
+# Copy to .github/workflows/repolens-review.yml in the repository you want reviewed.
+# Needs two repository secrets: REPOLENS_TOKEN (a read token from RepoLens, Profile, Access tokens) and a repository variable
+# REPOLENS_URL (the address of your server). The repository must be added to RepoLens and indexed.
+name: RepoLens review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write      # to post the comment
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: gnsaddy/repolens/integrations/github-action@main
+        with:
+          url: ${{ vars.REPOLENS_URL }}
+          token: ${{ secrets.REPOLENS_TOKEN }}
+          # fail-on: high        # uncomment to block merges at "high" risk or above

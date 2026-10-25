@@ -1,0 +1,22 @@
+name: RepoLens pull request review
+description: Comment on pull requests with change risk, who knows the code, related tests and documentation, from your own RepoLens server.
+branding: { icon: search, color: indigo }
+inputs:
+  url: { description: "Address of your RepoLens server, e.g. https://repolens.example.com", required: true }
+  token: { description: "A RepoLens read access token (Profile, Access tokens). Keep it in a repository secret.", required: true }
+  github-token: { description: "Token used to read the pull request and write the comment.", default: "${{ github.token }}" }
+  repo: { description: "The repository's name or id in RepoLens. Defaults to this repository's owner/name.", default: "" }
+  fail-on: { description: "Fail the job at this risk level or higher (high or critical). Empty never fails.", default: "" }
+  full: { description: "Include dependents and documents from other repositories. Only for private repositories.", default: "false" }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        REPOLENS_URL: ${{ inputs.url }}
+        REPOLENS_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        REPOLENS_REPO: ${{ inputs.repo }}
+        REPOLENS_FAIL_ON: ${{ inputs.fail-on }}
+        REPOLENS_FULL: ${{ inputs.full }}
+      run: python3 "${{ github.action_path }}/review.py"

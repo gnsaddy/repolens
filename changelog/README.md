@@ -18,6 +18,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 - 2026-10-25 · [Night mode](2026-10-25-night-mode.md)
 - 2026-10-25 · [MCP server and personal access tokens](2026-10-25-mcp-and-access-tokens.md)
 - 2026-10-25 · [Jira: new ticket list, analysis and investigation of several tickets, and "Start from Jira"](2026-10-25-jira-redesign-and-batch.md)
+- 2026-10-25 · [GitHub Action: a RepoLens review on every pull request](2026-10-25-github-action.md)
 - 2026-10-25 · [A fuller dashboard](2026-10-25-dashboard.md)
 - 2026-10-25 · [Browser end-to-end tests](2026-10-25-browser-tests.md)
 - 2026-10-25 · [Nightly database backups and a restore guide](2026-10-25-backups.md)

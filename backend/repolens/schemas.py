@@ -299,6 +299,15 @@ class RiskFile(BaseModel):
     deletions: int = Field(default=0, ge=0, le=10_000_000)
 
 
+class PrReportIn(BaseModel):
+    repo: str = Field(min_length=1, max_length=300)  # id, name, or the GitHub owner/name it was cloned from
+    files: list[RiskFile] = Field(min_length=1, max_length=1500)
+    title: str = Field(default="", max_length=500)
+    pr_number: int | None = Field(default=None, ge=1)
+    app_url: str = Field(default="", max_length=300)
+    full: bool = False  # include dependents and documents from other repositories (only for private pull requests)
+
+
 class RiskAssessIn(BaseModel):
     """Exactly one of: sha | pr_number | base+head | files."""
 

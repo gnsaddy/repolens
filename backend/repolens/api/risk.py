@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import RiskAssessment
-from ..schemas import RiskAssessIn
+from ..schemas import PrReportIn, RiskAssessIn
 from ..services import gitops
+from ..services import pr_report as pr_report_svc
 from ..services import risk as oracle
 from ..services.access import Scope, scope_for
 from ..services.policy import authorize
@@ -69,6 +70,19 @@ def persist(db: Session, org_id: str, repo_id: str, user_id: str, result: dict) 
     db.add(row)
     db.commit()
     return row
+
+
+@router.post("/pr-report")
+def pr_report(body: PrReportIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """A comment-ready review of a pull request from its changed files; nothing is stored. Used by the GitHub Action."""
+    authorize(db, p, "risk.preview", body.repo)
+    scope = scope_for(db, p)
+    repo = pr_report_svc.find_repo(db, p.org_id, scope, body.repo)
+    if repo is None:
+        raise HTTPException(404, "No repository you can see matches that name. Add it to RepoLens first.")
+    return pr_report_svc.build(
+        db, repo, scope, [f.model_dump() for f in body.files], body.title, body.pr_number, body.app_url, body.full
+    )
 
 
 @router.post("/assess", status_code=201)

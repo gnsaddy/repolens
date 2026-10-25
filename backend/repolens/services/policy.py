@@ -32,6 +32,7 @@ ACTION_MIN_ROLE = {
     "wiki.propose": "member",
     "feedback.give": "viewer",
     "token.create": "viewer",
+    "risk.preview": "viewer",
     "mcp.read": "viewer",
     "mcp.investigate": "member",
     "wiki.decide": "member",

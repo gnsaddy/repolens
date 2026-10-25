@@ -166,6 +166,10 @@ whose tools call the existing endpoint functions in-process with the caller's `P
 audit are the same as in the web app. `services/api_tokens.py` and `ApiToken` back personal access tokens (`rlp_` prefix, hash only);
 `current_principal` maps a read token to the viewer role and a write token to at most member.
 
+`services/pr_report.py` turns a change (file names and counts) into the comment Markdown using `risk.assess`, `ownership.experts` and the
+graph; `integrations/github-action/review.py` (standard library only) reads the PR's files from GitHub, calls
+`POST /api/risk/pr-report` with a read token and keeps one sticky comment up to date.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

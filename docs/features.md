@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Pull request reviews (GitHub Action)
+
+Add the RepoLens Action to a repository and every pull request gets one comment, updated as the PR changes: the change-risk score and its top reasons, who knows the code, the tests that cover it, what else uses it, and the documentation that describes it. It sends RepoLens only file names and line counts, and the comment stays within that repository's own information unless you ask otherwise. Setup is in `docs/github-action.md`.
+
 ## Use RepoLens from your editor (MCP) and access tokens
 
 Create a token under **Profile → Access tokens** (read, or read and start investigations; it expires and can be revoked) and add RepoLens to your editor: `claude mcp add --transport http repolens https://<your-server>/api/mcp --header "Authorization: Bearer rlp_…"` for Claude Code, a `url` + `headers` entry for Cursor, or the standard input/output bridge for Claude Desktop (the page shows each snippet with your token filled in). The editor then has these tools: `search`, `ask`, `find_symbol`, `symbol_brief`, `read_wiki_page`, `who_to_ask`, `change_risk`, `get_investigation`, and `investigate` (write tokens only). Answers cite files and lines; nothing is sent anywhere except to your own RepoLens server, which only uses the language model you connected.
