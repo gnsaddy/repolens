@@ -9,6 +9,7 @@ import { useAuth } from "./lib/auth";
 import { cn } from "./lib/utils";
 import { Spinner } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
+import ReportIssue from "./components/ReportIssue";
 import Login, { SsoComplete } from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 const Repositories = lazy(() => import("./pages/Repositories"));
@@ -86,6 +87,7 @@ function Shell() {
           <button onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10">
             <LogOut className="h-4 w-4" />Sign out
           </button>
+          <ReportIssue />
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-8">

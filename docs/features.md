@@ -147,6 +147,10 @@ Create a token under **Settings → MCP & tokens** (read, or read and start inve
 
 On a confirmed investigation, **Propose a fix** drafts a small code change for the root cause: the exact lines to replace, a diff you can read, the tests worth adding, and a syntax check. It is limited to three files and a short change, never touches build, deployment, dependency or secrets files, and is never run. You can download it as a patch, reject it, or approve it, which creates a branch and opens a **draft** pull request on GitHub for someone to review. RepoLens never merges, and refuses if the files changed since the fix was drafted. With a connected language model it writes the change itself; without one it only offers a plain template for simple cases (a missing dictionary key) and otherwise says it cannot help.
 
+## Report a bug or request a feature
+
+The bottom of the sidebar has **Report a bug / request a feature**. It opens the project's public GitHub issue form in a new tab; nothing from your workspace is sent for you, and the dialog reminds people not to paste private code or secrets. Builds for a fork or a company copy can point it at their own tracker with `VITE_ISSUES_URL`.
+
 ## Dashboard
 
 The dashboard opens with **Needs attention** (failed indexing or investigations, possibly outdated wiki pages, edits waiting for review, unconfirmed or low-confidence investigations), each line linking to where to act. Below the headline numbers it shows investigations per day, AI use and savings with how helpful people found answers, and a knowledge-base snapshot; admins also see recent activity from the audit trail.
