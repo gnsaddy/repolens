@@ -52,6 +52,13 @@ build:     ## production build of the web app
 migrate:   ## apply database migrations (uses REPOLENS_DATABASE_URL)
 	$(VENV) && alembic upgrade head
 
+backup:    ## Docker Compose: dump the database to backups/
+	@mkdir -p backups && f=backups/repolens-$$(date -u +%Y%m%dT%H%M%SZ).dump && docker compose exec -T db pg_dump -U repolens -d repolens -Fc > $$f && docker compose exec -T db pg_restore --list < $$f > /dev/null && echo "backup written: $$f"
+restore:   ## Docker Compose: restore a dump into a NEW database: make restore file=backups/x.dump
+	@test -f "$(file)" || (echo 'usage: make restore file=backups/repolens-<time>.dump' && exit 1)
+	docker compose exec -T db psql -U repolens -d postgres -c 'create database repolens_restore'
+	docker compose exec -T db pg_restore -U repolens -d repolens_restore --no-owner < $(file)
+	@echo "restored into database repolens_restore; check it, then switch the API to it or restore over repolens"
 up:        ## Docker: build and start
 	docker compose up --build -d
 down:      ## Docker: stop

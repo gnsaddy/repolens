@@ -1,0 +1,52 @@
+# Nightly PostgreSQL backup. Dumps go to their own volume; copy them off the cluster (see docs/operations.md), because a backup
+# on the same disk as the database does not survive losing that disk.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: repolens-backups, namespace: repolens }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 20Gi } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: postgres-backup, namespace: repolens }
+spec:
+  schedule: "15 2 * * *"            # 02:15 UTC every night
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata: { labels: { app: backup } }
+        spec:
+          restartPolicy: OnFailure
+          securityContext: { runAsNonRoot: true, runAsUser: 999, fsGroup: 999, seccompProfile: { type: RuntimeDefault } }
+          containers:
+            - name: dump
+              image: pgvector/pgvector:pg16
+              env:
+                - { name: RETENTION_DAYS, value: "14" }
+                - name: PGPASSWORD
+                  valueFrom: { secretKeyRef: { name: repolens-secrets, key: POSTGRES_PASSWORD } }
+              command:
+                - sh
+                - -ec
+                - |
+                  f=/backups/repolens-$(date -u +%Y%m%dT%H%M%SZ).dump
+                  pg_dump -h postgres -U repolens -d repolens -Fc -f "$f.tmp"
+                  mv "$f.tmp" "$f"
+                  pg_restore --list "$f" > /dev/null   # the file must be readable before it counts as a backup
+                  find /backups -name 'repolens-*.dump' -mtime +"$RETENTION_DAYS" -delete
+                  echo "backup written: $f ($(du -h "$f" | cut -f1)); kept:"; ls -1 /backups | tail -n 20
+              resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 1Gi } }
+              securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+              volumeMounts:
+                - { name: backups, mountPath: /backups }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: backups, persistentVolumeClaim: { claimName: repolens-backups } }
+            - { name: tmp, emptyDir: {} }

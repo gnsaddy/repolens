@@ -1,0 +1,53 @@
+# Operations: backups, restore, upgrades
+
+## What to back up
+
+Everything RepoLens remembers is in PostgreSQL: users, sessions, repositories, the search index, the knowledge graph, wiki pages,
+investigations, the answer memory, settings and connection secrets (encrypted). Git clones under `/data/repos` are a cache and are
+rebuilt from the remote on the next index. Keep a copy of your secrets (`REPOLENS_SECRET_KEY`, `REPOLENS_JWT_SECRET`) somewhere safe
+and separate: **encrypted connection secrets in a restored database cannot be read without the same `REPOLENS_SECRET_KEY`**.
+
+## Kubernetes
+
+`deploy/k8s/backup.yaml` adds a nightly `CronJob` (02:15 UTC) that writes a compressed dump (`pg_dump -Fc`) to its own volume
+`repolens-backups`, checks the file can be read back (`pg_restore --list`), and deletes dumps older than 14 days
+(`RETENTION_DAYS`). It runs with the same restricted security settings as the other pods and may only talk to PostgreSQL.
+
+- Run one now: `kubectl -n repolens create job backup-now --from=cronjob/postgres-backup && kubectl -n repolens logs -f job/backup-now`
+- A backup on the same disk as the database does not survive losing that disk. Copy the dumps off the cluster (object storage, a
+  backup agent, or `kubectl cp` from a pod that mounts `repolens-backups`). For a managed PostgreSQL, use its own snapshots and
+  point-in-time recovery instead and drop this job from `kustomization.yaml`.
+
+### Restore
+
+1. Stop writes: `kubectl -n repolens scale deploy/api --replicas=0`.
+2. Restore into a new database first and check it:
+   ```bash
+   # a throwaway pod that mounts the backups volume and has the postgres tools
+   kubectl -n repolens run restore --rm -it --restart=Never --image=pgvector/pgvector:pg16 \
+     --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":999},"containers":[{"name":"restore","image":"pgvector/pgvector:pg16","stdin":true,"tty":true,"command":["bash"],"env":[{"name":"PGPASSWORD","valueFrom":{"secretKeyRef":{"name":"repolens-secrets","key":"POSTGRES_PASSWORD"}}}],"volumeMounts":[{"name":"b","mountPath":"/backups","readOnly":true},{"name":"t","mountPath":"/tmp"}]}],"volumes":[{"name":"b","persistentVolumeClaim":{"claimName":"repolens-backups"}},{"name":"t","emptyDir":{}}]}}'
+   # inside it (the pod needs the label app=backup to reach the database; add --labels=app=backup to the command above)
+   ls /backups
+   psql -h postgres -U repolens -d postgres -c 'create database repolens_restore'
+   pg_restore -h postgres -U repolens -d repolens_restore --no-owner /backups/repolens-YYYYMMDDTHHMMSSZ.dump
+   psql -h postgres -U repolens -d repolens_restore -c 'select count(*) from users'
+   ```
+3. To replace the live data: drop and recreate the `repolens` database (or restore into it with `--clean --if-exists`), then
+   `kubectl -n repolens scale deploy/api --replicas=1`. The API applies any newer migrations when it starts.
+4. Open the app, sign in, and open a repository and a wiki page. Then drop `repolens_restore`.
+
+Rehearse a restore once now and after any big change; an untested backup is a hope, not a backup. This procedure was run end to end
+on a real cluster when the job was added (dump, read-back check, restore of the data into a new database).
+
+## Docker Compose and local runs
+
+```bash
+make backup                       # writes backups/repolens-<time>.dump from the compose database
+make restore file=backups/repolens-20261025T021500Z.dump   # restores into a new database named repolens_restore
+```
+
+## Upgrading
+
+Images run `alembic upgrade head` on start, so deploying a new image migrates the database. Take a backup first
+(`kubectl create job --from=cronjob/postgres-backup`), and read the **Upgrade notes** in `changelog/` for the versions you skip.
+Changing the embedding model needs `python -m repolens.devtools.reembed` (see `evals/README.md`).

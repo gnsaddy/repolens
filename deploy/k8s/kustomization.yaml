@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: repolens
-resources: [namespace.yaml, config.yaml, postgres.yaml, api.yaml, web.yaml, networkpolicy.yaml]
+resources: [namespace.yaml, config.yaml, postgres.yaml, backup.yaml, api.yaml, web.yaml, networkpolicy.yaml]
 images:
   - { name: ghcr.io/OWNER/repolens-api, newTag: latest }
   - { name: ghcr.io/OWNER/repolens-web, newTag: latest }

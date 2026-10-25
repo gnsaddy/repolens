@@ -14,6 +14,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 - 2026-10-25 · [Security hardening, Insights, evaluation suites and feedback](2026-10-25-security-insights-evals.md)
 - 2026-10-25 · ["What leaves this server" panel](2026-10-25-outbound-panel.md)
 - 2026-10-25 · [Browser end-to-end tests](2026-10-25-browser-tests.md)
+- 2026-10-25 · [Nightly database backups and a restore guide](2026-10-25-backups.md)
 - 2026-10-25 · [Audit log page](2026-10-25-audit-log.md)
 - 2026-10-25 · [Invitations, password-reset links and authenticator-app sign-in](2026-10-25-account-safety.md)
 - 2026-10-22 · [Integrations, multi-model routing, Jira analysis and wiki tools](2026-10-22-integrations-models-jira-wiki.md)
