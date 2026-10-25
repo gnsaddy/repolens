@@ -17,3 +17,7 @@ deploy/k8s/secret.yaml
 .DS_Store
 .vscode/
 .idea/
+
+# private notes
+idea.md
+LEARNINGS.md
