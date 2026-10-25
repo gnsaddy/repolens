@@ -1,3 +1,5 @@
+<p align="center"><img src="frontend/public/favicon.svg" width="88" alt="RepoLens AI logo: a lens over a small graph of connected nodes"></p>
+
 # RepoLens AI
 
 **Version v0.1-beta.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.

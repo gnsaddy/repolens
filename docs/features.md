@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Logo and About
+
+The mark is a lens over a small graph of connected repository nodes (one node in amber). It is the browser-tab icon (`frontend/public/favicon.svg`), the sidebar and sign-in logo (`components/Logo.tsx`, the same drawing), and appears in **Settings → About** with the version, the licence and links to report a bug or see the source.
+
 ## Report a bug or request a feature
 
 The bottom of the sidebar has **Report a bug / request a feature**. It opens the project's public GitHub issue form in a new tab; nothing from your workspace is sent for you, and the dialog reminds people not to paste private code or secrets. Builds for a fork or a company copy can point it at their own tracker with `VITE_ISSUES_URL`.
