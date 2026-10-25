@@ -260,3 +260,13 @@ export interface JiraBatch {
   related: JiraAnalysis["related"];
 }
 export interface JiraInvestigateBatch { started: { issue_key: string; investigation_id: string }[]; existing: { issue_key: string; investigation_id: string }[] }
+
+export interface DashAttention { severity: "high" | "medium" | "low" | "info"; text: string; to: string }
+export interface DashInsights {
+  attention: DashAttention[];
+  investigations_per_day: { date: string; completed: number; failed: number }[];
+  ai: { tokens: number; avoided: number; savings_rate: number; cost: number; requests: number; helpful_rate: number | null; ratings: number; daily: { date: string; tokens: number }[] };
+  knowledge: { pages: number; chunks: number; graph_nodes: number; graph_edges: number; documented_ratio: number | null; wiki_issues: number; drift_open: number; proposals_pending: number };
+  activity: { at: string; who: string; what: string; target: string }[];
+  week: { started: number; failed: number; confirmed: number };
+}

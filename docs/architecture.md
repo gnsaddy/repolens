@@ -132,6 +132,9 @@ is connected the finding is added to its prompt. `services/jira_analysis.py` dis
 (similar summaries, or the same error in the same file); `api/jira.py` serves the batch endpoints (at most ten tickets, each ticket
 fetched once). The UI shares one ticket browser (`JiraIssueBrowser`) between the Jira page and the Investigations picker.
 
+`services/dashboard.py` builds the dashboard's attention list, 14-day trend, AI summary, knowledge snapshot and activity feed from existing
+tables (served by `GET /api/dashboard/insights`, slower than the headline `GET /api/dashboard`, so the UI polls it less often).
+
 Night mode is `html.dark` (`lib/theme.ts`): `index.css` re-points the colour variables Tailwind's utilities read (canvas, surface,
 ink, the slate scale and the tinted badge colours), restores the light values inside the sidebar, and lets `bg-white` follow the
 surface colour. The preference lives in `localStorage` and the device setting is followed while it is "system".

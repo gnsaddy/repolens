@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import Investigation, LLMCallEvent, Repository
+from ..services import dashboard as dash
 from ..services import usage
 from ..services.access import can_view_investigation, scope_for
 
@@ -98,3 +99,9 @@ def dashboard(p: Principal = Depends(current_principal), db: Session = Depends(g
             {"name": k, "count": v} for k, v in sorted(top.items(), key=lambda kv: kv[1], reverse=True)[:5]
         ],
     }
+
+
+@router.get("/dashboard/insights")
+def dashboard_insights(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """What needs attention, trends, AI savings, knowledge-base health and recent activity (slower than /dashboard)."""
+    return dash.build(db, p.org_id, p.user_id, p.role, scope_for(db, p))

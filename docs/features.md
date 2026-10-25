@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Dashboard
+
+The dashboard opens with **Needs attention** (failed indexing or investigations, possibly outdated wiki pages, edits waiting for review, unconfirmed or low-confidence investigations), each line linking to where to act. Below the headline numbers it shows investigations per day, AI use and savings with how helpful people found answers, and a knowledge-base snapshot; admins also see recent activity from the audit trail.
+
 ## Night mode
 
 Use the **Night mode** button at the bottom of the sidebar, or pick "Match my device", "Day" or "Night" on your Profile. The default follows your device; your choice is kept in this browser. Colours come from the same design tokens in both modes (see `frontend/src/index.css`), so new screens get night mode without extra work as long as they use the existing colour classes.
