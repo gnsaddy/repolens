@@ -7,7 +7,7 @@ inputs:
   github-token: { description: "Token used to read the pull request and write the comment.", default: "${{ github.token }}" }
   repo: { description: "The repository's name or id in RepoLens. Defaults to this repository's owner/name.", default: "" }
   fail-on: { description: "Fail the job at this risk level or higher (high or critical). Empty never fails.", default: "" }
-  full: { description: "Include dependents and documents from other repositories. Only for private repositories.", default: "false" }
+  full: { description: "Include dependents and documents from other repositories. Only for private repositories; ignored on public ones, where the comment is always limited to the score and the pull request's own files.", default: "false" }
 runs:
   using: composite
   steps:

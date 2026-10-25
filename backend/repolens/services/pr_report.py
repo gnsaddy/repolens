@@ -26,9 +26,12 @@ def build(
     pr_number: int | None = None,
     app_url: str = "",
     full: bool = False,
+    public: bool = False,
 ) -> dict:
     """`full=False` keeps the comment to this repository only: dependents and documents that live in other repositories are left
     out, because the comment lands on a pull request that may be public."""
+    if public:
+        return _strict(db, repo, scope, files, title, pr_number, app_url)
     ci = oracle.from_files(repo, files, title)
     r = oracle.assess(db, ci, scope)
     aff = r["affected"]
@@ -83,6 +86,40 @@ def build(
         "docs": [d.get("title") or d.get("path", "") for d in docs],
         "dependents": len(deps),
         "indexed_sha": repo.indexed_sha,
+    }
+
+
+def _strict(
+    db: Session, repo: Repository, scope: Scope, files: list[dict], title: str, pr_number: int | None, app_url: str
+) -> dict:
+    """The comment for a pull request on a PUBLIC repository: the score, the names of the risk signals, and file paths that the
+    pull request itself already shows. No signal detail (it can quote tickets or commit messages), no names of people, no
+    documents, no dependents, no tests that are not part of the pull request. Enforced here, whatever the client sends."""
+    ci = oracle.from_files(repo, files, title)
+    r = oracle.assess(db, ci, scope)
+    own = {f["path"] for f in files}
+    tests = [t["path"] for t in r["affected"]["tests_to_run"] if t["path"] in own]
+    top = [s for s in sorted(r["signals"], key=lambda s: -s["points"]) if s["points"] > 0][:3]
+    lines = [MARKER, f"### RepoLens review: {LEVEL[r['level']]} ({round(r['score'])}/100)", ""]
+    if top:
+        lines += ["**Why:** " + ", ".join(s["label"] for s in top), ""]
+    else:
+        lines += ["Nothing in this change stands out.", ""]
+    if tests:
+        lines += ["**Tests changed in this pull request:** " + _code(tests, 6), ""]
+    link = f" · [Open in RepoLens]({app_url.rstrip('/')}/risk)" if app_url else ""
+    lines += ["<sub>Public repository: limited to the score and the files in this pull request." + link + "</sub>"]
+    return {
+        "markdown": "\n".join(lines).rstrip() + "\n",
+        "score": r["score"],
+        "level": r["level"],
+        "ref": f"PR #{pr_number}" if pr_number else r["ref"],
+        "who": [],
+        "tests": tests[:15],
+        "docs": [],
+        "dependents": 0,
+        "indexed_sha": repo.indexed_sha,
+        "strict": True,
     }
 
 

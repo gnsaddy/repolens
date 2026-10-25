@@ -18,7 +18,19 @@ from .investigations import get_inv
 router = APIRouter(tags=["fixes"])
 
 
-def _view(f: FixProposal) -> dict:
+def _target_public(db: Session, p: Principal, f: FixProposal) -> bool | None:
+    """Whether the GitHub repository a pending fix would be opened against is public; None when it cannot be told."""
+    if f.status != "pending":
+        return None
+    try:
+        repo = db.get(Repository, f.repo_id)
+        gh_repo = resolve_gh_repo(repo, None) if repo else None
+        return make_client(db, p.org_id).is_public(gh_repo) if gh_repo else None
+    except Exception:  # no token, GitHub down, rate limit: unknown, never an error on a read
+        return None
+
+
+def _view(f: FixProposal, target_public: bool | None = None) -> dict:
     return {
         "id": f.id,
         "investigation_id": f.investigation_id,
@@ -36,6 +48,7 @@ def _view(f: FixProposal) -> dict:
         "pr_url": f.pr_url,
         "created_at": f.created_at,
         "decided_at": f.decided_at,
+        "target_public": target_public,
     }
 
 
@@ -52,7 +65,8 @@ def propose(inv_id: str, p: Principal = Depends(current_principal), db: Session 
     inv = get_inv(db, p, inv_id)
     authorize(db, p, "fix.propose", inv.id)
     try:
-        return _view(fixes.propose(db, p.user_id, inv))
+        f = fixes.propose(db, p.user_id, inv)
+        return _view(f, _target_public(db, p, f))
     except fixes.FixError as e:
         raise HTTPException(422, str(e)) from None
 
@@ -63,12 +77,13 @@ def for_investigation(inv_id: str, p: Principal = Depends(current_principal), db
     rows = db.scalars(
         select(FixProposal).where(FixProposal.investigation_id == inv.id).order_by(FixProposal.created_at.desc())
     )
-    return [_view(f) for f in rows]
+    return [_view(f, _target_public(db, p, f)) for f in rows]
 
 
 @router.get("/api/fix-proposals/{fix_id}")
 def read(fix_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    return _view(_get(db, p, fix_id))
+    f = _get(db, p, fix_id)
+    return _view(f, _target_public(db, p, f))
 
 
 @router.get("/api/fix-proposals/{fix_id}/patch")
@@ -91,8 +106,8 @@ def decide(fix_id: str, body: FixDecisionIn, p: Principal = Depends(current_prin
     authorize(db, p, "fix.decide", f.id, decision=body.decision)
     if f.status != "pending":
         raise HTTPException(409, f"This fix was already {f.status}")
-    f.decided_at = datetime.now(UTC)
     if body.decision == "reject":
+        f.decided_at = datetime.now(UTC)
         f.status = "rejected"
         db.commit()
         return _view(f)
@@ -102,9 +117,21 @@ def decide(fix_id: str, body: FixDecisionIn, p: Principal = Depends(current_prin
     gh_repo = resolve_gh_repo(repo, None)
     if not gh_repo:
         raise HTTPException(400, "This repository is not on GitHub. Download the patch and apply it yourself.")
+    client = make_client(db, p.org_id)
+    try:
+        public = client.is_public(gh_repo)
+    except GitHubError:
+        public = None
+    if public and not body.confirm_public:
+        raise HTTPException(
+            409,
+            f"{gh_repo} is a public repository: the branch, the code change and this explanation would be visible to "
+            "everyone. Read them again and confirm explicitly (confirm_public) to continue.",
+        )
+    f.decided_at = datetime.now(UTC)
     inv = db.get(Investigation, f.investigation_id)
     try:
-        f.pr_url = fixes.open_pull_request(db, f, make_client(db, p.org_id), gh_repo, inv.title if inv else "")
+        f.pr_url = fixes.open_pull_request(db, f, client, gh_repo, inv.title if inv else "")
         f.status, f.result = "approved", "Draft pull request opened"
     except (fixes.FixError, GitHubError) as e:
         f.status, f.result = "failed", str(e)[:500]

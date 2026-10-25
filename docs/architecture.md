@@ -176,7 +176,10 @@ task (strong tier of the model router, strict JSON of `{path, old, new}` replace
 `cause_hints`, applies the replacements (each `old` must occur exactly once; forbidden paths are refused), computes the unified diff
 with secrets masked, checks Python syntax with `ast.parse`, and stores a `FixProposal` (migration 0020). `api/fixes.py` lists, reads,
 serves the patch and records the decision; approval re-reads the files from the default branch through the GitHub write helpers,
-re-applies the edits and opens a draft pull request, or fails without writing anything if they no longer apply.
+re-applies the edits and opens a draft pull request, or fails without writing anything if they no longer apply. Before writing,
+`GitHubClient.is_public` reads `GET /repos/{repo}`; the fix view exposes it as `target_public` (null when unknown), and the decision
+endpoint answers `409` for a public target unless the body has `confirm_public: true`. `pr_report.build(public=True)` is the strict
+variant of the pull request comment (score, signal names and the pull request's own files only), chosen by the Action's `public` flag.
 
 ## Real-bug evaluation, calibration and injection tests
 `evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose

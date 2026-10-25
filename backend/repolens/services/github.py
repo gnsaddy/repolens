@@ -92,6 +92,17 @@ class GitHubClient:
         d = self._get(f"/repos/{repo}")
         return str(d.get("default_branch", "main")) if isinstance(d, dict) else "main"
 
+    def is_public(self, repo: str) -> bool | None:
+        """True when the repository is visible to everyone, False when private or internal, None when GitHub does not say."""
+        d = self._get(f"/repos/{repo}")
+        if not isinstance(d, dict):
+            return None
+        vis = d.get("visibility")
+        if isinstance(vis, str) and vis:
+            return vis == "public"
+        priv = d.get("private")
+        return None if not isinstance(priv, bool) else not priv
+
     def branch_head(self, repo: str, branch: str) -> str:
         d = self._get(f"/repos/{repo}/git/ref/heads/{branch}")
         return str(d["object"]["sha"]) if isinstance(d, dict) else ""

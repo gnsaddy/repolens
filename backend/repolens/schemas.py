@@ -140,6 +140,7 @@ class InvestigationOut(InvestigationSummary):
 
 class FixDecisionIn(BaseModel):
     decision: str = Field(pattern="^(approve|reject)$")
+    confirm_public: bool = False  # the person accepted that the pull request will be visible to everyone
 
 
 class ReviewIn(BaseModel):
@@ -309,6 +310,9 @@ class PrReportIn(BaseModel):
     title: str = Field(default="", max_length=500)
     pr_number: int | None = Field(default=None, ge=1)
     app_url: str = Field(default="", max_length=300)
+    public: bool = (
+        False  # the pull request is on a public repository: the server keeps the comment to the strictest content
+    )
     full: bool = False  # include dependents and documents from other repositories (only for private pull requests)
 
 
