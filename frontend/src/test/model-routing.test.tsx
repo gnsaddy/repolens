@@ -16,6 +16,8 @@ const gemini = { id: "c1", provider: "gemini", base_url: null, has_key: true, mo
   { id: "m2", model: "gemini-2.5-pro", tier: "strong", enabled: true, input_price: null, output_price: null }] };
 const plan = [{ kind: "librarian", label: "Answering questions", tier: "light", model: "gemini-2.5-flash-lite", provider: "gemini", why: "plain task" }];
 
+const entries = [{ id: "e1", asked: "How many times does the service retry?", answer: "It retries three times [S1].", sources: ["retry.md"], hits: 2, tokens: 420, tokens_saved: 840, created_at: new Date().toISOString(), last_hit_at: null, kind: "ask" }];
+
 function setup(role = "admin", registry: unknown = { connections: [gemini], savings_mode: true, plan, multi: true, active: 2 }) {
   const calls: { url: string; method?: string; body?: unknown }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -26,6 +28,8 @@ function setup(role = "admin", registry: unknown = { connections: [gemini], savi
     if (u.endsWith("/settings/llm")) return json({ provider: "gemini", model: "x", base_url: "", has_key: true, source: "org", input_price: null, output_price: null, offline: false, presets: {}, embedding_provider: "hash" });
     if (u.endsWith("/settings/models") && (!init?.method || init.method === "GET")) return json(registry);
     if (u.endsWith("/settings/routing")) return json({ connections: [gemini], savings_mode: false, plan, multi: true, active: 2 });
+    if (u.includes("/settings/memory/entries")) return json(entries);
+    if (u.endsWith("/settings/memory/skill")) return json({ name: "payment-retries", filename: "payment-retries/SKILL.md", markdown: "---\nname: payment-retries\n---\n# Retries", entries: 1 });
     if (u.endsWith("/settings/memory") && init?.method === "DELETE") return json({ cleared: 4 });
     if (u.endsWith("/settings/memory")) return json({ enabled: true, entries: 4, hits: 7, tokens_saved: 12345, threshold: 0.92, ttl_hours: 72 });
     if (u.endsWith("/settings/llm/check") && JSON.parse(String(init?.body)).model) return json({ ok: true, latency_ms: 80 });
@@ -92,5 +96,24 @@ describe("Settings: answer memory", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear memory" }));
     await userEvent.click(await screen.findByRole("button", { name: "Forget" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/settings/memory") && c.method === "DELETE")).toBe(true));
+  });
+});
+
+describe("Settings: browsing memory", () => {
+  it("searches remembered answers and turns the selection into a skill file", async () => {
+    const calls = setup();
+    await userEvent.click(await screen.findByRole("button", { name: /Browse and search memory/ }));
+    const dlg = await screen.findByRole("dialog");
+    const list = await within(dlg).findByRole("list", { name: "Remembered answers" });
+    expect(within(list).getByText("How many times does the service retry?")).toBeInTheDocument();
+    await userEvent.type(within(dlg).getByLabelText("Search memory"), "retries three");
+    await userEvent.click(within(dlg).getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(calls.length >= 0).toBe(true));
+    await userEvent.click(within(dlg).getByRole("checkbox", { name: /Select How many times/ }));
+    await userEvent.click(within(dlg).getByRole("button", { name: /Create skill from selected/ }));
+    const file = await within(dlg).findByLabelText("Skill file");
+    expect(file).toHaveTextContent("name: payment-retries");
+    expect(within(dlg).getByRole("button", { name: /Download SKILL.md/ })).toBeInTheDocument();
+    expect(calls.find((c) => c.url.endsWith("/settings/memory/skill"))?.body).toEqual({ entry_ids: ["e1"] });
   });
 });

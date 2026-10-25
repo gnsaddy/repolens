@@ -177,3 +177,57 @@ def test_cheap_answers_must_cite_or_the_next_model_is_tried(client, auth, sessio
 
     assert _grounded("It retries three times [S1].") and _grounded("The sources do not mention that.")
     assert not _grounded("Probably around three.")
+
+
+def _remembered(client, auth, monkeypatch):
+    setup_llm(client, auth, monkeypatch)
+    seed_doc(client, auth)
+    ask(client, auth, "How many times does the payment service retry failed requests?")
+    ask(client, auth, "What exponential backoff does the payment service use between attempts?")
+
+
+def test_memory_can_be_browsed_and_deep_searched(client, auth, session, monkeypatch):
+    _remembered(client, auth, monkeypatch)
+    rows = client.get("/api/settings/memory/entries", headers=auth).json()
+    assert len(rows) == 2 and {"id", "asked", "answer", "sources", "hits", "tokens"} <= set(rows[0])
+    q = client.get("/api/settings/memory/entries", headers=auth, params={"q": "retry"}).json()
+    assert q and q[0]["asked"].startswith("How many times") and q[0]["matched"] in ("question", "answer")
+    # deep search reads the answer text: "retries three" appears only in the answer
+    deep = client.get("/api/settings/memory/entries", headers=auth, params={"q": "retries three"}).json()
+    shallow = client.get(
+        "/api/settings/memory/entries", headers=auth, params={"q": "retries three", "deep": "false"}
+    ).json()
+    assert deep and deep[0]["matched"] == "answer" and len(deep) >= len(shallow)
+    assert (
+        client.get("/api/settings/memory/entries", headers=auth, params={"q": "kubernetes ingress certificate"}).json()
+        == []
+    )
+
+
+def test_memory_entries_are_private_to_the_workspace_and_deletable_by_admins(client, auth, session, monkeypatch):
+    _remembered(client, auth, monkeypatch)
+    other = register(client, "m@other.io", "M")
+    assert client.get("/api/settings/memory/entries", headers=other).json() == []
+    rows = client.get("/api/settings/memory/entries", headers=auth).json()
+    assert client.delete(f"/api/settings/memory/entries/{rows[0]['id']}", headers=other).status_code == 404
+    assert client.delete(f"/api/settings/memory/entries/{rows[0]['id']}", headers=auth).status_code == 204
+    assert len(client.get("/api/settings/memory/entries", headers=auth).json()) == 1
+
+
+def test_selected_answers_become_a_skill_file(client, auth, session, monkeypatch):
+    _remembered(client, auth, monkeypatch)
+    ids = [r["id"] for r in client.get("/api/settings/memory/entries", headers=auth).json()]
+    r = client.post("/api/settings/memory/skill", headers=auth, json={"entry_ids": ids, "name": "Payment retries"})
+    assert r.status_code == 200
+    s = r.json()
+    assert s["name"] == "payment-retries" and s["filename"] == "payment-retries/SKILL.md" and s["entries"] == 2
+    md = s["markdown"]
+    assert md.startswith("---\nname: payment-retries\ndescription: Answers about:") and "\n---\n" in md
+    assert "## When to use" in md and "retries three times" in md and "Sources:" in md
+    assert client.post("/api/settings/memory/skill", headers=auth, json={"entry_ids": ["nope"]}).status_code == 404
+    assert (
+        client.post(
+            "/api/settings/memory/skill", headers=register(client, "s@other.io", "S"), json={"entry_ids": ids}
+        ).status_code
+        == 404
+    )

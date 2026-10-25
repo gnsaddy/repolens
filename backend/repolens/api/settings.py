@@ -9,9 +9,10 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import LLMConnection, LLMModel, LLMSetting
-from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn
+from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
 from ..services import answer_memory, llm_router
+from ..services.access import scope_for
 from ..services.jira import JiraError, validate_base_url
 from ..services.llm import (
     CHAT_PROVIDERS,
@@ -486,3 +487,32 @@ def memory_stats(p: Principal = Depends(current_principal), db: Session = Depend
 def memory_clear(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     authorize(db, p, "llm.configure", "answer-memory")
     return {"cleared": answer_memory.clear(db, p.org_id)}
+
+
+@router.get("/memory/entries")
+def memory_entries(
+    q: str = "",
+    deep: bool = True,
+    limit: int = 40,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Browse remembered answers, or search them (deep search also reads the answers)."""
+    return answer_memory.browse(db, p.org_id, scope_for(db, p), p.role == "admin", q, deep, max(1, min(limit, 100)))
+
+
+@router.delete("/memory/entries/{entry_id}", status_code=204)
+def memory_forget(entry_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "llm.configure", "answer-memory", op="forget")
+    if not answer_memory.delete_entry(db, p.org_id, entry_id):
+        raise HTTPException(404, "Not found")
+
+
+@router.post("/memory/skill")
+def memory_skill(body: SkillIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Package selected answers as a Claude skill (SKILL.md) to download or copy."""
+    authorize(db, p, "wiki.propose", "memory-skill", count=len(body.entry_ids))
+    try:
+        return answer_memory.build_skill(db, p.org_id, scope_for(db, p), p.role == "admin", body.entry_ids, body.name)
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from None

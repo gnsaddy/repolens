@@ -234,3 +234,6 @@ export interface MetricsOverview {
 
 export interface BriefRef { id: string; name: string; qualname: string; type: string; path: string; repo: string }
 export interface NodeBrief { summary: string; callers: BriefRef[]; dependencies: BriefRef[]; documented_in: BriefRef[]; history: BriefRef[]; callers_total: number; cross_repo: boolean; notes: string[] }
+
+export interface MemoryEntry { id: string; asked: string; answer: string; sources: string[]; hits: number; tokens: number; tokens_saved: number; created_at: string; last_hit_at: string | null; kind: string; score?: number; matched?: "question" | "answer" }
+export interface SkillFile { name: string; filename: string; markdown: string; entries: number }

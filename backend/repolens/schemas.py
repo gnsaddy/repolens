@@ -189,6 +189,11 @@ class WikiPageIn(BaseModel):
     content: str = Field(max_length=500_000)
 
 
+class SkillIn(BaseModel):
+    entry_ids: list[str] = Field(min_length=1, max_length=30)
+    name: str = Field(default="", max_length=80)
+
+
 class HeatIn(BaseModel):
     metric: str = Field(pattern="^(churn|bugs|connections|undocumented)$")
     node_ids: list[str] = Field(min_length=1, max_length=500)

@@ -230,3 +230,95 @@ def suggest(
     kinds: list[str] | None,
 ) -> list[dict]:
     return similar(db, org, kind, query, scope_key(scope, repo_ids, kinds), fingerprint(db, org, scope, repo_ids))
+
+
+# ------------------------------------------------------------------------------------------------ browse and skills
+def _visible(db: Session, org: str, scope: Scope | None, admin: bool) -> list[AnswerMemory]:
+    """Entries a person may read. Admins see everything in the workspace; everyone else only answers that were
+    produced for the repositories they can see (the two standard questions: all sources, and documentation only)."""
+    q = select(AnswerMemory).where(AnswerMemory.org_id == org).order_by(AnswerMemory.created_at.desc()).limit(1000)
+    rows = list(db.scalars(q))
+    if admin:
+        return rows
+    keys = {scope_key(scope, None, None), scope_key(scope, None, ["doc"])}
+    return [r for r in rows if r.scope_key in keys]
+
+
+def _view(r: AnswerMemory, score: float | None = None, matched: str = "") -> dict:
+    return {
+        "id": r.id,
+        "asked": r.query,
+        "answer": r.answer.get("answer", ""),
+        "sources": sorted({s.get("file") for s in r.answer.get("sources", []) if s.get("file")})[:6],
+        "hits": r.hits,
+        "tokens": r.tokens,
+        "tokens_saved": r.tokens_saved,
+        "created_at": r.created_at,
+        "last_hit_at": r.last_hit_at,
+        "kind": r.kind,
+        **({"score": round(score, 2), "matched": matched} if score is not None else {}),
+    }
+
+
+def browse(
+    db: Session, org: str, scope: Scope | None, admin: bool, q: str = "", deep: bool = True, limit: int = 40
+) -> list[dict]:
+    """List remembered answers. With a query, rank them by how well the question and, when `deep`, the answer text
+    match: embedding similarity of the question, plus how many of the query's words appear anywhere in the entry."""
+    rows = _visible(db, org, scope, admin)
+    if not q.strip():
+        return [_view(r) for r in rows[:limit]]
+    qv, qw = _embed(q), _words(q)
+    ranked: list[tuple[float, str, AnswerMemory]] = []
+    for r in rows:
+        cos, jac = _similarity(qv, qw, r)
+        score, where = max(cos, jac), "question"
+        if deep and qw:
+            body = _words(r.answer.get("answer", ""))
+            cover = len(qw & (body | _words(r.query))) / len(qw)  # share of the query's words found in the entry
+            if cover * 0.9 > score:
+                score, where = cover * 0.9, "answer"
+        if score >= 0.3:
+            ranked.append((score, where, r))
+    ranked.sort(key=lambda t: -t[0])
+    return [_view(r, s, w) for s, w, r in ranked[:limit]]
+
+
+def delete_entry(db: Session, org: str, entry_id: str) -> bool:
+    row = db.get(AnswerMemory, entry_id)
+    if row is None or row.org_id != org:
+        return False
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def build_skill(db: Session, org: str, scope: Scope | None, admin: bool, ids: list[str], name: str = "") -> dict:
+    """Turn remembered answers into a Claude skill (SKILL.md): when to use it, the answers and their sources."""
+    import re as _re
+
+    from ..security import redact_stored
+
+    allowed = {r.id: r for r in _visible(db, org, scope, admin)}
+    rows = [allowed[i] for i in ids if i in allowed]
+    if not rows:
+        raise ValueError("None of the selected answers are available")
+    first = rows[0].query
+    slug = _re.sub(r"[^a-z0-9]+", "-", (name or first).lower()).strip("-")[:60].strip("-") or "repolens-knowledge"
+    topics = "; ".join(r.query.rstrip("?. ") for r in rows[:6])
+    desc = f"Answers about: {topics}. Use when the user asks about these topics or something close to them."[:1000]
+    out = [f"---\nname: {slug}\ndescription: {desc}\n---\n", f"# {first.rstrip('?. ').capitalize()}\n"]
+    out.append(
+        "These answers were produced by RepoLens AI from this team's documents, pull requests and code, "
+        "and reviewed by reuse. Check the sources before relying on them for a change.\n"
+    )
+    out.append("## When to use\n\n" + "\n".join(f"- {r.query}" for r in rows) + "\n")
+    out.append("## Answers\n")
+    for r in rows:
+        files = sorted({s.get("file") for s in r.answer.get("sources", []) if s.get("file")})
+        block = f"### {r.query}\n\n{r.answer.get('answer', '').strip()}\n"
+        if files:
+            block += "\nSources: " + ", ".join(f"`{f}`" for f in files[:6]) + "\n"
+        out.append(block)
+    text, _ = redact_stored("\n".join(out))  # secrets never leave in an exported skill
+    return {"name": slug, "filename": f"{slug}/SKILL.md", "markdown": text, "entries": len(rows)}
