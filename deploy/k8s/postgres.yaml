@@ -21,7 +21,8 @@ spec:
             - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
             - name: POSTGRES_PASSWORD
               valueFrom: { secretKeyRef: { name: repolens-secrets, key: POSTGRES_PASSWORD } }
-          readinessProbe: { exec: { command: ["pg_isready", "-U", "repolens", "-d", "repolens"] }, periodSeconds: 5 }
+          startupProbe: { exec: { command: ["pg_isready", "-U", "repolens", "-d", "repolens"] }, periodSeconds: 5, timeoutSeconds: 5, failureThreshold: 60 }   # first start can be slow on network disks
+          readinessProbe: { exec: { command: ["pg_isready", "-U", "repolens", "-d", "repolens"] }, periodSeconds: 5, timeoutSeconds: 5, failureThreshold: 6 }
           resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 2Gi } }
           securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
           volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]

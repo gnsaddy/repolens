@@ -61,6 +61,10 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
 
 * Kubernetes: `deploy/k8s` (kustomize). Create the secret from `secret.example.yaml` first, set the image owner/host,
   then `kubectl apply -k deploy/k8s`. Uses default-deny NetworkPolicies, non-root pods, read-only root FS.
+  The API waits for PostgreSQL before it migrates and starts (init container), the database has a patient startup probe for slow
+  disks, and git clones over SSH (port 22) are allowed in addition to HTTPS. To try it on a local cluster (MicroK8s, kind), push
+  the two images to a registry the cluster can reach, point `images:` in an overlay at them, create the secret, and apply; the
+  namespace enforces the `restricted` Pod Security level and the network policies are enforced when the CNI supports them (Calico).
 * CI (`.github/workflows/ci.yml`): lint, mypy, tests on SQLite and pgvector, migrations, frontend lint/type/test/build,
   image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR and rolls out (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).

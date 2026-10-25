@@ -18,6 +18,23 @@ spec:
       annotations: { prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: /metrics }
     spec:
       securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        - name: wait-for-db   # the API runs migrations on start: wait for PostgreSQL instead of crash-looping
+          image: ghcr.io/OWNER/repolens-api:latest
+          command:
+            - python
+            - -c
+            - |
+              import socket, time
+              for _ in range(180):
+                  try:
+                      socket.create_connection(("postgres", 5432), timeout=2).close()
+                      raise SystemExit(0)
+                  except OSError:
+                      time.sleep(2)
+              raise SystemExit("PostgreSQL did not become reachable in 6 minutes")
+          resources: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 128Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
       containers:
         - name: api
           image: ghcr.io/OWNER/repolens-api:latest
