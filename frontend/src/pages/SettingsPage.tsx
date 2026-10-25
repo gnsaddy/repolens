@@ -34,7 +34,7 @@ export default function SettingsPage() {
             className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       <div className={tab === "people" ? "" : "max-w-4xl"}>
-        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : tab === "mcp" ? <AccessTokens canWrite={user?.role !== "viewer"} /> : (
+        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
           <div className="space-y-4">
             <OutboundCard />
             {!managed && <LanguageModelCard admin={admin} />}

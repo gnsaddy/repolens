@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import Investigation, LLMCallEvent, Repository
+from ..services import calibration, usage
 from ..services import dashboard as dash
-from ..services import usage
 from ..services.access import can_view_investigation, scope_for
 
 router = APIRouter(prefix="/api", tags=["usage"])
@@ -105,3 +105,22 @@ def dashboard(p: Principal = Depends(current_principal), db: Session = Depends(g
 def dashboard_insights(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """What needs attention, trends, AI savings, knowledge-base health and recent activity (slower than /dashboard)."""
     return dash.build(db, p.org_id, p.user_id, p.role, scope_for(db, p))
+
+
+@router.get("/dashboard/calibration")
+def confidence_calibration(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """How the confidence score compares with what people confirmed (investigations this person may see)."""
+    scope = scope_for(db, p)
+    rows = db.scalars(
+        select(Investigation).where(
+            Investigation.org_id == p.org_id,
+            Investigation.status == "completed",
+            Investigation.root_cause_status.in_(("confirmed", "rejected")),
+        )
+    )
+    pairs = [
+        (min(1.0, max(0.0, float(i.confidence or 0))), 1 if i.root_cause_status == "confirmed" else 0)
+        for i in rows
+        if can_view_investigation(scope, i, p.user_id)
+    ]
+    return calibration.report(pairs)

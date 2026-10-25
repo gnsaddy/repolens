@@ -138,3 +138,35 @@ valid questions); at 15% it wrongly refuses 25% of re-worded questions and catch
 a model, set `REPOLENS_EMBEDDING_PROVIDER=openai` with the base URL, model and dimension, then run
 `python -m repolens.devtools.reembed` (resizes the vector columns, clears the answer memory and marks repositories for
 re-indexing). Settings → AI & search warns when the stored vectors came from a different model.
+
+## Real bugs from a repository's own history (`bugs` suite)
+
+`python -m repolens.evals.suites --suite bugs --repo /path/to/a/git/repo --cases 20` (or `make eval-bugs repo=/path`) needs no download and
+sends nothing anywhere. It finds commits whose message says they fix something, treats the message as the bug report, rebuilds the
+repository **as it was just before the fix** (later history is unreachable), indexes it, and checks whether RepoLens points at the
+files the fix actually changed. It scores two things: plain retrieval, and the full investigation (its shortlist of suspects).
+File names in the report are masked so the question is not trivial. No language model is called.
+
+Measured on this project's own history (10 usable fix commits, offline, 2026-10-25; `evals/results/bugs-repolens-own-history.json`):
+
+| | retrieval | investigation |
+|---|---|---|
+| true file in top 1 | 10% | 20% |
+| top 3 | 30% (95% CI 11-60%) | 40% (CI 17-69%) |
+| top 5 | 60% | 40% |
+| MRR | 0.26 | 0.30 |
+| picking files at random, top 3 | 2% | 2% |
+
+How to read it honestly: ten cases is a small sample, so the intervals are wide; the report is a commit message, tidier than a real
+ticket; and the repository is the one this software was built in. It is clearly far better than chance, and it is **not** good enough
+to trust blindly: in six of ten cases the right file is not in the investigation's top 3. Two leads from the table: raw retrieval finds the
+right file in the top 5 more often than the investigation's shortlist does (60% against 40%), so the shortlist is dropping good
+candidates, and commits that only change configuration or tests are never found. Re-run it on your own repositories and quote your
+numbers, not these.
+
+## Is the confidence score trustworthy? (calibration)
+
+The investigation confidence is a heuristic score. **Insights → "Can the confidence score be trusted?"** compares it with what people
+confirmed (`GET /api/dashboard/calibration`): reliability by score band, expected calibration error, Brier score against always
+predicting the base rate, and a bias label. After 20 reviewed investigations a monotone correction (pool-adjacent-violators) is
+fitted. Until then the card says how many reviews are missing and that the score is a ranking, not a probability.

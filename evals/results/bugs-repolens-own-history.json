@@ -1,0 +1,123 @@
+{
+  "bugs": {
+    "cases": 10,
+    "random_top3": 0.022,
+    "retrieval_top1": 0.1,
+    "retrieval_top3": 0.3,
+    "retrieval_top5": 0.6,
+    "retrieval_top10": 0.6,
+    "retrieval_mrr": 0.255,
+    "retrieval_top3_ci95": [
+      0.108,
+      0.603
+    ],
+    "investigation_top1": 0.2,
+    "investigation_top3": 0.4,
+    "investigation_top5": 0.4,
+    "investigation_top10": 0.4,
+    "investigation_mrr": 0.3,
+    "investigation_top3_ci95": [
+      0.168,
+      0.687
+    ],
+    "rows": [
+      {
+        "commit": "9c7e3f0c",
+        "report": "Make the sidebar scrollable so Sign out is reachable on short screens; fix e2e locator",
+        "files": [
+          "frontend/src/App.tsx"
+        ],
+        "retrieval_rank": 16,
+        "investigation_rank": null
+      },
+      {
+        "commit": "671596d7",
+        "report": "e2e: fix an ambiguous locator and make hangs report the step that stalled",
+        "files": [
+          "frontend/playwright.config.ts"
+        ],
+        "retrieval_rank": null,
+        "investigation_rank": null
+      },
+      {
+        "commit": "293990be",
+        "report": "Add a daily retention sweep and a workspace deletion tool; fix dev upgrade of NOT NULL JSO",
+        "files": [
+          "backend/repolens/api/settings.py",
+          "backend/repolens/config.py",
+          "backend/repolens/db.py",
+          "backend/repolens/main.py"
+        ],
+        "retrieval_rank": 5,
+        "investigation_rank": null
+      },
+      {
+        "commit": "6b5b9e8f",
+        "report": "Lint fix",
+        "files": [
+          "backend/repolens/services/embeddings.py"
+        ],
+        "retrieval_rank": null,
+        "investigation_rank": null
+      },
+      {
+        "commit": "a60cd48b",
+        "report": "Fix embeddings against keyless local servers; record the embedder comparison (hash vs nomi",
+        "files": [
+          "backend/repolens/services/embeddings.py"
+        ],
+        "retrieval_rank": 1,
+        "investigation_rank": 1
+      },
+      {
+        "commit": "a35405e3",
+        "report": "fix(bitbucket): support Atlassian API tokens (email + token) and pick the credential type ",
+        "files": [
+          "backend/repolens/api/bitbucket.py",
+          "backend/repolens/services/bitbucket.py",
+          "frontend/src/components/connections/bitbucket.tsx"
+        ],
+        "retrieval_rank": 3,
+        "investigation_rank": 2
+      },
+      {
+        "commit": "e9ac492a",
+        "report": "fix(bitbucket): tell 401 from 403, and let tokens without the profile scope pass the test",
+        "files": [
+          "backend/repolens/services/bitbucket.py"
+        ],
+        "retrieval_rank": null,
+        "investigation_rank": null
+      },
+      {
+        "commit": "c8bf8f07",
+        "report": "fix(settings): mark GitHub Models as retired and explain it in the UI and errors",
+        "files": [
+          "backend/repolens/services/llm.py",
+          "frontend/src/pages/SettingsPage.tsx"
+        ],
+        "retrieval_rank": 5,
+        "investigation_rank": null
+      },
+      {
+        "commit": "05f1ed8b",
+        "report": "fix(llm): explain non-JSON and rejected replies from model services",
+        "files": [
+          "backend/repolens/api/settings.py",
+          "backend/repolens/services/llm.py"
+        ],
+        "retrieval_rank": 4,
+        "investigation_rank": 2
+      },
+      {
+        "commit": "36f78562",
+        "report": "fix(clone): batch blob prefetch stalled on large repositories; disable negotiation",
+        "files": [
+          "backend/repolens/services/gitops.py"
+        ],
+        "retrieval_rank": 2,
+        "investigation_rank": 1
+      }
+    ]
+  }
+}

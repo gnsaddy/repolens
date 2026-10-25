@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import docs, memory, routing
+from . import bugs, docs, memory, routing
 from .embedders import HASH, EmbedderSpec
 
 # metric -> direction ("up" = higher is better) and the slack allowed before the gate fails
@@ -55,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--embed-no-dimensions", action="store_true", help="do not send the `dimensions` field (Ollama, Voyage...)"
     )
+    ap.add_argument("--repo", default="", help="bugs suite: a local git repository whose fix commits become test cases")
+    ap.add_argument("--cases", type=int, default=20)
     ap.add_argument("--rerank", default="lexical", choices=["none", "lexical"])
     ap.add_argument("--out", default="")
     ap.add_argument("--baseline", default="")
@@ -82,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
         res["memory"] = memory.run(spec)
     if "routing" in wanted:
         res["routing"] = routing.run()
+    if "bugs" in wanted:
+        if not a.repo:
+            ap.error("--suite bugs needs --repo PATH")
+        res["bugs"] = bugs.run(a.repo, a.cases)
     print(json.dumps(res, indent=2))
     if a.out:
         Path(a.out).mkdir(parents=True, exist_ok=True)

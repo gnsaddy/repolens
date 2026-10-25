@@ -240,6 +240,8 @@ export interface SkillFile { name: string; filename: string; markdown: string; e
 
 export interface SysPoint { t: number; host_cpu: number | null; process_cpu: number | null; mem_used: number | null; mem_total: number | null; process_rss: number | null; rx_bps: number | null; tx_bps: number | null; rps: number; error_rate: number; p50_ms: number | null; p95_ms: number | null; container_limit: number | null }
 export interface SysMetrics { available: boolean; cores: number | null; load_average: number[] | null; uptime_s: number; threads: number | null; current: SysPoint; history: SysPoint[]; interval_s: number }
+export interface CalibrationBand { from: number; to: number; n: number; mean_confidence: number | null; confirmed_rate: number | null }
+export interface Calibration { status: "empty" | "too_few" | "ok"; message: string; reviewed: number; min_for_curve: number; bands: CalibrationBand[]; confirmed_rate?: number; mean_confidence?: number; brier?: number; ece?: number; bias?: string }
 export interface FeedbackSummary { days: number; total: number; helpful_rate: number | null; by_kind: Record<string, { up: number; down: number }>; from_memory: { total: number; helpful_rate: number | null } }
 
 export interface OutboundItem { id: string; name: string; kind: string; host: string; stays_on_machine: boolean; sends: string[]; where: string; note: string }

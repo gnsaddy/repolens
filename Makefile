@@ -1,4 +1,4 @@
-.PHONY: sample e2e help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
+.PHONY: eval-bugs sample e2e help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
 .DEFAULT_GOAL := help
 
 VENV = cd backend && . .venv/bin/activate
@@ -30,6 +30,8 @@ test-pg:   ## backend tests on PostgreSQL + pgvector (set REPOLENS_TEST_DATABASE
 
 eval:      ## quality gate: documents, answer memory, routing vs the recorded baseline
 	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --check
+eval-bugs:  ## real-bug eval from a repository's own fix commits: make eval-bugs repo=/path/to/repo
+	$(VENV) && python -m repolens.evals.suites --suite bugs --repo $(repo) --cases 20
 eval-baseline: ## record new baselines (only after an improvement you have reviewed)
 	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --update-baseline
 

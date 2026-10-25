@@ -178,6 +178,15 @@ with secrets masked, checks Python syntax with `ast.parse`, and stores a `FixPro
 serves the patch and records the decision; approval re-reads the files from the default branch through the GitHub write helpers,
 re-applies the edits and opens a draft pull request, or fails without writing anything if they no longer apply.
 
+## Real-bug evaluation, calibration and injection tests
+`evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose
+only reachable history ends there), indexes it with the offline stack and scores retrieval and the investigation shortlist against the
+files the fix changed, with Wilson intervals and a random-ranking comparison. `services/calibration.py` compares investigation
+confidence with confirmed/rejected reviews (bands, Brier, ECE, pool-adjacent-violators curve once 20 reviews exist) behind
+`GET /api/dashboard/calibration`. `tests/test_injection.py` is a red-team suite: hostile text in documents and code must stay on the
+data side of every prompt, planted secrets must not reach a prompt, a model that obeyed the attacker cannot edit build or deploy files,
+add command execution or network calls to a fix, or flood a report, and the frontend has a guard test against raw-HTML rendering.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

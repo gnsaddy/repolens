@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Meter, Spark } from "@/components/charts";
 import { Badge, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
-import { api, type FeedbackSummary, type MetricsOverview, type SysMetrics } from "@/lib/api";
+import { api, type Calibration, type FeedbackSummary, type MetricsOverview, type SysMetrics } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export default function Insights() {
   const { data: m } = useQuery({ queryKey: ["metrics", days], queryFn: () => api<MetricsOverview>(`/metrics/overview?days=${days}`) });
   const sys = useQuery({ queryKey: ["system"], enabled: user?.role === "admin", refetchInterval: 5000, retry: false, queryFn: () => api<SysMetrics>("/metrics/system") });
   const fb = useQuery({ queryKey: ["feedback", days], queryFn: () => api<FeedbackSummary>(`/feedback/summary?days=${days}`) });
+  const cal = useQuery({ queryKey: ["calibration"], queryFn: () => api<Calibration>("/dashboard/calibration") });
   const models = (m?.ai.by_model ?? []).filter((x) => x.input_tokens + x.output_tokens > 0 || x.cost > 0); // models that did nothing are not worth a row
   const top = Math.max(...models.map((x) => x.input_tokens + x.output_tokens), 1);
   const wouldHave = m ? m.ai.tokens + m.ai.tokens_avoided : 0;
@@ -47,6 +48,17 @@ export default function Insights() {
             <Card className="p-4" aria-label="Answer quality">
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm"><span className="font-medium">{Math.round((fb.data.helpful_rate ?? 0) * 100)}% of rated answers were helpful</span><span className="text-xs text-muted">{fb.data.total} ratings{fb.data.from_memory.total ? ` · answers from memory: ${Math.round((fb.data.from_memory.helpful_rate ?? 0) * 100)}% helpful (${fb.data.from_memory.total})` : ""}</span></div>
               <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-red-100"><div className="bg-emerald-500" style={{ width: `${(fb.data.helpful_rate ?? 0) * 100}%` }} /></div>
+            </Card>)}
+          {cal.data && cal.data.status !== "empty" && (
+            <Card className="p-4" aria-label="Confidence check">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm"><span className="font-medium">Can the confidence score be trusted?</span><span className="text-xs text-muted">{cal.data.reviewed} reviewed investigations</span></div>
+              <p className="mt-1 text-xs text-muted">{cal.data.message}</p>
+              <table className="mt-3 w-full text-xs" aria-label="Confidence against outcome">
+                <thead><tr className="text-left text-muted"><th className="py-1 font-normal">Score band</th><th className="font-normal">Investigations</th><th className="font-normal">Average score</th><th className="font-normal">Actually confirmed</th></tr></thead>
+                <tbody>{cal.data.bands.filter((b) => b.n > 0).map((b) => (
+                  <tr key={b.from} className="border-t border-line"><td className="py-1">{Math.round(b.from * 100)}–{Math.round(b.to * 100)}%</td><td>{b.n}</td><td>{Math.round((b.mean_confidence ?? 0) * 100)}%</td><td className="font-medium">{Math.round((b.confirmed_rate ?? 0) * 100)}%</td></tr>))}</tbody>
+              </table>
+              {cal.data.brier !== undefined && <p className="mt-2 text-xs text-muted">Calibration error {Math.round((cal.data.ece ?? 0) * 100)} points · Brier score {cal.data.brier} · {cal.data.bias}</p>}
             </Card>)}
           {wouldHave > 0 && (
             <Card className="p-4" aria-label="Savings">

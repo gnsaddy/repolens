@@ -21,6 +21,13 @@ from . import risk as oracle
 from .llm import LLMClient
 from .llm_router import Task
 
+# lines a bug fix has no reason to add; a model that was talked into adding one is dropped, a person never sees it as a proposal
+_RISKY = re.compile(
+    r"os\.system|subprocess|\beval\s*\(|\bexec\s*\(|__import__|pickle\.loads?|child_process|new\s+Function|Runtime\.getRuntime|"
+    r"\bcurl\b|\bwget\b|https?://|base64\.b64decode|\bnc\s+-|/dev/tcp|\.ssh/|AWS_SECRET|PRIVATE KEY",
+    re.I,
+)
+
 MAX_FILES, MAX_EDITS, MAX_DIFF_LINES, CONTEXT = 3, 6, 220, 45
 
 # a model told to "fix a bug" must not be able to change how code is built, deployed, or what it depends on
@@ -113,12 +120,23 @@ def check(before: dict[str, str], after: dict[str, str]) -> dict:
                 ok = False
                 notes.append(f"{path} would not parse: line {e.lineno}: {e.msg}")
     diff = make_diff(before, after)
+    risky = [
+        ln[1:].strip()[:120]
+        for ln in diff.splitlines()
+        if ln.startswith("+") and not ln.startswith("+++") and _RISKY.search(ln)
+    ]
+    if risky:
+        ok = False
+        notes.append(
+            "The change adds code that runs commands or contacts a network, which a bug fix should not: " + risky[0]
+        )
     changed = sum(1 for ln in diff.splitlines() if ln[:1] in "+-" and not ln.startswith(("+++", "---")))
     if changed > MAX_DIFF_LINES:
         ok = False
         notes.append(f"The change is {changed} lines; a suggested fix is limited to {MAX_DIFF_LINES}. Fix it by hand.")
     return {
         "syntax_ok": ok,
+        "risky": risky,
         "files": sum(1 for p in after if before[p] != after[p]),
         "lines_changed": changed,
         "notes": notes,
