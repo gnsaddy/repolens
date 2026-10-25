@@ -69,6 +69,9 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
   image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR and rolls out (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).
 
+## Changelog
+Every notable change has an entry in [`changelog/`](changelog/README.md) (`make changelog title="..."` adds one); behaviour and design changes also update `docs/`.
+
 ## Configuration & security
 See `.env.example` and [`SECURITY.md`](SECURITY.md). Set `REPOLENS_ENV=prod`, a strong `REPOLENS_JWT_SECRET` and
 `REPOLENS_SECRET_KEY` for any real deployment.

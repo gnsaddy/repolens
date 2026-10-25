@@ -1,4 +1,4 @@
-.PHONY: help eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
+.PHONY: help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
 .DEFAULT_GOAL := help
 
 VENV = cd backend && . .venv/bin/activate
@@ -29,6 +29,13 @@ eval:      ## quality gate: documents, answer memory, routing vs the recorded ba
 	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --check
 eval-baseline: ## record new baselines (only after an improvement you have reviewed)
 	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --update-baseline
+
+changelog: ## new changelog entry: make changelog title="short title"
+	@test -n "$(title)" || (echo 'usage: make changelog title="short title"' && exit 1)
+	@f=changelog/$$(date +%F)-$$(echo "$(title)" | tr 'A-Z ' 'a-z-' | tr -cd 'a-z0-9-').md; \
+	  sed 's/^# TITLE/# $(title)/' changelog/TEMPLATE.md > $$f && echo $$f
+changelog-index: ## rebuild the list in changelog/README.md
+	python3 changelog/build_index.py
 
 lint:      ## ruff, mypy and eslint
 	$(VENV) && ruff check . && ruff format --check . && mypy repolens
