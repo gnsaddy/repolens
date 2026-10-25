@@ -11,6 +11,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 
 <!-- entries:start -->
 - 2026-10-25 · [Security hardening, Insights, evaluation suites and feedback](2026-10-25-security-insights-evals.md)
+- 2026-10-25 · ["What leaves this server" panel](2026-10-25-outbound-panel.md)
 - 2026-10-22 · [Integrations, multi-model routing, Jira analysis and wiki tools](2026-10-22-integrations-models-jira-wiki.md)
 - 2026-10-20 · [Initial platform](2026-10-20-initial-platform.md)
 <!-- entries:end -->

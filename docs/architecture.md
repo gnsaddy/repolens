@@ -153,6 +153,9 @@ pluggable (`--embedder http` for any OpenAI-compatible endpoint). `evals/baselin
 configuration. `services/sysmetrics.py` samples /proc every five seconds (CPU, memory, network) and the request guard records
 request rate and latency into the same ring buffer for `GET /api/metrics/system`.
 
+`services/outbound.py` builds the "what leaves this server" list from the stored connections and the server settings; it never reads
+a secret and a destination on localhost is reported as staying on the machine.
+
 ## Not implemented
 Fix generation / Blue-Red-Judge agents and a generated-code execution sandbox, a GitHub App installation flow (the webhook
 receiver for `push` re-indexing is implemented), multi-factor authentication.

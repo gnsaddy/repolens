@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## What leaves this server
+
+Settings → AI & search starts with a panel listing every service this server sends data to: each connected model provider (and which models), an embedding or reranking service if one is configured, GitHub, Bitbucket, Jira (and whether publishing is on), Confluence, other wiki sources, a single sign-on provider and a trace collector. For each it shows the host, what is sent, whether it stays on the machine (a model server on localhost does), and where to manage it. A fresh install says "Nothing leaves". The default install connects nothing: no model, the local embedder, no connectors.
+
 ## Quality checks and feedback
 
 - **Evaluation suites** (`python -m repolens.evals.suites`, `make eval`): document question answering, answer-memory matching and model routing, scored offline against a recorded baseline. CI fails when a metric gets worse. See `evals/README.md` for the suites and the embedder comparison.

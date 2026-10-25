@@ -12,6 +12,7 @@ from ..models import LLMConnection, LLMModel, LLMSetting
 from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
 from ..services import answer_memory, embedding_state, llm_router
+from ..services import outbound as outbound_svc
 from ..services.access import scope_for
 from ..services.jira import JiraError, validate_base_url
 from ..services.llm import (
@@ -64,6 +65,12 @@ def _view(db: Session, org_id: str) -> dict:
         "presets": PRESETS,
         "embedding_provider": get_settings().embedding_provider,
     }
+
+
+@router.get("/outbound")
+def outbound(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Where this server sends data, from what is configured right now (everyone may see it)."""
+    return outbound_svc.list_outbound(db, p.org_id)
 
 
 @router.get("/retrieval")
