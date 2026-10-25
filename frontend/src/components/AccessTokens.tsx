@@ -50,7 +50,7 @@ export default function AccessTokens({ canWrite }: { canWrite: boolean }) {
             <span className="text-xs text-muted">{t.last_used_at ? `used ${timeAgo(t.last_used_at)}` : "never used"}{t.expires_at ? ` · expires ${new Date(t.expires_at).toLocaleDateString()}` : " · does not expire"}</span>
             <Button size="sm" variant="ghost" className="ml-auto" onClick={async () => { if (await ask({ title: `Revoke “${t.name}”?`, message: "Anything using it stops working immediately.", confirmLabel: "Revoke", danger: true })) revoke.mutate(t.id); }}>Revoke</Button>
           </li>))}</ul>)}
-      <details className="rounded-lg border border-line p-3 text-sm">
+      <details open className="rounded-lg border border-line p-3 text-sm">
         <summary className="flex cursor-pointer items-center gap-1.5 font-medium"><Plug className="h-4 w-4" />Use RepoLens from your editor (MCP)</summary>
         <div className="mt-3 space-y-3 text-xs">
           <p className="text-muted">RepoLens speaks the Model Context Protocol, so an editor can search your code, docs and pull requests, ask questions with cited sources, and check a symbol before changing it, using your access. Replace the token with yours.</p>

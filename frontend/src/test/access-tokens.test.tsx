@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
-import Profile from "@/pages/Profile";
+import SettingsPage from "@/pages/SettingsPage";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(b === null ? null : JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
 beforeEach(() => localStorage.setItem("repolens.token", "tok"));
@@ -25,7 +25,7 @@ function show(role = "member") {
     if (u.includes("/auth/api-tokens/") && init?.method === "DELETE") { tokens = tokens.map((t) => ({ ...t, revoked: true })); return json(null, 204); }
     return json({});
   });
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter><Profile /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={["/settings?tab=mcp"]}><SettingsPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
   return calls;
 }
 
@@ -37,7 +37,6 @@ describe("Access tokens", () => {
     await userEvent.click(screen.getByRole("button", { name: "Create token" }));
     expect(await screen.findByLabelText("New access token")).toHaveValue("rlp_SECRET_VALUE_ONCE");
     expect(calls.find((c) => c.url.endsWith("/auth/api-tokens"))?.body).toEqual({ name: "CI", scope: "write", days: 90 });
-    await userEvent.click(screen.getByText(/Use RepoLens from your editor/));
     expect(screen.getByText(/claude mcp add --transport http repolens .*\/api\/mcp --header "Authorization: Bearer rlp_SECRET_VALUE_ONCE"/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(screen.queryByLabelText("New access token")).not.toBeInTheDocument(); // gone for good

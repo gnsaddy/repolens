@@ -21,7 +21,7 @@ receives the finished comment. The comment is updated in place as the pull reque
 ## Set it up (five minutes)
 
 1. Add the repository to RepoLens and let it finish indexing.
-2. In RepoLens open **Profile → Access tokens**, create a **read** token, and copy it.
+2. In RepoLens open **Settings → MCP & tokens**, create a **read** token, and copy it.
 3. In the GitHub repository add a **secret** `REPOLENS_TOKEN` (that token) and a **variable** `REPOLENS_URL` (your server's address).
 4. Copy `examples/workflows/repolens-review.yml` to `.github/workflows/` in that repository.
 
