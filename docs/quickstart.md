@@ -1,6 +1,6 @@
 # Try it in five minutes
 
-You need Python 3.11+ and Node 20+. No model, account or key is required: search, git-history correlation and ranking work offline.
+You need Python 3.11+ and Node 20+. No AI model, account or key is required: search, git-history correlation and ranking run on your machine without calling any AI service.
 
 ```bash
 git clone https://github.com/gnsaddy/repolens.git && cd repolens

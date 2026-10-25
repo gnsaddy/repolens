@@ -259,10 +259,21 @@ def _confluence_client(db: Session, org_id: str):
     return client_for_org(db, org_id)
 
 
-def apply(db: Session, p: DocProposal, user_id: str, target: str = "auto") -> str:
-    """Write the approved change. Returns a human description of what was done; raises ProposalError otherwise."""
+def _reindex_after_commit(db: Session, repo_id: str) -> None:
+    """Indexing runs in its own session, so it must start only once this change is committed. Started earlier it would wait on
+    this transaction's lock on the repository (a deadlock when jobs run inline) or read the page as it was before the edit."""
+    db.info.setdefault("reindex", []).append(repo_id)
+
+
+def _start_reindex(db: Session) -> None:
     from ..api.repos import schedule_index
 
+    for repo_id in dict.fromkeys(db.info.pop("reindex", [])):
+        schedule_index(repo_id)
+
+
+def apply(db: Session, p: DocProposal, user_id: str, target: str = "auto") -> str:
+    """Write the approved change. Returns a human description of what was done; raises ProposalError otherwise."""
     if p.status != "pending":
         raise ProposalError("This proposal was already decided")
     repo = db.get(Repository, p.doc_repo_id) if p.doc_repo_id else None
@@ -289,7 +300,7 @@ def apply(db: Session, p: DocProposal, user_id: str, target: str = "auto") -> st
         doc.content, doc.content_hash = p.proposed, sha(p.proposed)
         repo.status = "indexing"
         db.flush()
-        schedule_index(repo.id)
+        _reindex_after_commit(db, repo.id)
         return f"Updated {repo.name}/{p.doc_path}"
     # new page: into the chosen collection, or a "Runbooks" collection created on demand
     if repo is None:
@@ -325,7 +336,7 @@ def apply(db: Session, p: DocProposal, user_id: str, target: str = "auto") -> st
     p.doc_path = path
     repo.status = "indexing"
     db.flush()
-    schedule_index(repo.id)
+    _reindex_after_commit(db, repo.id)
     return f"Created {repo.name}/{path}"
 
 
@@ -365,10 +376,12 @@ def decide(db: Session, p: DocProposal, user_id: str, approve: bool, target: str
         p.result = apply(db, p, user_id, target)
         p.status = "applied"
     except ProposalError as e:
+        db.info.pop("reindex", None)
         p.status, p.result = "failed", str(e)
         p.decided_by, p.decided_at = user_id, now
         db.commit()
         raise
     p.decided_by, p.decided_at = user_id, now
     db.commit()
+    _start_reindex(db)
     return p

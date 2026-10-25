@@ -63,7 +63,7 @@ function Shell() {
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col overflow-y-auto bg-sidebar p-3 text-slate-300 md:flex">
         <div className="mb-6 flex items-center gap-2 px-2 pt-2 text-white">
-          <Activity className="h-5 w-5 text-indigo-400" /><span className="font-semibold">RepoLens AI</span><span title="Beta: expect rough edges and changes" className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">{APP_VERSION}</span>
+          <Activity className="h-5 w-5 text-indigo-400" /><span className="font-semibold">RepoLens AI</span>
         </div>
         <button onClick={() => setPalette(true)} className="mb-3 flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-left text-xs text-slate-400 hover:bg-white/10">
           <Search className="h-3.5 w-3.5" />Jump to…<kbd className="ml-auto rounded border border-white/20 px-1">Ctrl K</kbd>
@@ -89,6 +89,7 @@ function Shell() {
             <LogOut className="h-4 w-4" />Sign out
           </button>
           <ReportIssue />
+          <div className="mt-3 px-2 text-[11px] text-slate-500" title="Beta: expect rough edges and changes">RepoLens AI <span className="font-medium text-slate-400">{APP_VERSION}</span></div>
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-8">

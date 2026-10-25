@@ -2,13 +2,14 @@
 
 **Version v0.1-beta.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
 
-Repository intelligence and evidence-backed root-cause analysis. See [`docs/architecture.md`](docs/architecture.md) for how it
-works and [`docs/features.md`](docs/features.md) for what is implemented.
+**DeepMind Wiki: a living wiki for your code and docs.** Point RepoLens at your repositories, READMEs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint, and it builds a wiki you can browse and ask questions of, with a code atlas for every repository and an at-a-glance card (kind, owner, warnings, commands) for every page. Answers cite their sources. It also keeps the wiki honest: it flags pages that may be out of date when the code they describe changes, finds orphaned, duplicated and broken pages, and drafts edits that a person reviews before anything changes.
+
+On top of the wiki, RepoLens runs **evidence-backed root-cause investigations** from a bug report, CI log or Jira ticket, and turns a confirmed cause into a runbook or a human-approved fix pull request. See [`docs/architecture.md`](docs/architecture.md) for how it works and [`docs/features.md`](docs/features.md) for what is implemented.
 
 **Stack:** FastAPI · LangGraph · PostgreSQL + pgvector · Tree-sitter · Vite + React + TypeScript + Tailwind ·
 OpenTelemetry/Prometheus · Docker · Kubernetes · GitHub Actions.
 
-**What it does:** turns your docs, pull requests, tickets and code into one searchable, connected knowledge base, and answers
+**Under the hood:** your docs, pull requests, tickets and code become one searchable, connected knowledge base, and answers
 from it with citations while keeping model cost low: several models are routed by task difficulty, repeated questions are
 answered from a local memory, and retrieved context is condensed before it reaches a model. Nothing needs a model to work;
 connecting one only improves the wording.
@@ -42,7 +43,7 @@ flowchart LR
   classDef s fill:#eef,stroke:#99c
 ```
 
-Everything left of the model router works offline. A model only improves wording; people confirm findings before anything is published or proposed.
+Everything left of the model router runs on your own machine without calling any AI service: no model is required for search, ranking or git-history analysis. A model only improves the wording of answers; people confirm findings before anything is published or proposed.
 
 **New here?** Follow the [five-minute quickstart](docs/quickstart.md). **Contributing?** See [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -69,8 +70,8 @@ docker compose up --build       # web http://localhost:8080 , API http://localho
 ```
 
 Create a workspace on the login page (first user is admin). Add a language-model key under **Settings** (or via `REPOLENS_LLM_*`), upload docs under **Knowledge → Documents**, and **Connect with GitHub** under Settings (device-flow sign-in; register an OAuth App with Device Flow enabled and paste its Client ID) to sync pull requests or use **GitHub Models** as the LLM. Anthropic uses an API key; Claude-subscription and Copilot sign-in are not offered by those vendors for third-party apps. Mount git repos under `./data/local-repos` (mounted at
-`/mnt/repos`) or add an https/ssh Git URL. Out of the box `LLM_PROVIDER=heuristic` and `EMBEDDING_PROVIDER=hash` run
-fully offline: retrieval, git-history correlation and ranking work without any model; set `anthropic`/`openai` for LLM
+`/mnt/repos`) or add an https/ssh Git URL. Out of the box `LLM_PROVIDER=heuristic` and `EMBEDDING_PROVIDER=hash` call no AI service:
+retrieval, git-history correlation and ranking work without any model (GitHub, Jira and the like still need the network when you connect them); set `anthropic`/`openai` for LLM
 narrative synthesis (and `REPOLENS_PRICING_JSON` for cost estimates).
 
 ## Develop

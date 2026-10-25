@@ -275,3 +275,33 @@ def test_runbook_uses_the_investigators_digest_instead_of_the_full_evidence(clie
     client.post(f"/api/investigations/{inv['id']}/review", headers=auth, json={"outcome": "confirmed"})
     p = client.post("/api/wiki/proposals/from-incident", headers=auth, json={"investigation_id": inv["id"]}).json()
     assert p["status"] == "pending" and p["proposed"].strip()
+
+
+def test_reindexing_starts_only_after_the_approved_edit_is_committed(client, auth, shop, session, monkeypatch):  # noqa: F811
+    """Indexing runs in its own session. Started before the commit it waits on the request's lock on the repository
+    (a deadlock on PostgreSQL when jobs run inline) or indexes the page as it was before the edit."""
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    from repolens.api import repos as repos_api
+
+    col, alert = drifted(client, auth, shop[0])
+    p = client.post(f"/api/wiki/proposals/from-drift/{alert['id']}", headers=auth).json()
+    order: list[str] = []
+
+    def on_flush(*a):
+        order.append("flush")
+
+    def on_commit(*a):
+        order.append("commit")
+
+    event.listen(Session, "after_flush", on_flush)
+    event.listen(Session, "after_commit", on_commit)
+    monkeypatch.setattr(repos_api, "schedule_index", lambda repo_id: order.append("schedule"))
+    try:
+        r = client.post(f"/api/wiki/proposals/{p['id']}/decision", headers=auth, json={"approve": True})
+        assert r.status_code == 200
+    finally:  # the listeners are class-wide: take them off again
+        event.remove(Session, "after_flush", on_flush)
+        event.remove(Session, "after_commit", on_commit)
+    assert order.count("schedule") == 1 and order[order.index("schedule") - 1] == "commit"
