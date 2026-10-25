@@ -94,3 +94,17 @@ def test_embeddings_work_with_keyless_local_servers(monkeypatch):
     config.get_settings.cache_clear()
     embeddings.Embedder().embed(["a"])
     assert seen["headers"] == {"Authorization": "Bearer k-123"}
+
+
+def test_the_fast_local_embedder_produces_exactly_the_vectors_stored_vectors_were_made_with():
+    """`local-hash-v1` must never change silently: stored vectors would stop matching new queries."""
+    import hashlib
+
+    from repolens.services.embeddings import hash_embed
+
+    v = hash_embed("def get_profile(self): return UserRepository.find_by_id(user_id)  # KeyError: 'name'", 256)
+    assert (
+        hashlib.sha256(",".join(f"{x:.9f}" for x in v).encode()).hexdigest()
+        == "8f63a282590f04eebcf61466ea85946ab56ec1df676e4d7f82f851e39a21a065"
+    )
+    assert abs(sum(x * x for x in v) - 1.0) < 1e-9 and len(v) == 256

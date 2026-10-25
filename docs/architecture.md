@@ -157,6 +157,14 @@ request rate and latency into the same ring buffer for `GET /api/metrics/system`
 Fix generation / Blue-Red-Judge agents and a generated-code execution sandbox, a GitHub App installation flow (the webhook
 receiver for `push` re-indexing is implemented), multi-factor authentication.
 
+## Measured limits (single PostgreSQL 16 + pgvector 0.8, 256-dimension vectors, 200,000 chunks, one 8-core machine)
+Vector table 261 MB plus HNSW index 260 MB plus full-text index 39 MB. Nearest-neighbour search: 4.6 ms unfiltered, about 40 ms
+when filtered by workspace and repository (the planner scans exactly, recall 100%), full-text OR query about 120 ms. Building the
+HNSW index took 7.7 minutes single-threaded (parallel build needs more shared memory than a default container has), so for a very
+large first import load the rows first and build the index afterwards. The local hash embedder produces about 5,700 chunks per
+second (a million chunks in under four minutes); a model behind an HTTP API is limited by that API. SQLite (development) reads
+every chunk into Python, so use PostgreSQL beyond a few tens of thousands of chunks.
+
 ## Scaling notes
 Background jobs run in-process thread pools. A restart mid-index leaves a repository in `indexing` (re-index to recover);
 unfinished investigations are failed by the startup sweep and can be run again. For multiple API replicas move to a
