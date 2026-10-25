@@ -58,6 +58,28 @@ describe("Knowledge page", () => {
     expect(await screen.findByText("Fresh AI answer.")).toBeInTheDocument();
   });
 
+  it("lets people rate an answer; a thumbs-down asks what was wrong", async () => {
+    const posts: unknown[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.endsWith("/feedback")) { posts.push(JSON.parse(String(init?.body))); return json({ id: "f1", rating: "down" }, 201); }
+      if (u.endsWith("/knowledge/ask")) return json({ query: "how many retries", mode: "llm", answer: "Three times [S1].", sources: [], connections: [] });
+      if (u.endsWith("/knowledge/search") || u.endsWith("/knowledge/similar")) return json([]);
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=ask");
+    await userEvent.type(await screen.findByLabelText("Question"), "how many retries");
+    await userEvent.click(screen.getByRole("button", { name: /Ask/ }));
+    await screen.findByText("Three times [S1].");
+    await userEvent.click(screen.getByRole("button", { name: "Not helpful" }));
+    await userEvent.type(screen.getByLabelText("What was wrong?"), "missed the backoff");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/Thanks, noted/)).toBeInTheDocument();
+    expect(posts).toEqual([{ kind: "answer", rating: "down", target_id: "how many retries", query: "how many retries", note: "missed the backoff", meta: { from_memory: false } }]);
+  });
+
   it("labels answers served from memory and can ask the model again", async () => {
     const bodies: unknown[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {

@@ -1,4 +1,4 @@
-.PHONY: help run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
+.PHONY: help eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
 .DEFAULT_GOAL := help
 
 VENV = cd backend && . .venv/bin/activate
@@ -24,6 +24,11 @@ test-web:  ## frontend tests
 	cd frontend && npm test
 test-pg:   ## backend tests on PostgreSQL + pgvector (set REPOLENS_TEST_DATABASE_URL)
 	$(VENV) && REPOLENS_TEST_DATABASE_URL=$${REPOLENS_TEST_DATABASE_URL:?set REPOLENS_TEST_DATABASE_URL} pytest -q
+
+eval:      ## quality gate: documents, answer memory, routing vs the recorded baseline
+	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --check
+eval-baseline: ## record new baselines (only after an improvement you have reviewed)
+	$(VENV) && python -m repolens.evals.suites --baseline ../evals/baselines/suites.json --update-baseline
 
 lint:      ## ruff, mypy and eslint
 	$(VENV) && ruff check . && ruff format --check . && mypy repolens

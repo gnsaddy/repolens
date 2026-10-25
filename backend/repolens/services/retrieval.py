@@ -76,6 +76,17 @@ def extract_stack_refs(text_: str) -> list[dict]:
     return refs
 
 
+def coverage(query: str, hit: "Hit") -> float:
+    """Share of the question's meaningful words that appear in the best passage (0..1). Unlike the fused score, this
+    says whether the passage is about the question at all, so it can tell "the docs do not cover this" from a match."""
+    terms = set(query_terms(query))
+    if not terms:
+        return 0.0
+    c = hit.chunk
+    have = set(tokenize(c.content)) | set(tokenize(c.file_path)) | set(tokenize(c.symbol_name))
+    return len(terms & have) / len(terms)
+
+
 def search_chunks(
     db: Session,
     org_id: str,

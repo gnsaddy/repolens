@@ -189,6 +189,15 @@ class WikiPageIn(BaseModel):
     content: str = Field(max_length=500_000)
 
 
+class FeedbackIn(BaseModel):
+    kind: str = Field(pattern="^(answer|memory|investigation)$")
+    rating: str = Field(pattern="^(up|down)$")
+    target_id: str = Field(default="", max_length=64)
+    query: str = Field(default="", max_length=2000)
+    note: str = Field(default="", max_length=2000)
+    meta: dict = Field(default_factory=dict)
+
+
 class SkillIn(BaseModel):
     entry_ids: list[str] = Field(min_length=1, max_length=30)
     name: str = Field(default="", max_length=80)

@@ -3,6 +3,7 @@ import { AlertTriangle, BookOpen, Check, FileEdit, Map as MapIcon, ChevronDown, 
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
+import AnswerFeedback from "@/components/AnswerFeedback";
 import SimilarAnswers from "@/components/SimilarAnswers";
 import { api, type SimilarAnswer, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageInsights, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
@@ -194,6 +195,7 @@ function AskWiki({ open }: { open: Open }) {
       {a && (<>
         <Card><CardTitle right={<Badge tone={a.mode === "llm" ? "brand" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>}>Answer</CardTitle>
           <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
+          <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
           {!!a.connections.length && <div className="mt-4 border-t border-line pt-3 text-xs"><div className="mb-1 font-medium text-muted">Connected code and pages</div>
             <ul className="space-y-0.5">{a.connections.slice(0, 6).map((c, i) => <li key={i}><b>{c.from}</b> <span className="text-muted">{c.label}</span> <code>{c.to}</code></li>)}</ul></div>}
         </Card>

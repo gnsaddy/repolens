@@ -35,8 +35,10 @@ jobs:
         run: pytest
       - name: Benchmark smoke (offline, deterministic)
         run: python -m repolens.evals --cases 10 --no-org-wide --out /tmp/eval-report
+      - name: Quality gate (documents, answer memory, model routing vs the recorded baseline)
+        run: python -m repolens.evals.suites --out /tmp/eval-suites --baseline ../evals/baselines/suites.json --check
       - uses: actions/upload-artifact@v4
-        with: { name: eval-report, path: /tmp/eval-report }
+        with: { name: eval-report, path: "/tmp/eval-*" }
       - name: Migrations apply cleanly
         env: { REPOLENS_DATABASE_URL: "postgresql+psycopg://postgres:pw@localhost:5432/repolens" }
         run: |

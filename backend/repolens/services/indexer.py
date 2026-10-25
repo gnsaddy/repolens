@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import Change, CodeChunk, Document, IndexRun, Repository
 from ..security import redact_stored
-from . import gitops, usage
+from . import embedding_state, gitops, usage
 from .embeddings import Embedder
 from .graph import build_repo_graph
 from .links import web_base
@@ -189,6 +189,10 @@ def index_repository(db: Session, repo_id: str, max_commits: int = 300) -> Index
         repo.chunk_count = kept + written
         repo.status = "ready"
         run.status = "completed"
+        if (
+            embedding_state.recorded(db, repo.org_id) is None
+        ):  # remember what made these vectors; a later change is flagged
+            embedding_state.record(db, repo.org_id)
         log.info("indexed %s: %s", repo.name, graph)
     except Exception as e:
         log.exception("indexing failed for %s", repo_id)

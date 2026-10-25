@@ -11,7 +11,7 @@ from ..deps import Principal, current_principal
 from ..models import LLMConnection, LLMModel, LLMSetting
 from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
-from ..services import answer_memory, llm_router
+from ..services import answer_memory, embedding_state, llm_router
 from ..services.access import scope_for
 from ..services.jira import JiraError, validate_base_url
 from ..services.llm import (
@@ -67,10 +67,11 @@ def _view(db: Session, org_id: str) -> dict:
 
 
 @router.get("/retrieval")
-def retrieval_status(p: Principal = Depends(current_principal)):
+def retrieval_status(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Read-only view of how search is configured on this server (set with REPOLENS_* environment variables)."""
     s = get_settings()
     return {
+        "embedding_state": embedding_state.status(db, p.org_id),
         "embedding": {
             "provider": s.embedding_provider,
             "model": "local-hash-v1" if s.embedding_provider == "hash" else s.embedding_model,

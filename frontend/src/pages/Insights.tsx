@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Meter, Spark } from "@/components/charts";
 import { Badge, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
-import { api, type MetricsOverview, type SysMetrics } from "@/lib/api";
+import { api, type FeedbackSummary, type MetricsOverview, type SysMetrics } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ export default function Insights() {
   const [days, setDays] = useState(30);
   const { data: m } = useQuery({ queryKey: ["metrics", days], queryFn: () => api<MetricsOverview>(`/metrics/overview?days=${days}`) });
   const sys = useQuery({ queryKey: ["system"], enabled: user?.role === "admin", refetchInterval: 5000, retry: false, queryFn: () => api<SysMetrics>("/metrics/system") });
+  const fb = useQuery({ queryKey: ["feedback", days], queryFn: () => api<FeedbackSummary>(`/feedback/summary?days=${days}`) });
   const models = (m?.ai.by_model ?? []).filter((x) => x.input_tokens + x.output_tokens > 0 || x.cost > 0); // models that did nothing are not worth a row
   const top = Math.max(...models.map((x) => x.input_tokens + x.output_tokens), 1);
   const wouldHave = m ? m.ai.tokens + m.ai.tokens_avoided : 0;
@@ -42,6 +43,11 @@ export default function Insights() {
             <Kpi icon={<PiggyBank className="h-4 w-4" />} label="Tokens avoided" value={fmtTokens(m.ai.tokens_avoided)} tone="text-emerald-600" hint={`${Math.round(m.ai.savings_rate * 100)}% of what would have been used`} />
             <Kpi icon={<Database className="h-4 w-4" />} label="Answers from memory" value={n(m.memory.hits)} tone="text-violet-600" hint={`${n(m.memory.stored)} remembered`} />
           </div>
+          {!!fb.data?.total && (
+            <Card className="p-4" aria-label="Answer quality">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm"><span className="font-medium">{Math.round((fb.data.helpful_rate ?? 0) * 100)}% of rated answers were helpful</span><span className="text-xs text-muted">{fb.data.total} ratings{fb.data.from_memory.total ? ` · answers from memory: ${Math.round((fb.data.from_memory.helpful_rate ?? 0) * 100)}% helpful (${fb.data.from_memory.total})` : ""}</span></div>
+              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-red-100"><div className="bg-emerald-500" style={{ width: `${(fb.data.helpful_rate ?? 0) * 100}%` }} /></div>
+            </Card>)}
           {wouldHave > 0 && (
             <Card className="p-4" aria-label="Savings">
               <div className="mb-2 flex items-baseline justify-between text-sm"><span className="font-medium">Without routing, memory and condensing, this would have been {fmtTokens(wouldHave)} tokens</span><span className="text-emerald-700">{Math.round(m.ai.savings_rate * 100)}% saved</span></div>

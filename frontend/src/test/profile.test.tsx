@@ -26,6 +26,7 @@ function renderPage(el: React.ReactNode) {
     if (u.endsWith("/auth/sessions")) return json(sessions);
     if (u.includes("/auth/sessions/")) return json(null, 204);
     if (u.endsWith("/auth/password")) return json(null, 204);
+    if (u.includes("/feedback/summary")) return json({ days: 30, total: 10, helpful_rate: 0.8, by_kind: { answer: { up: 8, down: 2 } }, from_memory: { total: 4, helpful_rate: 0.75 } });
     if (u.includes("/metrics/system")) return json({ available: true, cores: 8, load_average: [0.5, 0.6, 0.7], uptime_s: 7300, threads: 24, interval_s: 5,
       current: { t: 1, host_cpu: 37.2, process_cpu: 12.5, mem_used: 5_000_000_000, mem_total: 16_000_000_000, process_rss: 120_000_000, rx_bps: 2048, tx_bps: 4096, rps: 1.4, error_rate: 0, p50_ms: 8, p95_ms: 41, container_limit: null },
       history: [{ t: 1, host_cpu: 30, process_cpu: 10, mem_used: 5e9, mem_total: 16e9, process_rss: 1e8, rx_bps: 1000, tx_bps: 2000, rps: 1, error_rate: 0, p50_ms: 8, p95_ms: 40, container_limit: null }] });
@@ -78,6 +79,7 @@ describe("Insights", () => {
     expect(within(ai).getByText("gemini/flash-lite")).toBeInTheDocument();
     expect(within(ai).queryByText("memory/memory")).not.toBeInTheDocument(); // a model that used no tokens and cost nothing is not listed
     expect(within(ai).getByText("$0.42")).toBeInTheDocument();
+    expect(within(ai).getByLabelText("Answer quality")).toHaveTextContent("80% of rated answers were helpful");
     expect(within(screen.getByRole("region", { name: "Work done" })).getByText("1.5 min")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Knowledge base" })).getByText("900 nodes")).toBeInTheDocument();
   });

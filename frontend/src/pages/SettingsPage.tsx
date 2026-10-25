@@ -47,6 +47,7 @@ function RetrievalCard() {
   return (
     <ConnectionCard icon={SearchCheck} tint="emerald" title="Search quality" description="How results are found and ranked. Set with environment variables on the server (REPOLENS_EMBEDDING_* and REPOLENS_RERANK_*)."
       status={<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", TINTS.slate)}><ShieldCheck className="h-3 w-3" />{data.embedding.offline ? "runs offline" : "uses a hosted embedder"}</span>}>
+      {data.embedding_state?.stale && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{data.embedding_state.message} An admin can run <code>python -m repolens.devtools.reembed</code> on the server.</p>}
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         <div><dt className="text-xs text-muted">Embeddings</dt><dd className="font-medium">{data.embedding.model} <Badge tone={data.embedding.offline ? "gray" : "brand"}>{data.embedding.offline ? "offline" : data.embedding.provider}</Badge></dd>
           <dd className="text-xs text-muted">{data.embedding.dimensions} dimensions{data.embedding.offline ? " · works without internet, weaker on natural language" : ""}</dd></div>

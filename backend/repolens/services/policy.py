@@ -30,6 +30,7 @@ ACTION_MIN_ROLE = {
     "wiki.import": "admin",
     "sso.configure": "admin",
     "wiki.propose": "member",
+    "feedback.give": "viewer",
     "wiki.decide": "member",
     "wiki.publish": "admin",
 }

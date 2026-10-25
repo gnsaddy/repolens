@@ -54,6 +54,22 @@ class User(Base):
     external_id: Mapped[str] = mapped_column(String(200), default="")  # the identity provider's subject / SCIM id
 
 
+class FeedbackEvent(Base):
+    """A person's verdict on an answer or an investigation. Feeds the quality trend and the evaluation question sets."""
+
+    __tablename__ = "feedback_events"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)  # answer | memory | investigation
+    target_id: Mapped[str] = mapped_column(String(64), default="")
+    rating: Mapped[str] = mapped_column(String(8))  # up | down
+    query: Mapped[str] = mapped_column(Text, default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)  # mode, model, from-memory flag, source files
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
 class UserSession(Base):
     """One sign-in. Tokens carry the session id, so a session can be ended from the server at any time."""
 

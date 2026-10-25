@@ -174,7 +174,7 @@ export interface CheckoutRow { path: string; repos: string[]; exists: boolean; b
 export interface StorageInfo { ttl_days: number; total_bytes: number; checkouts: CheckoutRow[] }
 export interface CleanupResult { removed: { path: string; repos: string[]; bytes: number }[]; freed_bytes: number; dry_run: boolean }
 export interface HeatResult { metric: string; label: string; max: number; values: Record<string, number>; raw: Record<string, number> }
-export interface RetrievalStatus { embedding: { provider: string; model: string; dimensions: number; offline: boolean }; rerank: { provider: string; model: string; configured: boolean; depth: number } }
+export interface RetrievalStatus { embedding_state?: { stale: boolean; message: string }; embedding: { provider: string; model: string; dimensions: number; offline: boolean }; rerank: { provider: string; model: string; configured: boolean; depth: number } }
 export interface OwnerRow { author: string; share: number; commits: number; lines: number; last_commit_at: string; files?: string[] }
 export interface OwnershipArea { area: string; owners: OwnerRow[]; bus_factor: number; commits: number; last_activity: string; risk: "ok" | "single_owner" | "stale_owner" }
 export interface OwnershipOverview { repo_id: string; repo: string; summary: { people: number; areas: number; bus_factor: number; areas_at_risk: number }; areas: OwnershipArea[]; people: { author: string; share: number; commits: number; last_commit_at: string; areas: string[] }[] }
@@ -240,3 +240,4 @@ export interface SkillFile { name: string; filename: string; markdown: string; e
 
 export interface SysPoint { t: number; host_cpu: number | null; process_cpu: number | null; mem_used: number | null; mem_total: number | null; process_rss: number | null; rx_bps: number | null; tx_bps: number | null; rps: number; error_rate: number; p50_ms: number | null; p95_ms: number | null; container_limit: number | null }
 export interface SysMetrics { available: boolean; cores: number | null; load_average: number[] | null; uptime_s: number; threads: number | null; current: SysPoint; history: SysPoint[]; interval_s: number }
+export interface FeedbackSummary { days: number; total: number; helpful_rate: number | null; by_kind: Record<string, { up: number; down: number }>; from_memory: { total: number; helpful_rate: number | null } }

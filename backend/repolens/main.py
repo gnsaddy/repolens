@@ -11,6 +11,7 @@ from sqlalchemy import text
 from .api import (
     auth,
     bitbucket,
+    feedback,
     github,
     investigations,
     jira,
@@ -172,6 +173,7 @@ def create_app() -> FastAPI:
         settings.router,
         usage.router,
         metrics.router,
+        feedback.router,
         jira.router,
         webhooks.router,
         wiki.router,
