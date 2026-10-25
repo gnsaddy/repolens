@@ -63,7 +63,7 @@ class GoogleDocsSource(Connector):
             "Service-account key (JSON)",
             type="textarea",
             secret=True,
-            placeholder='{"type": "service_account", …}',
+            placeholder="Paste the contents of the key file you downloaded from Google Cloud",
             help="The folder must be shared with the key's client_email.",
         ),
     ]
