@@ -3,11 +3,12 @@
 import hashlib
 import json
 import re
+import time
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .config import get_settings
-from .services import ratelimit
+from .services import ratelimit, sysmetrics
 
 _EXEMPT = ("/healthz", "/readyz", "/metrics")
 _AUTH = re.compile(r"^/api/auth/(login|register|sso/(discover|start|exchange))$")
@@ -95,8 +96,12 @@ class EdgeGuard:
                     raise _TooLarge()
             return msg
 
+        began = time.monotonic()
+
         async def with_headers(msg: Message) -> None:
             if msg["type"] == "http.response.start":
+                if path.startswith(("/api/", "/scim/")):
+                    sysmetrics.record_request(int(msg["status"]), (time.monotonic() - began) * 1000)
                 have = {k.lower() for k, _ in msg["headers"]}
                 extra = [(k, v) for k, v in HEADERS if k not in have]
                 if path.startswith(("/api/", "/scim/")):

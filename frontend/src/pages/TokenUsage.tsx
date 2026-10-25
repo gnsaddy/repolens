@@ -8,7 +8,11 @@ import { fmtCost, fmtTokens, pct } from "@/lib/utils";
 const COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#64748b"];
 const delta = (d: number | null) => (d == null ? undefined : `${d >= 0 ? "↑" : "↓"} ${Math.abs(Math.round(d * 100))}% vs previous period`);
 
-function Table({ rows, label }: { rows: UsageGroup[]; label: string }) {
+/** A row with no tokens and no cost says nothing, so it is not shown. */
+const used = (r: UsageGroup) => r.input_tokens + r.output_tokens > 0 || r.cost > 0;
+
+function Table({ rows: all, label }: { rows: UsageGroup[]; label: string }) {
+  const rows = all.filter(used);
   if (!rows.length) return <Empty>No usage recorded yet.</Empty>;
   return (
     <table className="w-full text-sm">
@@ -38,17 +42,17 @@ export default function TokenUsage() {
         <Stat label="Cache hit rate" value={pct(t?.cache_hit_rate)} hint={t ? `~${fmtTokens(t.tokens_avoided)} tokens avoided (estimate)` : undefined} />
         <Stat label="Cost / successful RCA" value={t?.cost_per_successful_rca != null ? fmtCost(t.cost_per_successful_rca) : "—"} hint={t ? `${t.successful_investigations} completed · ${pct(t.error_rate)} errors` : undefined} />
       </div>
-      {unpriced && <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0 because no pricing is configured for these models. Set <code>REPOLENS_PRICING_JSON</code> to enable cost estimates.</div>}
+      {unpriced && <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no pricing is configured for these models. Set <code>REPOLENS_PRICING_JSON</code> to enable cost estimates.</div>}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardTitle>Tokens per day</CardTitle>
           {!data?.daily.length ? <Empty>No data yet.</Empty> : (
             <div className="h-64"><ResponsiveContainer><BarChart data={data.daily}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} tickFormatter={fmtTokens} /><Tooltip formatter={(v) => fmtTokens(Number(v))} /><Bar dataKey="tokens" fill="#4f46e5" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>)}
         </Card>
-        <Card><CardTitle>Cost by model</CardTitle>
-          {!data?.by_model.length ? <Empty>No data yet.</Empty> : (<>
-            <div className="h-40"><ResponsiveContainer><PieChart><Pie data={data.by_model.map((m) => ({ name: m.name, value: m.input_tokens + m.output_tokens }))} dataKey="value" innerRadius={40} outerRadius={65}>
-              {data.by_model.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip formatter={(v) => fmtTokens(Number(v))} /></PieChart></ResponsiveContainer></div>
-            <ul className="mt-2 space-y-1 text-xs">{data.by_model.map((m, i) => <li key={m.name} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{m.name}<span className="ml-auto text-muted">{fmtCost(m.cost)}</span></li>)}</ul></>)}
+        <Card><CardTitle>Share of tokens by model</CardTitle>
+          {!data?.by_model.filter(used).length ? <Empty>No data yet.</Empty> : (<>
+            <div className="h-40"><ResponsiveContainer><PieChart><Pie data={data.by_model.filter(used).map((m) => ({ name: m.name, value: m.input_tokens + m.output_tokens }))} dataKey="value" innerRadius={40} outerRadius={65}>
+              {data.by_model.filter(used).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip formatter={(v) => fmtTokens(Number(v))} /></PieChart></ResponsiveContainer></div>
+            <ul className="mt-2 space-y-1 text-xs">{data.by_model.filter(used).map((m, i) => <li key={m.name} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} /><span className="truncate" title={m.name}>{m.name}</span><span className="ml-auto shrink-0 text-muted">{fmtTokens(m.input_tokens + m.output_tokens)}{m.cost > 0 ? ` · ${fmtCost(m.cost)}` : ""}</span></li>)}</ul></>)}
         </Card>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
@@ -57,7 +61,7 @@ export default function TokenUsage() {
         <Card><CardTitle>By workflow</CardTitle><Table rows={data?.by_workflow ?? []} label="Workflow" /></Card>
       </div>
       {data && (data.budgets.daily > 0 || data.budgets.monthly > 0) && (
-        <p className="mt-4 text-xs text-muted">Budgets: {data.budgets.daily > 0 && `daily $${data.budgets.daily}`} {data.budgets.monthly > 0 && `monthly $${data.budgets.monthly}`} — optional inference stops when exceeded.</p>)}
+        <p className="mt-4 text-xs text-muted">Budgets: {data.budgets.daily > 0 && `daily ${fmtCost(data.budgets.daily)}`} {data.budgets.monthly > 0 && `monthly ${fmtCost(data.budgets.monthly)}`} — optional inference stops when exceeded.</p>)}
     </div>
   );
 }

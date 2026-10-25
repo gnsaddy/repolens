@@ -15,7 +15,22 @@ export function timeAgo(iso: string | null | undefined): string {
 export const fmtTokens = (n: number): string =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
 
-export const fmtCost = (n: number): string => `$${n.toFixed(n < 1 ? 4 : 2)}`;
+const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usdSmall = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 4 });
+/** US dollars: $1,234.57 for amounts from $1, and up to four decimals below $1 so small costs stay visible ($0.0105). */
+export const fmtCost = (n: number): string => (Math.abs(n) >= 1 ? usd2 : usdSmall).format(n || 0);
+export const fmtBytes = (n: number | null | undefined): string => {
+  if (n == null) return "—";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0, v = n;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${u[i]}`;
+};
+export const fmtRate = (bps: number | null | undefined): string => (bps == null ? "—" : `${fmtBytes(bps)}/s`);
+export const fmtDuration = (s: number): string => {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+};
 
 export const pct = (n: number | null | undefined): string => (n == null ? "—" : `${Math.round(n * 100)}%`);
 

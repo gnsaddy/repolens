@@ -283,3 +283,39 @@ def test_interactive_docs_exist_only_in_development(monkeypatch):
         and c.get("/openapi.json").status_code == 404
         and c.get("/redoc").status_code == 404
     )
+
+
+def test_system_metrics_report_cpu_memory_network_and_request_rate(client, auth, monkeypatch):
+    from repolens.services import sysmetrics
+
+    monkeypatch.setenv("REPOLENS_RATE_LIMIT_ENABLED", "false")
+    for _ in range(3):
+        client.get("/api/auth/me", headers=auth)
+    sysmetrics.sample()
+    s = client.get("/api/metrics/system", headers=auth).json()
+    assert s["cores"] >= 1 and s["interval_s"] == 5.0 and s["history"] and "load_average" in s
+    cur = s["current"]
+    assert {
+        "host_cpu",
+        "process_cpu",
+        "mem_used",
+        "mem_total",
+        "process_rss",
+        "rx_bps",
+        "tx_bps",
+        "rps",
+        "p95_ms",
+    } <= set(cur)
+    if s["available"]:  # Linux
+        assert cur["mem_total"] > 0 and cur["process_rss"] > 0
+    # only admins may read how loaded the server is
+    client.post(
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "member-pass-1", "role": "member"}
+    )
+    m = {
+        "Authorization": "Bearer "
+        + client.post("/api/auth/login", json={"email": "m@acme.io", "password": "member-pass-1"}).json()[
+            "access_token"
+        ]
+    }
+    assert client.get("/api/metrics/system", headers=m).status_code == 403

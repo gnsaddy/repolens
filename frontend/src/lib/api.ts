@@ -237,3 +237,6 @@ export interface NodeBrief { summary: string; callers: BriefRef[]; dependencies:
 
 export interface MemoryEntry { id: string; asked: string; answer: string; sources: string[]; hits: number; tokens: number; tokens_saved: number; created_at: string; last_hit_at: string | null; kind: string; score?: number; matched?: "question" | "answer" }
 export interface SkillFile { name: string; filename: string; markdown: string; entries: number }
+
+export interface SysPoint { t: number; host_cpu: number | null; process_cpu: number | null; mem_used: number | null; mem_total: number | null; process_rss: number | null; rx_bps: number | null; tx_bps: number | null; rps: number; error_rate: number; p50_ms: number | null; p95_ms: number | null; container_limit: number | null }
+export interface SysMetrics { available: boolean; cores: number | null; load_average: number[] | null; uptime_s: number; threads: number | null; current: SysPoint; history: SysPoint[]; interval_s: number }

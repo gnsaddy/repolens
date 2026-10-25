@@ -24,6 +24,9 @@ describe("utils", () => {
     expect(fmtTokens(2_400_000)).toBe("2.40M");
     expect(fmtTokens(1500)).toBe("1.5K");
     expect(fmtCost(8.4231)).toBe("$8.42");
+    expect(fmtCost(1234.567)).toBe("$1,234.57");
+    expect(fmtCost(0.42)).toBe("$0.42");
+    expect(fmtCost(0)).toBe("$0.00");
     expect(fmtCost(0.0105)).toBe("$0.0105");
     expect(pct(0.892)).toBe("89%");
     expect(pct(null)).toBe("—");

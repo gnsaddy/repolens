@@ -19,8 +19,9 @@ from ..models import (
     User,
     UserSession,
 )
-from ..services import answer_memory, usage
+from ..services import answer_memory, sysmetrics, usage
 from ..services.access import scope_for
+from ..services.policy import authorize
 
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
 
@@ -92,3 +93,10 @@ def overview(
             "active_users_period": active_users,
         },
     }
+
+
+@router.get("/system")
+def system(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """CPU, memory, network and request rate of this server (admins)."""
+    authorize(db, p, "llm.configure", "system-metrics", op="read")
+    return sysmetrics.snapshot()

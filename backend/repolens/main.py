@@ -83,6 +83,18 @@ async def _source_scheduler(minutes: float = 5.0) -> None:
         await asyncio.sleep(minutes * 60)
 
 
+async def _system_sampler() -> None:
+    """Sample CPU, memory, network and request rate every few seconds for the Insights page."""
+    from .services import sysmetrics
+
+    while True:
+        try:
+            await asyncio.to_thread(sysmetrics.sample)
+        except Exception:
+            logging.getLogger("repolens.system").exception("system sample failed")
+        await asyncio.sleep(sysmetrics.INTERVAL)
+
+
 async def _investigation_reaper(seconds: float = 60.0) -> None:
     """Fail investigations left 'running' by a restart or a hung call, so they never spin forever."""
     from .db import session_factory
@@ -112,7 +124,11 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev, and be at least 32 characters")
     if s.env == "dev":  # other environments run `alembic upgrade head` (see Dockerfile entrypoint)
         create_all()
-    tasks = [asyncio.create_task(_source_scheduler()), asyncio.create_task(_investigation_reaper())]
+    tasks = [
+        asyncio.create_task(_source_scheduler()),
+        asyncio.create_task(_investigation_reaper()),
+        asyncio.create_task(_system_sampler()),
+    ]
     if s.checkout_ttl_days > 0:
         tasks.append(asyncio.create_task(_checkout_janitor()))
     yield
