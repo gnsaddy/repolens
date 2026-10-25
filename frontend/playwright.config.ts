@@ -13,7 +13,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"]],
+  reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],  // "github" turns failures into annotations on the run
   use: { baseURL: `http://127.0.0.1:${WEB}`, trace: "retain-on-failure", launchOptions: process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {} },
   // the real API on a throwaway SQLite database, and the real web app proxying to it
   webServer: [

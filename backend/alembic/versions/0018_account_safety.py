@@ -20,7 +20,10 @@ def upgrade() -> None:
     bind = op.get_bind()
     have = {c["name"] for c in sa.inspect(bind).get_columns("users")}
     for name, col in (
-        ("totp_secret_encrypted", sa.Column("totp_secret_encrypted", sa.String(300), nullable=False, server_default="")),
+        (
+            "totp_secret_encrypted",
+            sa.Column("totp_secret_encrypted", sa.String(300), nullable=False, server_default=""),
+        ),
         ("totp_enabled", sa.Column("totp_enabled", sa.Boolean, nullable=False, server_default=sa.false())),
         ("totp_last_step", sa.Column("totp_last_step", sa.Integer, nullable=False, server_default="0")),
         ("recovery_codes", sa.Column("recovery_codes", sa.JSON, nullable=False, server_default="[]")),
