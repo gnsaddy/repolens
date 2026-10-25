@@ -6,6 +6,11 @@ Repository intelligence and evidence-backed root-cause analysis. See [`idea.md`]
 **Stack:** FastAPI · LangGraph · PostgreSQL + pgvector · Tree-sitter · Vite + React + TypeScript + Tailwind ·
 OpenTelemetry/Prometheus · Docker · Kubernetes · GitHub Actions.
 
+**What it does:** turns your docs, pull requests, tickets and code into one searchable, connected knowledge base, and answers
+from it with citations while keeping model cost low: several models are routed by task difficulty, repeated questions are
+answered from a local memory, and retrieved context is condensed before it reaches a model. Nothing needs a model to work;
+connecting one only improves the wording.
+
 **Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
 Investigation View (root cause, confidence, timeline, code/commit/doc/test/PR evidence, report, human review), **Change
 Risk** (score a commit, branch or PR with signals, blast radius and tests to run), Token Usage & Cost, Jira, Settings (LLM
@@ -15,6 +20,15 @@ provider + key, GitHub sign-in).
 requests into one hybrid index and a typed knowledge graph (calls, imports, tests, doc links/mentions, semantic
 similarity, PR↔commit↔file). See [`docs/architecture.md`](docs/architecture.md), the feature checklist in [`docs/features.md`](docs/features.md) and the
 benchmark in [`evals/`](evals/README.md).
+
+## Highlights
+
+* **Investigations** from a bug report, a CI log or a Jira ticket: ranked causes with cited code, commits and pull requests, an error-against-code reading (KeyError, None, index, divide-by-zero), human review, and reports you approve before they reach Jira.
+* **Jira**: read tickets and comments in the app, run an analysis of what was tried and what is unknown, then investigate with those signals.
+* **Models and routing**: connect several models and providers, test each, and give each a tier. Plain tasks go to cheaper models, hard ones to stronger models, with fallback and one-step escalation.
+* **Answer memory**: earlier answers to similar questions are shown first and reused when the sources have not changed.
+* **DeepMind Wiki**: search by meaning, edit pages in place, a per-repository code atlas, and an at-a-glance card (kind, owner, warnings, commands) for every page.
+* **Accounts**: profile, device sessions you can end, idle timeout, sign-in rate limiting, and an Insights page for utilisation and AI savings.
 
 ## DeepMind Wiki
 
