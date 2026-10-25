@@ -86,7 +86,7 @@ Settings > AI & search: **Anthropic Claude**, **Google Gemini**, any **OpenAI-co
 
 Settings → AI & search → **Models and routing** lets you connect several models, even from different providers (Gemini, Claude, any OpenAI-compatible endpoint). After **Test connection** you tick the models to use and give each a tier: *light* (quick, cheap), *standard* or *strong* (hard problems). Tiers are guessed from the model name.
 
-Each task picks a tier from what it needs. Answering a question and connection tests start light; root-cause write-ups, doc updates and runbooks start standard. Signals such as a long prompt, a stack trace, a lot of evidence, several repositories or low confidence push a task up a tier. **Savings mode** (on by default) sends plain tasks one tier down. When the monthly budget is nearly used, everything goes to the cheapest tier.
+Each task picks a tier from what it needs. Answering a question and connection tests start light; root-cause write-ups, doc updates and runbooks start standard; suggested code fixes start on the strongest tier. Signals such as a long prompt, a stack trace, a lot of evidence, several repositories or low confidence push a task up a tier. **Savings mode** (on by default) sends plain tasks one tier down. When the monthly budget is nearly used, everything goes to the cheapest tier.
 
 If a model fails, the next one in the chain answers. If a model returns an answer that cannot be used (for example malformed JSON), one stronger model is tried. A single configured model is used for everything, exactly as before. The routing plan on the page shows which model each kind of task uses right now, and every answer records which model produced it.
 
@@ -142,6 +142,10 @@ Add the RepoLens Action to a repository and every pull request gets one comment,
 ## Use RepoLens from your editor (MCP) and access tokens
 
 Create a token under **Profile → Access tokens** (read, or read and start investigations; it expires and can be revoked) and add RepoLens to your editor: `claude mcp add --transport http repolens https://<your-server>/api/mcp --header "Authorization: Bearer rlp_…"` for Claude Code, a `url` + `headers` entry for Cursor, or the standard input/output bridge for Claude Desktop (the page shows each snippet with your token filled in). The editor then has these tools: `search`, `ask`, `find_symbol`, `symbol_brief`, `read_wiki_page`, `who_to_ask`, `change_risk`, `get_investigation`, and `investigate` (write tokens only). Answers cite files and lines; nothing is sent anywhere except to your own RepoLens server, which only uses the language model you connected.
+
+## Suggested fixes (with your approval)
+
+On a confirmed investigation, **Propose a fix** drafts a small code change for the root cause: the exact lines to replace, a diff you can read, the tests worth adding, and a syntax check. It is limited to three files and a short change, never touches build, deployment, dependency or secrets files, and is never run. You can download it as a patch, reject it, or approve it, which creates a branch and opens a **draft** pull request on GitHub for someone to review. RepoLens never merges, and refuses if the files changed since the fix was drafted. With a connected language model it writes the change itself; without one it only offers a plain template for simple cases (a missing dictionary key) and otherwise says it cannot help.
 
 ## Dashboard
 

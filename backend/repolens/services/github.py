@@ -67,6 +67,67 @@ class GitHubClient:
             raise GitHubError(f"GitHub returned {r.status_code}", r.status_code)
         return r.json()
 
+    # ---- writing: only used after a person approves a drafted fix ----
+    def _send(self, method: str, path: str, body: dict) -> dict:
+        try:
+            r = self.http.request(method, path, json=body)
+        except httpx.HTTPError as e:
+            raise GitHubError(f"GitHub unreachable: {type(e).__name__}") from e
+        if r.status_code in (401, 403, 404):
+            raise GitHubError(
+                f"GitHub refused ({r.status_code}). The saved token needs write access to this repository "
+                "(contents and pull requests).",
+                r.status_code,
+            )
+        if r.status_code == 422:
+            raise GitHubError(
+                f"GitHub rejected the request: {(r.json().get('message') if r.content else '')[:160]}", 422
+            )
+        if r.status_code >= 400:
+            raise GitHubError(f"GitHub returned {r.status_code}", r.status_code)
+        out = r.json() if r.content else {}
+        return out if isinstance(out, dict) else {}
+
+    def default_branch(self, repo: str) -> str:
+        d = self._get(f"/repos/{repo}")
+        return str(d.get("default_branch", "main")) if isinstance(d, dict) else "main"
+
+    def branch_head(self, repo: str, branch: str) -> str:
+        d = self._get(f"/repos/{repo}/git/ref/heads/{branch}")
+        return str(d["object"]["sha"]) if isinstance(d, dict) else ""
+
+    def create_branch(self, repo: str, branch: str, sha: str) -> None:
+        self._send("POST", f"/repos/{repo}/git/refs", {"ref": f"refs/heads/{branch}", "sha": sha})
+
+    def file_at(self, repo: str, path: str, ref: str) -> tuple[str, str]:
+        """(text, blob sha) of a file on a branch."""
+        import base64
+
+        d = self._get(f"/repos/{repo}/contents/{path}", ref=ref)
+        if not isinstance(d, dict) or d.get("encoding") != "base64":
+            raise GitHubError("GitHub did not return that file's content")
+        return base64.b64decode(d["content"]).decode("utf-8", errors="replace"), str(d["sha"])
+
+    def put_file(self, repo: str, path: str, branch: str, text: str, message: str, blob_sha: str) -> None:
+        import base64
+
+        self._send(
+            "PUT",
+            f"/repos/{repo}/contents/{path}",
+            {
+                "message": message,
+                "content": base64.b64encode(text.encode()).decode(),
+                "branch": branch,
+                "sha": blob_sha,
+            },
+        )
+
+    def open_pull(self, repo: str, title: str, head: str, base: str, body: str, draft: bool = True) -> str:
+        d = self._send(
+            "POST", f"/repos/{repo}/pulls", {"title": title, "head": head, "base": base, "body": body, "draft": draft}
+        )
+        return str(d.get("html_url", ""))
+
     def whoami(self) -> dict:
         d = self._get("/user")
         return d if isinstance(d, dict) else {}

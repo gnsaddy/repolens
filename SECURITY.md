@@ -62,6 +62,7 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
 - Optional authenticator-app sign-in (RFC 6238, one use per 30-second step, encrypted secret, hashed one-time recovery codes); invitations and password resets are one-time links stored as hashes, expire, replace each other and end the person's other sessions; open registration can be closed so people join by invitation.
 - Records are not kept forever: a daily retention sweep removes old feedback, audit events, ended sessions and used links (periods are settings), and a workspace can be deleted completely with one command.
 - Personal access tokens (`rlp_…`) are shown once, stored as hashes, expire, can be revoked, are capped below admin (read = viewer, write = at most member), cannot mint tokens or change account security, and every MCP tool call is audited by tool name only.
+- Suggested fixes are drafts: only confirmed investigations qualify, evidence and code are treated as untrusted text in the prompt, edits must match existing text exactly once, build/deploy/dependency/secret files are refused, nothing is executed, diffs have secrets masked, and a person must approve before a branch and a *draft* pull request are created (the saved GitHub token needs write access for this; RepoLens never merges).
 - An automated audit (`tests/test_security_edge.py`) fails the build if any endpoint other than the deliberate public ones works
   without a session, if a state-changing endpoint lacks a policy check, or if a viewer can change anything.
 

@@ -170,6 +170,14 @@ audit are the same as in the web app. `services/api_tokens.py` and `ApiToken` ba
 graph; `integrations/github-action/review.py` (standard library only) reads the PR's files from GitHub, calls
 `POST /api/risk/pr-report` with a read token and keeps one sticky comment up to date.
 
+## Suggested fixes
+`services/fixes.py` builds a fix from a confirmed investigation: it reads the evidence files at the indexed commit, asks the `fix-writer`
+task (strong tier of the model router, strict JSON of `{path, old, new}` replacements) or falls back to a template over
+`cause_hints`, applies the replacements (each `old` must occur exactly once; forbidden paths are refused), computes the unified diff
+with secrets masked, checks Python syntax with `ast.parse`, and stores a `FixProposal` (migration 0020). `api/fixes.py` lists, reads,
+serves the patch and records the decision; approval re-reads the files from the default branch through the GitHub write helpers,
+re-applies the edits and opens a draft pull request, or fails without writing anything if they no longer apply.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

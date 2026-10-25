@@ -138,6 +138,10 @@ class InvestigationOut(InvestigationSummary):
     hypotheses: list[HypothesisOut]
 
 
+class FixDecisionIn(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+
+
 class ReviewIn(BaseModel):
     outcome: str = Field(pattern="^(confirmed|rejected)$")
     note: str = ""

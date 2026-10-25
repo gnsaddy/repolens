@@ -58,6 +58,31 @@ class User(Base):
     recovery_codes: Mapped[list] = mapped_column(JSON, default=list)  # sha256 of unused one-time recovery codes
 
 
+class FixProposal(Base):
+    """A drafted code change for a confirmed root cause. Nothing is applied anywhere until a person approves it."""
+
+    __tablename__ = "fix_proposals"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    investigation_id: Mapped[str] = mapped_column(ForeignKey("investigations.id", ondelete="CASCADE"), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    base_sha: Mapped[str] = mapped_column(String(64), default="")  # the indexed commit the edits were made against
+    title: Mapped[str] = mapped_column(String(300))
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    edits: Mapped[list] = mapped_column(JSON, default=list)  # [{path, old, new}] exact-text replacements
+    diff: Mapped[str] = mapped_column(Text, default="")
+    checks: Mapped[dict] = mapped_column(JSON, default=dict)  # {syntax_ok, files, lines_changed, notes}
+    tests: Mapped[list] = mapped_column(JSON, default=list)  # tests to run or add, as advice
+    drafted_by: Mapped[str] = mapped_column(String(10), default="template")  # llm | template
+    model: Mapped[str] = mapped_column(String(100), default="")
+    status: Mapped[str] = mapped_column(String(10), default="pending", index=True)  # pending|approved|rejected|failed
+    result: Mapped[str] = mapped_column(Text, default="")
+    pr_url: Mapped[str] = mapped_column(String(500), default="")
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ApiToken(Base):
     """A personal access token for scripts, CI and editor tools (MCP). Only a hash is stored; it acts as its owner with
     reduced power: `read` tokens are viewers, `write` tokens are at most members, never admins."""

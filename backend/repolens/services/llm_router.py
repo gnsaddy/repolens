@@ -25,6 +25,7 @@ KIND_TIER = {
     "investigator": "standard",  # root-cause narrative
     "doc-updater": "standard",
     "runbook-writer": "standard",
+    "fix-writer": "strong",  # writing code that a person will review: use the best model available
 }
 KIND_LABEL = {
     "settings-test": "Connection tests",
@@ -32,6 +33,7 @@ KIND_LABEL = {
     "investigator": "Root-cause analysis",
     "doc-updater": "Wiki page updates",
     "runbook-writer": "Runbook drafts",
+    "fix-writer": "Suggested code fixes",
 }
 
 

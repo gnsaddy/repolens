@@ -14,6 +14,7 @@ from .api import (
     auth,
     bitbucket,
     feedback,
+    fixes,
     github,
     investigations,
     jira,
@@ -201,6 +202,7 @@ def create_app() -> FastAPI:
         feedback.router,
         jira.router,
         mcp.router,
+        fixes.router,
         webhooks.router,
         wiki.router,
     ):

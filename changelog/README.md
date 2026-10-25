@@ -11,6 +11,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 
 <!-- entries:start -->
 - 2026-10-25 · [Refusing weak document matches: measured, not shipped](2026-10-25-weak-match-refusal-evaluated.md)
+- 2026-10-25 · [Suggested fixes with human approval](2026-10-25-suggested-fixes.md)
 - 2026-10-25 · [Security hardening, Insights, evaluation suites and feedback](2026-10-25-security-insights-evals.md)
 - 2026-10-25 · [Retention sweep and workspace deletion](2026-10-25-retention-and-cleanup.md)
 - 2026-10-25 · [People moved into Settings; log rotation and cleaner logs](2026-10-25-people-in-settings-and-log-rotation.md)

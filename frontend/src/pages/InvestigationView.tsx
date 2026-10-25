@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/Modal";
+import FixProposals from "@/components/FixProposals";
 import { CheckCircle2, CircleDot, FileText, FlaskConical, GitCommit, GitPullRequest, Network, ThumbsDown, ThumbsUp, Ticket } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -122,6 +123,7 @@ export default function InvestigationView() {
               </div>)}
           </Card>
           <div className="space-y-4">
+            {inv.status === "completed" && inv.root_cause_status === "confirmed" && <FixProposals investigationId={inv.id} canAct={canWrite(user)} />}
             <Card>
               <CardTitle>Verification</CardTitle>
               <div className="flex items-center gap-2 text-sm">
