@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     retention_audit_days: int = 730
     retention_sessions_days: int = 30  # ended or expired sign-ins and used or expired invitation links
     retention_investigation_days: int = 0  # reports are kept until deleted, unless set
+    log_level: str = "INFO"
+    log_file: str = ""  # also write logs to this file, rotated (empty = standard output only)
+    log_max_mb: int = 10  # size of one log file before it is rotated
+    log_backups: int = 5  # rotated files kept: at most (backups + 1) x max_mb on disk
     session_idle_minutes: int = 60 * 8  # a session unused this long is ended (0 = never)
     login_max_failures: int = 5  # wrong passwords per account and address before pausing
     login_window_seconds: int = 600

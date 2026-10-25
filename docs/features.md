@@ -137,7 +137,7 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 
 ## People, invitations and authenticator sign-in
 
-Admins open **People** to see everyone in the workspace and how they sign in. **Invite someone** creates the account and a one-time link the person uses to choose their own password; **Reset password** makes a fresh link for someone who forgot theirs (the old password keeps working until the link is used, and using it signs out their other devices). Links are handed over by you, nothing is sent by e-mail.
+Admins open **Settings → People** to see everyone in the workspace and how they sign in. **Invite someone** creates the account and a one-time link the person uses to choose their own password; **Reset password** makes a fresh link for someone who forgot theirs (the old password keeps working until the link is used, and using it signs out their other devices). Links are handed over by you, nothing is sent by e-mail.
 
 Anyone can add an **authenticator app** on their Profile (optional): after the password, sign-in asks for a six-digit code, with eight recovery codes shown once for a lost phone. Admins can remove a lost authenticator. Turn off open registration with `REPOLENS_ALLOW_REGISTRATION=false` once your workspace exists; people then join by invitation.
 

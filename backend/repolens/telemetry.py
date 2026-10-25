@@ -14,11 +14,43 @@ INVESTIGATIONS = Counter("repolens_investigations_total", "Investigations", ["st
 LLM_TOKENS = Counter("repolens_llm_tokens_total", "LLM tokens", ["kind"])
 
 
+LOG_FORMAT = '{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}'
+
+
 def setup_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format='{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}',
-    )
+    """JSON log lines. With REPOLENS_LOG_FILE they go to a size-limited rotating file (at most (backups + 1) x max MB
+    on disk) and only warnings stay on standard output; without it everything goes to standard output, where Docker or
+    Kubernetes rotate it."""
+    from logging.handlers import RotatingFileHandler
+
+    s = get_settings()
+    root = logging.getLogger()
+    level = getattr(logging, s.log_level.upper(), logging.INFO)
+    root.setLevel(level)
+    for h in list(root.handlers):
+        if getattr(h, "_repolens", False):
+            root.removeHandler(h)
+    fmt = logging.Formatter(LOG_FORMAT)
+    out = logging.StreamHandler()
+    out.setFormatter(fmt)
+    out._repolens = True  # type: ignore[attr-defined]
+    handlers: list[logging.Handler] = [out]
+    if s.log_file:
+        out.setLevel(logging.WARNING)
+        fh = RotatingFileHandler(
+            s.log_file, maxBytes=s.log_max_mb * 1024 * 1024, backupCount=s.log_backups, encoding="utf-8"
+        )
+        fh.setFormatter(fmt)
+        fh._repolens = True  # type: ignore[attr-defined]
+        handlers.append(fh)
+    for h in handlers:
+        root.addHandler(h)
+    for noisy in ("httpx", "httpcore", "httpx2"):  # their INFO lines carry full request URLs, query strings included
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    if s.log_file:  # uvicorn keeps its own handlers: give its error log the same file
+        for name in ("uvicorn", "uvicorn.error"):
+            lg = logging.getLogger(name)
+            lg.addHandler(handlers[-1])
 
 
 def setup_telemetry(app: FastAPI) -> None:

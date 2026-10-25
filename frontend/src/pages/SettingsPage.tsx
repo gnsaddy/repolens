@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Brain, Plug, SearchCheck, ShieldCheck } from "lucide-react";
+import { Brain, Plug, SearchCheck, ShieldCheck, UserCog } from "lucide-react";
+import { PeoplePanel } from "@/pages/People";
 import { useSearchParams } from "react-router-dom";
 import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
@@ -11,26 +12,28 @@ import { api, type ModelRegistry, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain]] as const;
+const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain], ["people", "People", UserCog]] as const;
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const admin = user?.role === "admin";
   const [sp, setSp] = useSearchParams();
-  const tab = sp.get("tab") === "ai" ? "ai" : "integrations";
+  const asked = sp.get("tab");
+  const tab = asked === "ai" ? "ai" : asked === "people" && admin ? "people" : "integrations";
+  const tabs = TABS.filter(([k]) => k !== "people" || admin);
   const registry = useQuery({ queryKey: ["model-registry"], queryFn: () => api<ModelRegistry>("/settings/models") });
   const managed = !!registry.data?.connections?.some((c) => !c.legacy); // once models are managed below, one card is enough
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Connect the tools your team already uses, and a language model if you want AI-written answers." />
+      <PageHeader title="Settings" subtitle="Connect the tools your team already uses, a language model if you want AI-written answers, and the people who use RepoLens." />
       <div role="tablist" aria-label="Settings sections" className="mb-6 flex gap-1 border-b border-line">
-        {TABS.map(([k, label, Icon]) => (
+        {tabs.map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setSp(k === "integrations" ? {} : { tab: k })}
             className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
-      <div className="max-w-4xl">
-        {tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
+      <div className={tab === "people" ? "" : "max-w-4xl"}>
+        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : (
           <div className="space-y-4">
             <OutboundCard />
             {!managed && <LanguageModelCard admin={admin} />}

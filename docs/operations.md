@@ -46,6 +46,23 @@ make backup                       # writes backups/repolens-<time>.dump from the
 make restore file=backups/repolens-20261025T021500Z.dump   # restores into a new database named repolens_restore
 ```
 
+## Logs: size and rotation
+
+Logs are JSON lines. They are written as they happen and never kept in memory, so they cost disk, not RAM (the server's own
+in-memory history is a few hundred small samples for the Insights page).
+
+- **What is logged:** application events, warnings and errors, and one line per API request: `METHOD /path status time caller`
+  (about 100 bytes). The query string is never logged, because it can contain what someone searched for. Health checks and the screens
+  that poll the server every few seconds are logged only when they fail. The HTTP client's own request lines are off for the same
+  reason. At a steady 10 requests per second that is roughly 85 MB a day of access lines before rotation.
+- **Bounding it:** set `REPOLENS_LOG_FILE=/path/repolens.log` and the file rotates at `REPOLENS_LOG_MAX_MB` (10) keeping
+  `REPOLENS_LOG_BACKUPS` (5) older files, so at most 60 MB; only warnings and errors then go to standard output. Without a log file,
+  everything goes to standard output: Docker Compose caps it at 5 files of 10 MB per container (`docker-compose.yml`), and Kubernetes
+  rotates container logs itself (the kubelet defaults to 10 MiB and 5 files per container). Ship logs to a central system if you
+  need more than that history.
+- `./run-local.sh` writes `.run/repolens.log` (rotating); `.run/api.log` holds only start-up output and errors.
+- The database also grows: the daily retention sweep below keeps audit events, feedback and old sessions bounded.
+
 ## Retention and deleting data
 
 A daily job removes what is no longer useful: remembered answers past their lifetime, feedback older than 365 days, audit events older

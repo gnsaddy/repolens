@@ -167,6 +167,7 @@ cmd_up() {
   export REPOLENS_ENV="${REPOLENS_ENV:-dev}"
   export REPOLENS_DATABASE_URL="${REPOLENS_DATABASE_URL:-sqlite:///$BACKEND/data/repolens.db}"
   export REPOLENS_REPOS_DIR="${REPOLENS_REPOS_DIR:-$BACKEND/data/repos}"
+  export REPOLENS_LOG_FILE="${REPOLENS_LOG_FILE:-$RUN_DIR/repolens.log}"   # rotated: at most 6 x 10 MB; api.log keeps only start-up output and errors
   export REPOLENS_CORS_ORIGINS="${REPOLENS_CORS_ORIGINS:-[\"http://127.0.0.1:$WEB_PORT\",\"http://localhost:$WEB_PORT\"]}"
   [ -n "${LLM_PROVIDER:-}" ] && export REPOLENS_LLM_PROVIDER="$LLM_PROVIDER"
 
@@ -174,7 +175,7 @@ cmd_up() {
   say "Starting API on http://127.0.0.1:$API_PORT"
   local reload_flag=()
   [ "$RELOAD" = 1 ] && reload_flag=(--reload)
-  (cd "$BACKEND" && exec .venv/bin/uvicorn repolens.main:app --host 127.0.0.1 --port "$API_PORT" ${reload_flag[@]+"${reload_flag[@]}"}) \
+  (cd "$BACKEND" && exec .venv/bin/uvicorn repolens.main:app --no-access-log --host 127.0.0.1 --port "$API_PORT" ${reload_flag[@]+"${reload_flag[@]}"}) \
     >"$RUN_DIR/api.log" 2>&1 &
   PIDS+=("$!")
   echo "${PIDS[-1]}" >"$RUN_DIR/api.pid"

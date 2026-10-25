@@ -1,6 +1,11 @@
 # Local / self-hosted stack:  docker compose up --build   ->  http://localhost:8080
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }   # at most 50 MB of logs per container
+
 services:
   db:
+    logging: *logging
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: repolens
@@ -13,6 +18,7 @@ services:
       retries: 10
 
   api:
+    logging: *logging
     build: ./backend
     env_file: [{ path: .env, required: false }]
     environment:
@@ -27,6 +33,7 @@ services:
     ports: ["${API_PORT:-8000}:8000"]
 
   web:
+    logging: *logging
     build: ./frontend
     environment:
       API_UPSTREAM: http://api:8000

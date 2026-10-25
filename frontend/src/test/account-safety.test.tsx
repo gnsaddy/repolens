@@ -125,3 +125,30 @@ describe("Profile: authenticator app", () => {
     expect(await screen.findByRole("button", { name: "Set up" })).toBeInTheDocument();
   });
 });
+
+describe("People inside Settings", () => {
+  const people = [{ id: "1", email: "ana@acme.io", name: "Ana", role: "admin", active: true, auth_source: "password", totp_enabled: false, pending: null, created_at: new Date().toISOString() }];
+  const show = async (role: string, url: string) => {
+    localStorage.setItem("repolens.token", "tok");
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me({ role }));
+      if (u.endsWith("/auth/people")) return json(people);
+      return json({});
+    });
+    const { default: SettingsPage } = await import("@/pages/SettingsPage");
+    wrap(<SettingsPage />, url);
+  };
+  it("is a tab of Settings for admins", async () => {
+    await show("admin", "/settings?tab=people");
+    expect(await screen.findByRole("tab", { name: /People/ })).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "People" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Invite someone/ })).toBeInTheDocument();
+  });
+  it("is not offered to members, even by address", async () => {
+    await show("member", "/settings?tab=people");
+    await screen.findByRole("tablist", { name: "Settings sections" });
+    expect(screen.queryByRole("tab", { name: /People/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "People" })).not.toBeInTheDocument();
+  });
+});

@@ -13,6 +13,11 @@ interface LinkResult { link: string; expires_at: string }
 
 /** Everyone in the workspace: invite people, give someone a password-reset link, clear a lost authenticator. */
 export default function People() {
+  return <PeoplePanel standalone />;
+}
+
+/** The people list. Inside Settings it has no page header of its own. */
+export function PeoplePanel({ standalone = false }: { standalone?: boolean }) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
@@ -27,8 +32,12 @@ export default function People() {
   const full = (l: string) => `${window.location.origin}${l}`;
   return (
     <div>
-      <PageHeader title="People" subtitle="Invite people, and help someone who forgot their password or lost their phone. Nothing is e-mailed: you hand over a one-time link."
-        actions={<Button onClick={() => setInvite(true)}><UserPlus className="h-4 w-4" />Invite someone</Button>} />
+      {standalone ? (
+        <PageHeader title="People" subtitle="Invite people, and help someone who forgot their password or lost their phone. Nothing is e-mailed: you hand over a one-time link."
+          actions={<Button onClick={() => setInvite(true)}><UserPlus className="h-4 w-4" />Invite someone</Button>} />
+      ) : (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="max-w-xl text-sm text-muted">Invite people, and help someone who forgot their password or lost their phone. Nothing is e-mailed: you hand over a one-time link.</p>
+          <Button onClick={() => setInvite(true)}><UserPlus className="h-4 w-4" />Invite someone</Button></div>)}
       <ErrorNote error={reset.error ?? mfa.error} />
       {list.isLoading ? <Spinner /> : (
         <Card className="overflow-x-auto p-0">

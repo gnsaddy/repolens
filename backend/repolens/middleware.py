@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import re
 import time
 
@@ -11,6 +12,9 @@ from .config import get_settings
 from .services import ratelimit, sysmetrics
 
 _EXEMPT = ("/healthz", "/readyz", "/metrics")
+# polled by the UI every few seconds: logged only when something goes wrong
+_QUIET = ("/healthz", "/readyz", "/metrics", "/api/metrics/system", "/api/wiki/drift/count")
+access_log = logging.getLogger("repolens.access")
 _AUTH = re.compile(r"^/api/auth/(login|register|reset|sso/(discover|start|exchange))$")
 # calls that spend tokens, clone repositories or fan out work
 _HEAVY = re.compile(
@@ -100,8 +104,14 @@ class EdgeGuard:
 
         async def with_headers(msg: Message) -> None:
             if msg["type"] == "http.response.start":
+                ms = (time.monotonic() - began) * 1000
+                status = int(msg["status"])
                 if path.startswith(("/api/", "/scim/")):
-                    sysmetrics.record_request(int(msg["status"]), (time.monotonic() - began) * 1000)
+                    sysmetrics.record_request(status, ms)
+                if (
+                    status >= 400 or path not in _QUIET
+                ):  # the path only: query strings can hold what people searched for
+                    access_log.info("%s %s %d %.0fms %s", scope["method"], path, status, ms, _client(scope))
                 have = {k.lower() for k, _ in msg["headers"]}
                 extra = [(k, v) for k, v in HEADERS if k not in have]
                 if path.startswith(("/api/", "/scim/")):
