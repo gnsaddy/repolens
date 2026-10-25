@@ -135,6 +135,13 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Quality checks and feedback
+
+- **Evaluation suites** (`python -m repolens.evals.suites`, `make eval`): document question answering, answer-memory matching and model routing, scored offline against a recorded baseline. CI fails when a metric gets worse. See `evals/README.md` for the suites and the embedder comparison.
+- **Was this helpful?** Every answer has thumbs up and down (a thumbs-down asks what was wrong). Insights shows the share of helpful answers, and admins can export rated questions (`GET /api/feedback/export`) to grow the evaluation sets.
+- **Embedding changes are noticed:** the server remembers which model made the stored vectors; Settings warns when the configuration no longer matches, and `python -m repolens.devtools.reembed` prepares the database for the new model.
+- **Server load** (Insights, admins): CPU, memory, network and API request rate and latency, live.
+
 ## Search quality: embeddings and reranking
 
 - **Embeddings:** the default is an offline hash embedder (no network, deterministic). Set `REPOLENS_EMBEDDING_PROVIDER=openai` with `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` and `EMBEDDING_API_KEY` to use any OpenAI-compatible embedding service, including code-specific models. Set `EMBEDDING_SEND_DIMENSIONS=false` for providers that reject the `dimensions` field. `EMBEDDING_DIM` must match the model, and a re-index is needed after changing it.

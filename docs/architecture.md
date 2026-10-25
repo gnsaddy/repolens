@@ -143,6 +143,16 @@ everywhere else, and change their password (which ends the other sessions) under
 sign-in after repeated failures per account and address. `/api/metrics/overview` aggregates content, work done, AI use,
 savings and activity for the Insights page.
 
+## Evaluation suites, feedback and server metrics
+`repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
+and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and
+sweeps thresholds, `routing` replays task shapes through `decide()` against three priced virtual models. Embedders are
+pluggable (`--embedder http` for any OpenAI-compatible endpoint). `evals/baselines/suites.json` is the contract the CI gate enforces.
+`feedback_events` stores thumbs up/down with the (redacted) question and a few flags; `GET /api/feedback/summary` feeds Insights.
+`services/embedding_state.py` records the embedding model per workspace after the first index and compares it with the
+configuration. `services/sysmetrics.py` samples /proc every five seconds (CPU, memory, network) and the request guard records
+request rate and latency into the same ring buffer for `GET /api/metrics/system`.
+
 ## Not implemented
 Fix generation / Blue-Red-Judge agents and a generated-code execution sandbox, a GitHub App installation flow (the webhook
 receiver for `push` re-indexing is implemented), multi-factor authentication.
