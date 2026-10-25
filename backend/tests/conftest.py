@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from repolens import config, db
-from repolens.demo import build_demo_repo
+from tests.demo_repo import build_demo_repo
 
 
 @pytest.fixture(autouse=True)

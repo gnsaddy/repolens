@@ -2,14 +2,13 @@
 # RepoLens AI — run the whole project on your machine.
 #
 #   ./run-local.sh                 set up (first run only) and start API + web on SQLite
-#   ./run-local.sh up --seed       ... and load a demo repository with a real regression + an investigation
 #   ./run-local.sh up --postgres   use a throwaway PostgreSQL + pgvector container (needs Docker) instead of SQLite
 #   ./run-local.sh docker          the full Docker Compose stack (needs Docker)
 #   ./run-local.sh test            backend (pytest) + frontend (vitest) tests
 #   ./run-local.sh stop [--purge]  stop background processes / containers (--purge also deletes local data)
 #   ./run-local.sh help
 #
-# Options for `up`:  --api-port N (8000)  --web-port N (5173)  --reload  --seed  --postgres  --llm anthropic|openai
+# Options for `up`:  --api-port N (8000)  --web-port N (5173)  --reload  --postgres  --llm anthropic|openai
 #                    --lan  serve the web UI on all interfaces so another machine on your network can open it
 #                           (the API stays on 127.0.0.1 and is reachable only through the UI's proxy; dev mode, so
 #                            use a trusted network)
@@ -29,7 +28,6 @@ PG_NAME="repolens-local-pg"
 PG_VOLUME="repolens-local-pgdata"
 RELOAD=0
 LAN=0
-SEED=0
 POSTGRES=0
 PURGE=0
 
@@ -196,12 +194,6 @@ cmd_up() {
   wait_http "http://127.0.0.1:$WEB_PORT/" 60 || { tail -n 25 "$RUN_DIR/web.log" >&2; die "web UI did not start (log: $RUN_DIR/web.log)"; }
   ok "web UI is up"
 
-  if [ "$SEED" = 1 ]; then
-    say "Loading demo data"
-    (cd "$BACKEND" && .venv/bin/python scripts/seed_demo.py --api "http://127.0.0.1:$API_PORT" --path "$RUN_DIR/demo/user-service") \
-      || warn "demo seeding failed (the app still works)"
-  fi
-
   cat <<EOF
 
 ${B}RepoLens AI is running${N}
@@ -213,7 +205,6 @@ $( [ -n "$LAN_IP" ] && printf '  On your LAN  http://%s:%s\n' "$LAN_IP" "$WEB_PO
   Logs       $RUN_DIR/api.log   $RUN_DIR/web.log
 
   First time? Open the web UI and "Create a workspace" (the first user is the admin).
-$( [ "$SEED" = 1 ] && printf '  Demo login  demo@example.com / demo-password-123   (repository "user-service" + one investigation)\n' )
   Press Ctrl-C to stop.
 
 EOF
@@ -270,7 +261,6 @@ while [ "$#" -gt 0 ]; do
     --web-port) WEB_PORT="${2:?--web-port needs a value}"; shift 2 ;;
     --reload) RELOAD=1; shift ;;
     --lan) LAN=1; shift ;;
-    --seed) SEED=1; shift ;;
     --postgres) POSTGRES=1; shift ;;
     --purge) PURGE=1; shift ;;
     --llm) LLM_PROVIDER="${2:?--llm needs anthropic|openai}"; shift 2 ;;

@@ -210,7 +210,7 @@ def test_rate_limit_is_recorded_and_token_not_leaked(client, auth, demo_repo, gi
 
 
 def test_investigation_cites_the_pull_request(client, auth, synced):
-    from repolens.demo import BUG_REPORT
+    from tests.demo_repo import BUG_REPORT
 
     r = client.post("/api/investigations", headers=auth, json={"query": BUG_REPORT, "repo_ids": [synced["id"]]})
     inv = client.get(f"/api/investigations/{r.json()['id']}", headers=auth).json()

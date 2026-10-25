@@ -83,7 +83,7 @@ def test_configured_key_is_used_for_calls_with_price_override(client, auth, demo
     monkeypatch.setattr(llm, "_anthropic_call", fake)
     put(client, auth, input_price=3.0, output_price=15.0)
     repo = add_repo(client, auth, demo_repo[0])
-    from repolens.demo import BUG_REPORT
+    from tests.demo_repo import BUG_REPORT
 
     r = client.post("/api/investigations", headers=auth, json={"query": BUG_REPORT, "repo_ids": [repo["id"]]})
     inv = client.get(f"/api/investigations/{r.json()['id']}", headers=auth).json()

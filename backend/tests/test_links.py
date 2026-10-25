@@ -1,7 +1,6 @@
 import pytest
 
 from repolens.config import get_settings
-from repolens.demo import BUG_REPORT
 from repolens.models import GithubConnection, Repository
 from repolens.security import encrypt_secret
 from repolens.services import gitops, indexer
@@ -15,6 +14,7 @@ from repolens.services.links import (
     strip_credentials,
     web_base,
 )
+from tests.demo_repo import BUG_REPORT
 from tests.test_api import add_repo
 
 

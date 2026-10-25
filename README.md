@@ -46,9 +46,6 @@ Create a workspace on the login page (first user is admin). Add a language-model
 fully offline: retrieval, git-history correlation and ranking work without any model; set `anthropic`/`openai` for LLM
 narrative synthesis (and `REPOLENS_PRICING_JSON` for cost estimates).
 
-Demo data: `cd backend && python scripts/seed_demo.py` builds a small repo containing a real regression and runs an
-investigation on it.
-
 ## Develop
 
 ```bash

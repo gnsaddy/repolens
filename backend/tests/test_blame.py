@@ -1,6 +1,6 @@
-from repolens.demo import BUG_REPORT
 from repolens.services import gitops
 from tests.conftest import register
+from tests.demo_repo import BUG_REPORT
 from tests.test_api import add_repo
 from tests.test_risk import shop  # noqa: F401  (fixture)
 

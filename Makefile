@@ -1,4 +1,4 @@
-.PHONY: dev-api dev-web test lint up down seed
+.PHONY: dev-api dev-web test lint up down
 dev-api:   ## API with auto-reload on SQLite
 	cd backend && . .venv/bin/activate && uvicorn repolens.main:app --reload --port 8000
 dev-web:
@@ -13,5 +13,3 @@ up:
 	docker compose up --build -d
 down:
 	docker compose down
-seed:      ## needs the API on :8000
-	cd backend && . .venv/bin/activate && python scripts/seed_demo.py

@@ -6,8 +6,8 @@ import httpx
 import pytest
 
 from repolens.api import jira as jira_api
-from repolens.demo import BUG_REPORT
 from tests.conftest import register
+from tests.demo_repo import BUG_REPORT
 
 
 def add_repo(client, auth, path, name="user-service"):

@@ -304,7 +304,7 @@ def test_kg_models_have_no_dangling_edges(client, auth, indexed, session):
 
 
 def test_investigation_cites_related_docs_and_tests(client, auth, indexed):
-    from repolens.demo import BUG_REPORT
+    from tests.demo_repo import BUG_REPORT
 
     r = client.post("/api/investigations", headers=auth, json={"query": BUG_REPORT, "repo_ids": [indexed["id"]]})
     inv = client.get(f"/api/investigations/{r.json()['id']}", headers=auth).json()
