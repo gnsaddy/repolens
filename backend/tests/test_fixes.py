@@ -90,7 +90,9 @@ def pr_flow(monkeypatch, demo_repo):
     def handler(request: httpx.Request) -> httpx.Response:
         p, m = request.url.path, request.method
         if p == "/repos/acme/user-service" and m == "GET":
-            return httpx.Response(200, json={"default_branch": "main"})
+            if state.get("repo_status"):
+                return httpx.Response(state["repo_status"])
+            return httpx.Response(200, json={"default_branch": "main", **state.get("repo_info", {})})
         if p == "/repos/acme/user-service/git/ref/heads/main":
             return httpx.Response(200, json={"object": {"sha": "b" * 40}})
         if p == "/repos/acme/user-service/git/refs" and m == "POST":
@@ -169,6 +171,56 @@ def test_propose_review_download_and_open_a_draft_pull_request(client, auth, con
     assert NEW in sent and OLD not in sent
     again = client.post(f"/api/fix-proposals/{f['id']}/decision", headers=auth, json={"decision": "reject"})
     assert again.status_code == 409  # decided once
+
+
+def _pending(client, auth, confirmed, monkeypatch):
+    confirm(client, auth, confirmed)
+    monkeypatch.setattr(fixes, "_ask_model", lambda *a, **k: draft())
+    connect(client, auth, TOKEN)
+    return client.post(f"/api/investigations/{confirmed}/fix-proposals", headers=auth).json()
+
+
+def test_a_public_target_needs_an_explicit_confirmation_before_anything_is_published(
+    client, auth, confirmed, monkeypatch, pr_flow
+):
+    pr_flow["repo_info"] = {"private": False, "visibility": "public"}
+    f = _pending(client, auth, confirmed, monkeypatch)
+    assert f["target_public"] is True
+    assert client.get(f"/api/fix-proposals/{f['id']}", headers=auth).json()["target_public"] is True
+    url = f"/api/fix-proposals/{f['id']}/decision"
+    for body in ({"decision": "approve"}, {"decision": "approve", "confirm_public": False}):
+        r = client.post(url, headers=auth, json=body)
+        assert r.status_code == 409 and "public repository" in r.json()["detail"]
+    assert not pr_flow["refs"] and not pr_flow["puts"] and not pr_flow["pulls"]
+    assert client.get(f"/api/fix-proposals/{f['id']}", headers=auth).json()["status"] == "pending"  # still decidable
+    ok = client.post(url, headers=auth, json={"decision": "approve", "confirm_public": True})
+    assert ok.status_code == 200 and ok.json()["status"] == "approved" and pr_flow["pulls"]
+
+
+def test_rejecting_a_fix_for_a_public_repository_needs_no_confirmation(client, auth, confirmed, monkeypatch, pr_flow):
+    pr_flow["repo_info"] = {"private": False}
+    f = _pending(client, auth, confirmed, monkeypatch)
+    r = client.post(f"/api/fix-proposals/{f['id']}/decision", headers=auth, json={"decision": "reject"})
+    assert r.status_code == 200 and r.json()["status"] == "rejected"
+
+
+@pytest.mark.parametrize("info", [{"private": True, "visibility": "private"}, {"visibility": "internal"}])
+def test_a_private_target_behaves_as_before(client, auth, confirmed, monkeypatch, pr_flow, info):
+    pr_flow["repo_info"] = info
+    f = _pending(client, auth, confirmed, monkeypatch)
+    assert f["target_public"] is False
+    r = client.post(f"/api/fix-proposals/{f['id']}/decision", headers=auth, json={"decision": "approve"})
+    assert r.status_code == 200 and pr_flow["pulls"]
+
+
+def test_when_github_cannot_say_the_visibility_is_unknown_and_reading_still_works(
+    client, auth, confirmed, monkeypatch, pr_flow
+):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    assert f["target_public"] is None  # GitHub answered without visibility
+    pr_flow["repo_status"] = 500
+    got = client.get(f"/api/fix-proposals/{f['id']}", headers=auth)
+    assert got.status_code == 200 and got.json()["target_public"] is None
 
 
 def test_a_fix_is_refused_when_the_code_moved_on(client, auth, confirmed, monkeypatch, pr_flow):

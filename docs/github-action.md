@@ -31,9 +31,14 @@ The server must be reachable from GitHub's runners (a public address, or a self-
 
 - To RepoLens: the names of the changed files with their added and deleted line counts, the pull request title and number. No code,
   no diff.
-- To GitHub: the comment. Because a comment on a **public** repository is public, it only mentions things from that repository
-  (tests, documentation and dependents in other repositories are left out) unless you set `full: true`, which you should do only for
-  private repositories. People named are the repository's own commit authors.
+- To GitHub: the comment. On a **private** repository it only mentions things from that repository (tests, documentation and
+  dependents in other repositories are left out) unless you set `full: true`. People named are the repository's own commit authors.
+- **Public repositories get the strictest comment.** The Action reads the event's `repository.private` / `visibility`; unless it
+  positively says private, it sends `public: true` and ignores `full`. The server then limits the comment to the risk level and
+  score, the names of the main risk signals, and test files that are part of the pull request itself. It leaves out the detail
+  text of signals (which can quote tickets or commits), the names of people, documentation, dependents, and anything from other
+  repositories. This is enforced by the RepoLens server, not only by the script: any caller that sends `public: true` gets it.
+  Private-repository comments are unchanged.
 - The token can search and read, nothing more; revoke it in RepoLens any time. Pull requests from forks get no secrets from GitHub,
   so the step skips them.
 
@@ -44,9 +49,9 @@ The server must be reachable from GitHub's runners (a public address, or a self-
 | `url`, `token` | Your server and read token (required). |
 | `repo` | The repository's name or id in RepoLens, if it differs from the GitHub `owner/name`. |
 | `fail-on` | `high` or `critical`: fail the job at that level or above, so it can block a merge. Empty never fails. |
-| `full` | Include dependents and documents from other repositories. Private repositories only. |
+| `full` | Include dependents and documents from other repositories. Private repositories only; ignored on public ones. |
 
 A missing setup (the repository is not in RepoLens, a bad token) never blocks a merge: the step explains and passes, unless you set
 `REPOLENS_STRICT=1`.
 
-The same report is available to any script: `POST /api/risk/pr-report` with `{repo, files: [{path, additions, deletions}], title}`.
+The same report is available to any script: `POST /api/risk/pr-report` with `{repo, files: [{path, additions, deletions}], title}`; add `"public": true` for a public repository.

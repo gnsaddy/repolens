@@ -62,4 +62,29 @@ describe("Suggested fix", () => {
     expect(screen.queryByRole("button", { name: /approve/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /propose a fix/i })).toBeNull();
   });
+
+  it("warns about a public repository and sends confirm_public only after the person accepts the warning", async () => {
+    const calls = show([fix({ target_public: true })]);
+    expect(await screen.findByText("public repository")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /approve and open draft pr/i }));
+    expect(await screen.findByText(/This repository is PUBLIC/)).toBeInTheDocument();
+    const go = screen.getByRole("button", { name: "Open draft pull request" });
+    expect(go).toBeDisabled(); // cannot proceed without ticking the specific acknowledgement
+    await userEvent.click(screen.getByRole("checkbox", { name: /will be public/i }));
+    await userEvent.click(go);
+    await waitFor(() => expect(JSON.parse(calls.find((c) => c.url.endsWith("/decision"))?.body ?? "{}")).toEqual({ decision: "approve", confirm_public: true }));
+  });
+
+  it("shows no warning and sends no confirm_public for a private or unknown target", async () => {
+    for (const target_public of [false, null]) {
+      vi.restoreAllMocks();
+      const calls = show([fix({ target_public })]);
+      await screen.findAllByText("Guard the lookup");
+      expect(screen.queryByText("public repository")).toBeNull();
+      await userEvent.click(screen.getAllByRole("button", { name: /approve and open draft pr/i }).at(-1)!);
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      await userEvent.click(await screen.findByRole("button", { name: "Open draft pull request" }));
+      await waitFor(() => expect(calls.find((c) => c.url.endsWith("/decision"))?.body).toBe(JSON.stringify({ decision: "approve" })));
+    }
+  });
 });

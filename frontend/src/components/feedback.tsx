@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Button } from "@/components/ui";
 
 type Tone = "success" | "error" | "info";
-interface ConfirmOptions { title: string; message?: ReactNode; confirmLabel?: string; danger?: boolean }
+interface ConfirmOptions { title: string; message?: ReactNode; confirmLabel?: string; danger?: boolean; warning?: ReactNode; acknowledge?: string }
 interface Ctx { toast: (text: string, tone?: Tone) => void; confirm: (o: ConfirmOptions) => Promise<boolean> }
 
 // Without a provider (unit tests, storybook) fall back to the browser's own dialogs so callers never need a guard.
@@ -19,13 +19,14 @@ const TONE = { success: "border-emerald-200 bg-emerald-50 text-emerald-800", err
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<{ id: number; text: string; tone: Tone }[]>([]);
   const [dialog, setDialog] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
+  const [acked, setAcked] = useState(false);
   const next = useRef(1);
   const toast = useCallback((text: string, tone: Tone = "success") => {
     const id = next.current++;
     setToasts((t) => [...t, { id, text, tone }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 8000 : 4000);
   }, []);
-  const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((resolve) => setDialog({ ...o, resolve })), []);
+  const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((resolve) => { setAcked(false); setDialog({ ...o, resolve }); }), []);
   const close = (v: boolean) => { dialog?.resolve(v); setDialog(null); };
   const value = useMemo(() => ({ toast, confirm }), [toast, confirm]);
 
@@ -53,10 +54,16 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" onMouseDown={() => close(false)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
             <h2 id="confirm-title" className="text-base font-semibold">{dialog.title}</h2>
+            {dialog.warning && <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800">{dialog.warning}</div>}
             {dialog.message && <div className="mt-2 text-sm text-muted">{dialog.message}</div>}
+            {dialog.acknowledge && (
+              <label className="mt-3 flex items-start gap-2 text-sm">
+                <input type="checkbox" className="mt-0.5" checked={acked} onChange={(e) => setAcked(e.target.checked)} />
+                <span>{dialog.acknowledge}</span>
+              </label>)}
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
-              <Button variant={dialog.danger ? "danger" : "primary"} autoFocus onClick={() => close(true)}>{dialog.confirmLabel ?? "Confirm"}</Button>
+              <Button variant={dialog.danger ? "danger" : "primary"} autoFocus={!dialog.acknowledge} disabled={!!dialog.acknowledge && !acked} onClick={() => close(true)}>{dialog.confirmLabel ?? "Confirm"}</Button>
             </div>
           </div>
         </div>)}

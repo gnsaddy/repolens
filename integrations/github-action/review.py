@@ -3,7 +3,9 @@
 
 Environment: REPOLENS_URL, REPOLENS_TOKEN (a read access token), GITHUB_TOKEN, GITHUB_EVENT_PATH, GITHUB_REPOSITORY,
 and optionally REPOLENS_REPO (name or id in RepoLens, default owner/name), REPOLENS_FAIL_ON (high | critical),
-REPOLENS_FULL (true to include other repositories' dependents and documents: only for private repositories)."""
+REPOLENS_FULL (true to include other repositories' dependents and documents: only for private repositories).
+On a public repository (the event does not say `repository.private` is true) the comment is limited to the strictest content,
+and REPOLENS_FULL is ignored."""
 
 import json
 import os
@@ -47,6 +49,14 @@ def sticky_comment(api: str, repo: str, number: int, token: str, markdown: str) 
     return "posted"
 
 
+def is_public(event: dict) -> bool:
+    """True unless the event positively says the repository is private (an unknown visibility is treated as public)."""
+    repo = event.get("repository") or {}
+    if repo.get("visibility") in ("private", "internal"):
+        return False
+    return repo.get("private") is not True
+
+
 def main(env: dict[str, str] | None = None) -> int:
     e = env if env is not None else dict(os.environ)
     event = json.load(open(e["GITHUB_EVENT_PATH"]))
@@ -64,8 +74,9 @@ def main(env: dict[str, str] | None = None) -> int:
     if not files:
         print("No changed files.")
         return 0
+    public = is_public(event)
     body = {"repo": e.get("REPOLENS_REPO") or repo, "files": files, "title": pr.get("title", ""), "pr_number": number,
-            "app_url": server, "full": e.get("REPOLENS_FULL", "").lower() == "true"}
+            "app_url": server, "full": e.get("REPOLENS_FULL", "").lower() == "true" and not public, "public": public}
     try:
         report = call("POST", f"{server}/api/risk/pr-report", e["REPOLENS_TOKEN"], body)
     except urllib.error.HTTPError as err:

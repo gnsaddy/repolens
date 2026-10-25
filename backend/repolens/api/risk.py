@@ -81,7 +81,15 @@ def pr_report(body: PrReportIn, p: Principal = Depends(current_principal), db: S
     if repo is None:
         raise HTTPException(404, "No repository you can see matches that name. Add it to RepoLens first.")
     return pr_report_svc.build(
-        db, repo, scope, [f.model_dump() for f in body.files], body.title, body.pr_number, body.app_url, body.full
+        db,
+        repo,
+        scope,
+        [f.model_dump() for f in body.files],
+        body.title,
+        body.pr_number,
+        body.app_url,
+        body.full,
+        body.public,
     )
 
 

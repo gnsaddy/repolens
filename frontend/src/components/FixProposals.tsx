@@ -7,7 +7,7 @@ import { safeHref, timeAgo } from "@/lib/utils";
 
 export interface FixProposal {
   id: string; title: string; rationale: string; files: string[]; diff: string; status: "pending" | "approved" | "rejected" | "failed";
-  drafted_by: "llm" | "template"; model: string; tests: string[]; result: string; pr_url: string; created_at: string;
+  drafted_by: "llm" | "template"; model: string; tests: string[]; result: string; pr_url: string; created_at: string; target_public?: boolean | null;
   checks: { syntax_ok: boolean; lines_changed: number; notes: string[] };
 }
 
@@ -31,7 +31,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
   const list = useQuery({ queryKey: key, queryFn: () => api<FixProposal[]>(`/investigations/${investigationId}/fix-proposals`) });
   const propose = useMutation({ mutationFn: () => api<FixProposal>(`/investigations/${investigationId}/fix-proposals`, { method: "POST" }), onSuccess: () => qc.invalidateQueries({ queryKey: key }) });
   const decide = useMutation({
-    mutationFn: (v: { id: string; decision: "approve" | "reject" }) => api<FixProposal>(`/fix-proposals/${v.id}/decision`, { method: "POST", json: { decision: v.decision } }),
+    mutationFn: (v: { id: string; decision: "approve" | "reject"; confirmPublic?: boolean }) => api<FixProposal>(`/fix-proposals/${v.id}/decision`, { method: "POST", json: { decision: v.decision, ...(v.confirmPublic ? { confirm_public: true } : {}) } }),
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
   });
   const patch = async (f: FixProposal) => {
@@ -40,7 +40,14 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
     a.href = URL.createObjectURL(await r.blob()); a.download = `repolens-fix-${f.id.slice(0, 8)}.patch`; a.click(); URL.revokeObjectURL(a.href);
   };
   const approve = async (f: FixProposal) => {
-    if (await confirm({ title: "Open a draft pull request?", message: `RepoLens will create the branch repolens/fix-${f.id.slice(0, 8)} and open a draft pull request changing ${f.files.join(", ")}. Nothing is merged; a person reviews it on GitHub.`, confirmLabel: "Open draft pull request" })) decide.mutate({ id: f.id, decision: "approve" });
+    const pub = f.target_public === true;
+    const ok = await confirm({
+      title: "Open a draft pull request?",
+      message: `RepoLens will create the branch repolens/fix-${f.id.slice(0, 8)} and open a draft pull request changing ${f.files.join(", ")}. Nothing is merged; a person reviews it on GitHub.`,
+      confirmLabel: "Open draft pull request",
+      ...(pub ? { danger: true, warning: "This repository is PUBLIC. The branch, the code change and the explanation will be visible to everyone, and removing them later may not erase copies.", acknowledge: "I have read the change and the explanation, and I accept that they will be public." } : {}),
+    });
+    if (ok) decide.mutate({ id: f.id, decision: "approve", confirmPublic: pub });
   };
   const items = Array.isArray(list.data) ? list.data : [];
 
@@ -55,6 +62,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{f.title}</span>
             <Badge tone={tone(f.status)}>{f.status}</Badge>
+            {f.target_public === true && <Badge tone="red">public repository</Badge>}
             <span className="text-xs text-muted">{f.drafted_by === "llm" ? `written by ${f.model || "a model"}` : "simple template"} · {timeAgo(f.created_at)}</span>
           </div>
           <p className="mt-2 text-sm text-slate-700">{f.rationale}</p>

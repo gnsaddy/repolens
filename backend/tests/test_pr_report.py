@@ -145,9 +145,12 @@ def action():
     return mod
 
 
+PRIVATE_EVENT = {"pull_request": {"number": 7, "title": "Fix it"}, "repository": {"private": True}}
+
+
 def run_action(action, tmp_path, monkeypatch, *, existing=None, level="medium", env_extra=None, event=None):
     ev = tmp_path / "event.json"
-    ev.write_text(json.dumps(event or {"pull_request": {"number": 7, "title": "Fix it"}}))
+    ev.write_text(json.dumps(event or PRIVATE_EVENT))
     calls = []
 
     def fake(method, url, token, body=None, accept="application/json"):
@@ -183,6 +186,7 @@ def test_the_action_posts_one_comment_and_sends_only_file_names_and_counts(actio
         "pr_number": 7,
         "app_url": "https://rl.example.com",
         "full": False,
+        "public": False,
     }
     assert sent[2] == "rlp_x"  # RepoLens gets its own token, GitHub gets GitHub's
     post = next(c for c in calls if c[0] == "POST" and "/issues/7/comments" in c[1])
@@ -235,3 +239,55 @@ def test_a_missing_setup_or_a_fork_never_blocks_a_merge(action, tmp_path, monkey
     }
     assert action.main(env) == 0
     assert action.main({**env, "REPOLENS_STRICT": "1"}) == 1
+
+
+def test_the_action_marks_public_repositories_and_ignores_full_there(action, tmp_path, monkeypatch):
+    def sent(event, **extra):
+        _, calls = run_action(action, tmp_path, monkeypatch, event=event, env_extra=extra)
+        return next(c for c in calls if c[1].endswith("/pr-report"))[3]
+
+    pr = {"number": 7, "title": "Fix it"}
+    assert sent({"pull_request": pr, "repository": {"private": False}})["public"] is True
+    assert sent({"pull_request": pr, "repository": {"private": False}}, REPOLENS_FULL="true")["full"] is False
+    assert sent({"pull_request": pr})["public"] is True  # unknown visibility is treated as public
+    assert sent({"pull_request": pr, "repository": {"private": True}}, REPOLENS_FULL="true")["full"] is True
+    assert sent({"pull_request": pr, "repository": {"private": True}})["public"] is False
+    assert sent({"pull_request": pr, "repository": {"visibility": "internal"}})["public"] is False
+
+
+def test_the_server_keeps_a_public_comment_to_the_strictest_content(client, auth, indexed, session, monkeypatch):
+    from repolens.models import Repository
+    from repolens.services import pr_report as pr
+    from repolens.services import risk
+    from repolens.services.access import UNRESTRICTED
+
+    repo, col = indexed
+    fake = {
+        "tests_to_run": [{"path": "tests/test_user_profile.py"}, {"path": "tests/elsewhere.py"}],
+        "docs_to_update": [{"title": "Secret roadmap", "repo_id": repo["id"], "path": "o.md"}],
+        "dependents": [{"name": "internal_fn", "repo_id": repo["id"]}],
+        "files": [{"path": "src/user_profile.py"}],
+    }
+    sig = [{"label": "Test coverage gap", "detail": "ticket PAY-9 says the CEO's card", "points": 9}]
+    monkeypatch.setattr(
+        risk,
+        "assess",
+        lambda db, ci, scope=None: {"score": 30, "level": "medium", "signals": sig, "affected": fake, "ref": "x"},
+    )
+    r = session.get(Repository, repo["id"])
+    open_md = pr.build(session, r, UNRESTRICTED, FILES, full=True)["markdown"]
+    assert "Secret roadmap" in open_md and "PAY-9" in open_md  # private behaviour is unchanged
+    out = pr.build(session, r, UNRESTRICTED, FILES, full=True, public=True)
+    md = out["markdown"]
+    assert "Test coverage gap" in md and "(30/100)" in md and "tests/test_user_profile.py" in md
+    for leaked in ("PAY-9", "Secret roadmap", "internal_fn", "tests/elsewhere.py", "Who knows"):
+        assert leaked not in md
+    assert out["who"] == [] and out["docs"] == [] and out["dependents"] == 0
+
+
+def test_public_flag_through_the_endpoint_hides_names_of_people(client, auth, indexed):
+    h = bearer(client, auth)
+    loose = report(client, h, repo=indexed[0]["id"]).json()["markdown"]
+    strict = report(client, h, repo=indexed[0]["id"], public=True).json()
+    assert "Who knows this code" in loose
+    assert "Who knows" not in strict["markdown"] and strict["who"] == [] and strict["strict"] is True
