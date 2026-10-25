@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Jira: find, analyse and investigate tickets
+
+The Jira page lists tickets of every type (filter by project, type, status, assignee and text; 25 to 100 at a time, newest update first). Open a ticket to read it with its comments and run an analysis. Tick up to ten tickets and **Analyse together** to see what they share (errors, files, symbols, components), which look like duplicates, and what each says about its cause, or **Investigate all** to start one investigation per ticket. A ticket that already has an investigation keeps it. The Investigations page has **Start from Jira** (only when Jira is connected) with the same search and actions. Publishing a report back to Jira is still a separate, approved step.
+
 ## People, invitations and authenticator sign-in
 
 Admins open **Settings → People** to see everyone in the workspace and how they sign in. **Invite someone** creates the account and a one-time link the person uses to choose their own password; **Reset password** makes a fresh link for someone who forgot theirs (the old password keeps working until the link is used, and using it signs out their other devices). Links are handed over by you, nothing is sent by e-mail.

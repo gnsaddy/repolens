@@ -14,14 +14,14 @@ afterEach(() => vi.restoreAllMocks());
 const wrap = (ui: React.ReactNode, url = "/") => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={[url]}>{ui}</MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
 
 describe("Jira filters", () => {
-  it("builds JQL from project, status, type and text, and offers to import the result", async () => {
+  it("builds JQL from project, status and text (every type unless one is chosen), and offers to import the result", async () => {
     const queries: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const u = String(input);
       if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" });
       if (u.endsWith("/jira/connection")) return json({ base_url: "https://acme.atlassian.net", deployment: "cloud", email: "", allow_publish: false, default_project: "" });
       if (u.endsWith("/jira/projects")) return json([{ key: "PAY", name: "Payments" }]);
-      if (u.includes("/jira/issues")) { queries.push(decodeURIComponent(u.split("jql=")[1])); return json([]); }
+      if (u.includes("/jira/issues")) { queries.push(decodeURIComponent(u.split("jql=")[1].split("&limit")[0])); return json([]); }
       return json({});
     });
     wrap(<JiraPage />);
@@ -29,7 +29,7 @@ describe("Jira filters", () => {
     await userEvent.selectOptions(screen.getByLabelText("Project"), "PAY");
     await userEvent.selectOptions(screen.getByLabelText("Status"), "done");
     await userEvent.type(screen.getByLabelText("Search text"), "rounding");
-    await waitFor(() => expect(queries.at(-1)).toBe('project = "PAY" AND statusCategory = Done AND issuetype = "Bug" AND text ~ "rounding" ORDER BY updated DESC'));
+    await waitFor(() => expect(queries.at(-1)).toBe('project = "PAY" AND statusCategory = Done AND text ~ "rounding" ORDER BY updated DESC'));
     const link = screen.getByRole("link", { name: "Import these as searchable history" });
     expect(decodeURIComponent(link.getAttribute("href")!)).toContain('connector=jira&jql=project = "PAY"');
     await userEvent.click(screen.getByRole("button", { name: "Edit JQL" }));

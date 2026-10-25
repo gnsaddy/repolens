@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import Investigation, JiraConnection, JiraIssueLink, JiraPublishEvent
-from ..schemas import JiraConnectionIn, JiraConnectionOut, JiraInvestigateIn, JiraPublishIn
+from ..schemas import JiraBatchIn, JiraConnectionIn, JiraConnectionOut, JiraInvestigateIn, JiraPublishIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
 from ..services import jira_analysis as ja
 from ..services import knowledge as kb
@@ -112,30 +112,54 @@ def projects(p: Principal = Depends(current_principal), db: Session = Depends(ge
         raise HTTPException(502, str(e)) from e
 
 
+@router.get("/issue-types")
+def issue_types(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Issue types of the connected Jira, for the type filter."""
+    authorize(db, p, "jira.read", "issue-types")
+    try:
+        return _client(_conn(db, p)).issue_types()
+    except JiraError:
+        return ["Bug", "Task", "Story", "Epic", "Incident"]  # still usable if the account may not list them
+
+
+def _links(db: Session, p: Principal) -> dict[str, str]:
+    scope = scope_for(db, p)
+    links: dict[str, str] = {}
+    for lk in db.scalars(select(JiraIssueLink).where(JiraIssueLink.org_id == p.org_id)):
+        inv = db.get(Investigation, lk.investigation_id)
+        if inv is not None and can_view_investigation(scope, inv, p.user_id):  # never hint at hidden investigations
+            links[lk.issue_key] = lk.investigation_id
+    return links
+
+
 @router.get("/issues")
 def issues(
-    jql: str = Query("statusCategory != Done AND issuetype = Bug ORDER BY created DESC"),
+    jql: str = Query("statusCategory != Done ORDER BY updated DESC"),
+    limit: int = Query(25, ge=1, le=100),
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
     authorize(db, p, "jira.read", "search")
     try:
-        found = _client(_conn(db, p)).search(jql)
+        found = _client(_conn(db, p)).search(jql, limit)
     except JiraError as e:
-        raise HTTPException(502, str(e)) from e
-    scope = scope_for(db, p)
-    links = {}
-    for lk in db.scalars(select(JiraIssueLink).where(JiraIssueLink.org_id == p.org_id)):
-        inv = db.get(Investigation, lk.investigation_id)
-        if inv is not None and can_view_investigation(scope, inv, p.user_id):  # never hint at hidden investigations
-            links[lk.issue_key] = lk.investigation_id
+        raise HTTPException(502, redact_secrets(str(e))) from e
+    links = _links(db, p)
     return [
         {
             "key": i.key,
             "summary": i.summary,
             "status": i.status,
+            "status_category": i.status_category,
             "type": i.issue_type,
             "priority": i.priority,
+            "assignee": i.assignee,
+            "reporter": i.reporter,
+            "created": i.created,
+            "updated": i.updated,
+            "labels": i.labels,
+            "components": i.components,
+            "comments": len(i.comments),
             "url": i.url,
             "investigation_id": links.get(i.key),
         }
@@ -198,6 +222,69 @@ def analyze_issue(key: str, p: Principal = Depends(current_principal), db: Sessi
                 }
             )
     return {**digest, "related": related}
+
+
+def _fetch_many(db: Session, p: Principal, keys: list[str]):
+    client = _client(_conn(db, p))
+    out = []
+    for key in dict.fromkeys(keys):  # each ticket once, in the order asked
+        try:
+            out.append(client.get_issue(key))
+        except JiraError as e:
+            raise HTTPException(502, f"{key}: {redact_secrets(str(e))}") from e
+    return out
+
+
+@router.post("/analyze-batch")
+def analyze_batch(body: JiraBatchIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Analyse up to ten tickets together: each one, plus what they share and which look like duplicates."""
+    authorize(db, p, "jira.read", f"{len(body.keys)} tickets", op="analyze-batch")
+    issues_ = _fetch_many(db, p, body.keys)
+    pairs = [(i, ja.analyze(i)) for i in issues_]
+    scope = scope_for(db, p)
+    terms: list[str] = []
+    for _, d in pairs:
+        terms += d["search_terms"][:4]
+    related = []
+    if terms:
+        for r in kb.search(db, p.org_id, " ".join(dict.fromkeys(terms))[:400], scope.ids_or_none(), k=8, scope=scope):
+            related.append({k: r[k] for k in ("repo", "repo_id", "file", "kind", "title", "start_line", "node_id")})
+    links = _links(db, p)
+    return {
+        "tickets": [
+            {**d, "summary": i.summary, "type": i.issue_type, "url": i.url, "investigation_id": links.get(i.key)}
+            for i, d in pairs
+        ],
+        "common": ja.compare(pairs),
+        "related": related,
+    }
+
+
+@router.post("/investigate-batch", status_code=202)
+def investigate_batch(body: JiraBatchIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Start an investigation for each ticket (up to ten). A ticket that already has one keeps it."""
+    authorize(db, p, "investigation.create", f"{len(body.keys)} tickets", source="jira", op="batch")
+    repo_ids = validate_repo_ids(db, p, body.repo_ids)
+    links = _links(db, p)
+    started, existing = [], []
+    for issue in _fetch_many(db, p, body.keys):
+        if issue.key in links:
+            existing.append({"issue_key": issue.key, "investigation_id": links[issue.key]})
+            continue
+        inv = create_investigation(
+            db,
+            p.org_id,
+            p.user_id,
+            ja.investigation_query(issue, ja.analyze(issue)),
+            repo_ids,
+            title=f"{issue.key}: {issue.summary}",
+            jira_issue_key=issue.key,
+        )
+        db.add(JiraIssueLink(org_id=p.org_id, issue_key=issue.key, investigation_id=inv.id, summary=issue.summary))
+        db.commit()
+        submit(inv.id)
+        started.append({"issue_key": issue.key, "investigation_id": inv.id})
+    return {"started": started, "existing": existing}
 
 
 @router.post("/investigate", status_code=202)

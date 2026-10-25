@@ -128,6 +128,10 @@ messages against the retrieved code to name the exact lines and the producer tha
 is connected the finding is added to its prompt. `services/jira_analysis.py` distils a ticket's description and comments
 (signals, what was tried, proposed cause, workarounds, fixes, open questions, gaps) and seeds the investigation query.
 
+`services/jira_analysis.compare` finds what several tickets share (errors, files, symbols, components) and flags likely duplicates
+(similar summaries, or the same error in the same file); `api/jira.py` serves the batch endpoints (at most ten tickets, each ticket
+fetched once). The UI shares one ticket browser (`JiraIssueBrowser`) between the Jira page and the Investigations picker.
+
 ## DeepMind Wiki internals
 `services/docs.py` splits Markdown, RST and text by heading, then splits long sections at paragraph boundaries (never inside a
 fenced block or a table, repeating the last plain paragraph for context). `services/doc_intel.py` classifies each page

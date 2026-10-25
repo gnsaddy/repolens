@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import JiraPicker from "@/components/JiraPicker";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Textarea, statusTone } from "@/components/ui";
-import { api, type CiPreview, type InvestigationSummary, type Repo } from "@/lib/api";
+import { Ticket } from "lucide-react";
+import { api, type CiPreview, type InvestigationSummary, type JiraConnection, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, pct, timeAgo } from "@/lib/utils";
 
@@ -14,6 +16,8 @@ export default function Investigations() {
   const [query, setQuery] = useState(preset);
   const [repoIds, setRepoIds] = useState<string[]>([]);
   const [mode, setMode] = useState<"describe" | "ci">("describe");
+  const [picker, setPicker] = useState(false);
+  const jira = useQuery({ queryKey: ["jira-conn"], retry: false, queryFn: () => api<JiraConnection | null>("/jira/connection") }); // the button only exists when Jira is connected
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
   const list = useQuery({ queryKey: ["investigations"], queryFn: () => api<InvestigationSummary[]>("/investigations"), refetchInterval: 4000 });
   const start = useMutation({
@@ -25,7 +29,9 @@ export default function Investigations() {
 
   return (
     <div>
-      <PageHeader title="Investigations" subtitle="Root-cause analysis across your repositories, commits and past incidents." />
+      <PageHeader title="Investigations" subtitle="Root-cause analysis across your repositories, commits and past incidents."
+        actions={jira.data?.base_url ? <Button variant="outline" onClick={() => setPicker(true)}><Ticket className="h-4 w-4" />Start from Jira</Button> : undefined} />
+      {picker && <JiraPicker canInvestigate={canWrite(user)} onClose={() => setPicker(false)} />}
       {canWrite(user) && (
         <Card className="mb-6">
           <CardTitle>New investigation</CardTitle>

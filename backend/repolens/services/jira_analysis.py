@@ -188,3 +188,44 @@ def investigation_query(issue: JiraIssue, digest: dict) -> str:
     if issue.components:
         parts.append("Components: " + ", ".join(issue.components))
     return "\n\n".join(p for p in parts if p).strip()[:8000]
+
+
+def compare(items: list[tuple[JiraIssue, dict]]) -> dict:
+    """What several tickets have in common: shared errors, files, symbols and components, and likely duplicates."""
+
+    def shared(pick) -> list[dict]:
+        seen: dict[str, list[str]] = {}
+        for issue, digest in items:
+            for v in set(pick(issue, digest)):
+                seen.setdefault(v, []).append(issue.key)
+        return sorted(({"name": k, "keys": v} for k, v in seen.items() if len(v) >= 2), key=lambda x: -len(x["keys"]))[
+            :10
+        ]
+
+    words = {
+        i.key: {
+            embeddings.stem(w.lower()) for w in embeddings.tokenize(i.summary) if w.lower() not in _STOP and len(w) > 3
+        }
+        for i, _ in items
+    }
+    dupes = []
+    for a in range(len(items)):
+        for b in range(a + 1, len(items)):
+            (ia, da), (ib, db) = items[a], items[b]
+            wa, wb = words[ia.key], words[ib.key]
+            sim = len(wa & wb) / len(wa | wb) if wa and wb else 0.0
+            err = set(da["signals"]["errors"]) & set(db["signals"]["errors"])
+            files = set(da["signals"]["files"]) & set(db["signals"]["files"])
+            if sim >= 0.5 or (err and files):
+                why = "similar summaries" if sim >= 0.5 else f"same error ({sorted(err)[0]}) in {sorted(files)[0]}"
+                dupes.append({"keys": [ia.key, ib.key], "why": why, "similarity": round(sim, 2)})
+    return {
+        "errors": shared(lambda i, d: d["signals"]["errors"]),
+        "files": shared(lambda i, d: d["signals"]["files"]),
+        "symbols": shared(lambda i, d: d["signals"]["symbols"]),
+        "components": shared(lambda i, d: i.components),
+        "possible_duplicates": dupes,
+        "statuses": dict(Counter(i.status for i, _ in items)),
+        "priorities": dict(Counter(i.priority or "none" for i, _ in items)),
+        "attention": [f"{i.key}: {f}" for i, d in items for f in d["flags"]][:12],
+    }

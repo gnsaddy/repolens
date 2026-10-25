@@ -116,6 +116,7 @@ class JiraIssue:
     created: str = ""
     updated: str = ""
     comment_items: list[dict] = field(default_factory=list)  # [{author, created, body}] in order
+    status_category: str = ""  # To Do | In Progress | Done
 
     def investigation_query(self) -> str:
         parts = [self.summary, self.description, *self.comments[-5:]]
@@ -196,6 +197,7 @@ class JiraClient:
             created=f.get("created", ""),
             updated=f.get("updated", ""),
             comment_items=items,
+            status_category=((f.get("status") or {}).get("statusCategory") or {}).get("name", ""),
         )
 
     def get_issue(self, key: str) -> JiraIssue:
@@ -212,6 +214,14 @@ class JiraClient:
         else:
             d = self._req("GET", "/search", params={"jql": jql, "maxResults": limit, "fields": fields})
         return [self._issue_from(i) for i in d.get("issues", [])]
+
+    def issue_types(self) -> list[str]:
+        """The names of the issue types this Jira has (Bug, Task, Story, Epic, ...), for the filter."""
+        raw = self._req("GET", "/issuetype")
+        names = sorted(
+            {t.get("name", "") for t in raw if isinstance(t, dict) and not t.get("subtask") and t.get("name")}
+        )
+        return names
 
     def projects(self) -> list[dict]:
         if self.deployment == "cloud":

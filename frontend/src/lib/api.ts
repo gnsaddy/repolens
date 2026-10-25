@@ -57,7 +57,7 @@ export interface FileView {
   symbols: { name: string; parent: string; type: string; start: number; end: number }[];
 }
 export interface JiraConnection { base_url: string; deployment: "cloud" | "datacenter"; email: string; allow_publish: boolean; default_project: string; account?: string }
-export interface JiraIssue { key: string; summary: string; status: string; type: string; priority: string; url: string; investigation_id: string | null }
+export interface JiraIssue { key: string; summary: string; status: string; status_category?: string; type: string; priority: string; assignee?: string; reporter?: string; created?: string; updated?: string; labels?: string[]; components?: string[]; comments?: number; url: string; investigation_id: string | null }
 
 const TOKEN_KEY = "repolens.token";
 export const tokenStore = {
@@ -251,3 +251,12 @@ export interface AuditFacets { groups: string[]; users: { id: string; email: str
 
 export interface Person { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; active: boolean; auth_source: string; totp_enabled: boolean; pending: "invite" | "reset" | null; created_at: string }
 export interface TotpSetup { secret: string; uri: string }
+
+export interface JiraShared { name: string; keys: string[] }
+export interface JiraBatchTicket extends JiraAnalysis { summary: string; type: string; url: string; investigation_id: string | null }
+export interface JiraBatch {
+  tickets: JiraBatchTicket[];
+  common: { errors: JiraShared[]; files: JiraShared[]; symbols: JiraShared[]; components: JiraShared[]; possible_duplicates: { keys: string[]; why: string; similarity: number }[]; statuses: Record<string, number>; priorities: Record<string, number>; attention: string[] };
+  related: JiraAnalysis["related"];
+}
+export interface JiraInvestigateBatch { started: { issue_key: string; investigation_id: string }[]; existing: { issue_key: string; investigation_id: string }[] }
