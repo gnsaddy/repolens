@@ -1,10 +1,10 @@
 """Embedding providers. `hash` is a local, deterministic, offline identifier-aware embedder."""
 
 import hashlib
-from functools import lru_cache
 import math
 import re
 import time
+from functools import lru_cache
 
 import httpx
 
