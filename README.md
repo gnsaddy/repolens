@@ -1,5 +1,7 @@
 # RepoLens AI
 
+**Version v0.1-beta.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
+
 Repository intelligence and evidence-backed root-cause analysis. See [`docs/architecture.md`](docs/architecture.md) for how it
 works and [`docs/features.md`](docs/features.md) for what is implemented.
 

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from . import VERSION_LABEL
 from .api import (
     account,
     audit,
@@ -166,7 +167,7 @@ def create_app() -> FastAPI:
     prod = get_settings().env != "dev"  # the API schema and interactive docs are for development only
     app = FastAPI(
         title="RepoLens AI",
-        version="0.1.0",
+        version=VERSION_LABEL,
         lifespan=lifespan,
         docs_url=None if prod else "/docs",
         redoc_url=None if prod else "/redoc",
@@ -219,7 +220,7 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz", include_in_schema=False)
     def healthz():
-        return {"status": "ok"}
+        return {"status": "ok", "version": VERSION_LABEL}
 
     @app.get("/readyz", include_in_schema=False)
     def readyz():

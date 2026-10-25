@@ -79,3 +79,6 @@ in it>` shows what is there; add `--yes` to delete. Take a backup first. It cann
 Images run `alembic upgrade head` on start, so deploying a new image migrates the database. Take a backup first
 (`kubectl create job --from=cronjob/postgres-backup`), and read the **Upgrade notes** in `changelog/` for the versions you skip.
 Changing the embedding model needs `python -m repolens.devtools.reembed` (see `evals/README.md`).
+
+## Versions and releases
+The app is at **v0.1-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.1.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.1-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.1-beta` publishes a GitHub release without deploying anything.
