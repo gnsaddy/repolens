@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     rate_limit_auth_per_minute: int = 20  # sign-in, registration and single-sign-on discovery, per address
     max_body_mb: int = 32  # larger request bodies are refused
     metrics_token: str = ""  # when set, /metrics needs this bearer token
+    # How long old records are kept before the daily sweep removes them (0 = keep forever).
+    retention_feedback_days: int = 365
+    retention_audit_days: int = 730
+    retention_sessions_days: int = 30  # ended or expired sign-ins and used or expired invitation links
+    retention_investigation_days: int = 0  # reports are kept until deleted, unless set
     session_idle_minutes: int = 60 * 8  # a session unused this long is ended (0 = never)
     login_max_failures: int = 5  # wrong passwords per account and address before pausing
     login_window_seconds: int = 600

@@ -98,6 +98,26 @@ async def _system_sampler() -> None:
         await asyncio.sleep(sysmetrics.INTERVAL)
 
 
+async def _retention_sweeper(hours: float = 24.0) -> None:
+    """Once a day remove records that have outlived their retention (see services/retention.py)."""
+    from .db import session_factory
+    from .services import retention
+
+    def run() -> None:
+        with session_factory()() as db:
+            removed = {k: v for k, v in retention.sweep(db).items() if v}
+            if removed:
+                logging.getLogger("repolens.retention").info("retention sweep removed %s", removed)
+
+    await asyncio.sleep(600)  # not during start-up
+    while True:
+        try:
+            await asyncio.to_thread(run)
+        except Exception:
+            logging.getLogger("repolens.retention").exception("retention sweep failed")
+        await asyncio.sleep(hours * 3600)
+
+
 async def _investigation_reaper(seconds: float = 60.0) -> None:
     """Fail investigations left 'running' by a restart or a hung call, so they never spin forever."""
     from .db import session_factory

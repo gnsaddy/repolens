@@ -92,8 +92,15 @@ def _add_missing_columns(engine) -> None:  # type: ignore[no-untyped-def]
                 default = ""
                 if not col.nullable:
                     d = getattr(col.default, "arg", None)
-                    d = None if callable(d) else d
-                    if d is None:
+                    if callable(d):  # list / dict factories for JSON columns: an empty one is the right start value
+                        try:
+                            d = d(None) if d.__code__.co_argcount else d()
+                        except Exception:  # noqa: BLE001
+                            d = None
+                    if isinstance(d, (list, dict)):
+                        default = " DEFAULT '[]'" if isinstance(d, list) else " DEFAULT '{}'"
+                    elif d is None:
                         continue  # cannot add a NOT NULL column without a default; use alembic
-                    default = f" DEFAULT {d!r}" if isinstance(d, (int, float, str)) else ""
+                    else:
+                        default = f" DEFAULT {d!r}" if isinstance(d, (int, float, str)) else ""
                 conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {ddl}{default}')

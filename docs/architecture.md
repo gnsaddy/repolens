@@ -147,6 +147,9 @@ savings and activity for the Insights page.
 issues and redeems invitation and reset links (`auth_tokens`, hash only); `api/account.py` holds People, invitations, resets and the
 authenticator endpoints; `api/audit.py` serves the admin audit log.
 
+`services/retention.py` is the daily sweep (background task in `main.py`, also `POST /api/settings/retention/run`);
+`devtools/delete_workspace.py` removes one workspace and everything that references it.
+
 ## Evaluation suites, feedback and server metrics
 `repolens/evals/suites/` scores the daily-use paths against fixed data: `docs` indexes a 24-page corpus into a throwaway database
 and measures retrieval by question style, `memory` scores the two matching signals of the answer memory on labelled pairs and

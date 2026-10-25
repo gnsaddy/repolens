@@ -46,6 +46,17 @@ make backup                       # writes backups/repolens-<time>.dump from the
 make restore file=backups/repolens-20261025T021500Z.dump   # restores into a new database named repolens_restore
 ```
 
+## Retention and deleting data
+
+A daily job removes what is no longer useful: remembered answers past their lifetime, feedback older than 365 days, audit events older
+than 730 days, ended sign-ins and used or expired invitation links older than 30 days. Change the periods with
+`REPOLENS_RETENTION_FEEDBACK_DAYS`, `_AUDIT_DAYS`, `_SESSIONS_DAYS` and `_INVESTIGATION_DAYS` (0 keeps that kind forever; investigations
+are kept until someone deletes them unless you set a period). Admins can run it immediately from the API
+(`POST /api/settings/retention/run`).
+
+To delete a whole workspace (a test one, or for a deletion request): `python -m repolens.devtools.delete_workspace --email <any person
+in it>` shows what is there; add `--yes` to delete. Take a backup first. It cannot be undone.
+
 ## Upgrading
 
 Images run `alembic upgrade head` on start, so deploying a new image migrates the database. Take a backup first

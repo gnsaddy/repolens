@@ -12,6 +12,7 @@ Sections to use (leave out the empty ones): **Added**, **Changed**, **Fixed**, *
 <!-- entries:start -->
 - 2026-10-25 · [Refusing weak document matches: measured, not shipped](2026-10-25-weak-match-refusal-evaluated.md)
 - 2026-10-25 · [Security hardening, Insights, evaluation suites and feedback](2026-10-25-security-insights-evals.md)
+- 2026-10-25 · [Retention sweep and workspace deletion](2026-10-25-retention-and-cleanup.md)
 - 2026-10-25 · ["What leaves this server" panel](2026-10-25-outbound-panel.md)
 - 2026-10-25 · [Browser end-to-end tests](2026-10-25-browser-tests.md)
 - 2026-10-25 · [Nightly database backups and a restore guide](2026-10-25-backups.md)

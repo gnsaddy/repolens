@@ -60,6 +60,7 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
 - The UI only turns `http(s)` addresses into links (`safeHref`), renders Markdown without raw HTML, and loads pages on demand.
 - Admins can read the audit trail in the app (Audit log), filtered and exportable; it covers allowed and refused actions and failed sign-ins.
 - Optional authenticator-app sign-in (RFC 6238, one use per 30-second step, encrypted secret, hashed one-time recovery codes); invitations and password resets are one-time links stored as hashes, expire, replace each other and end the person's other sessions; open registration can be closed so people join by invitation.
+- Records are not kept forever: a daily retention sweep removes old feedback, audit events, ended sessions and used links (periods are settings), and a workspace can be deleted completely with one command.
 - An automated audit (`tests/test_security_edge.py`) fails the build if any endpoint other than the deliberate public ones works
   without a session, if a state-changing endpoint lacks a policy check, or if a viewer can change anything.
 

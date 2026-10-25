@@ -11,7 +11,7 @@ from ..deps import Principal, current_principal
 from ..models import LLMConnection, LLMModel, LLMSetting
 from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
-from ..services import answer_memory, embedding_state, llm_router
+from ..services import answer_memory, embedding_state, llm_router, retention
 from ..services import outbound as outbound_svc
 from ..services.access import scope_for
 from ..services.jira import JiraError, validate_base_url
@@ -483,6 +483,19 @@ def set_routing(body: RoutingIn, p: Principal = Depends(current_principal), db: 
     row.savings_mode, row.updated_by = body.savings_mode, p.user_id
     db.commit()
     return _registry_view(db, p.org_id)
+
+
+@router.get("/retention")
+def retention_policy(p: Principal = Depends(current_principal)):
+    """How long each kind of record is kept (0 = forever)."""
+    return retention.policy()
+
+
+@router.post("/retention/run")
+def retention_run(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Remove expired records for this workspace now (admins). The same sweep runs daily."""
+    authorize(db, p, "llm.configure", "retention", op="run")
+    return {"removed": retention.sweep(db, p.org_id)}
 
 
 @router.get("/memory")
