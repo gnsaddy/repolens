@@ -41,7 +41,7 @@ test("the wiki finds, edits and answers from a page", async ({ page, request }) 
   await page.goto("/wiki");
   await page.getByLabel("Search pages").fill("how many times are payments retried");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByRole("list", { name: "Search results" }).getByText("Retry policy")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Search results" }).getByText("Retry policy").first()).toBeVisible();
   await page.getByRole("tab", { name: /Ask/ }).click();
   await page.getByLabel("Question").fill("How many times does the payment service retry?");
   await page.getByRole("button", { name: /^Ask/ }).click();
