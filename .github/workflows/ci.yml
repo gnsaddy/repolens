@@ -98,7 +98,7 @@ jobs:
         uses: docker/build-push-action@v6
         with: { context: frontend, load: true, tags: repolens-web:ci, cache-from: type=gha, cache-to: "type=gha,mode=max" }
       - name: Scan images
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2  # v0.28.0 (the action's tags now start with "v"; pinned to the commit so a moved tag cannot change what runs)
         with: { image-ref: repolens-api:ci, severity: "CRITICAL,HIGH", exit-code: "1", ignore-unfixed: true }
       - name: Validate Kubernetes manifests
         run: |
