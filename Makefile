@@ -1,4 +1,4 @@
-.PHONY: help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
+.PHONY: e2e help changelog changelog-index eval eval-baseline run stop dev-api dev-web test test-api test-web test-pg lint fmt typecheck build migrate up down logs clean check
 .DEFAULT_GOAL := help
 
 VENV = cd backend && . .venv/bin/activate
@@ -42,6 +42,8 @@ lint:      ## ruff, mypy and eslint
 	cd frontend && npm run lint
 fmt:       ## format and auto-fix the backend
 	$(VENV) && ruff check --fix . && ruff format .
+e2e:       ## browser tests against the real API and web app (needs Playwright browsers: npx playwright install chromium)
+	cd frontend && npm run e2e
 typecheck: ## TypeScript
 	cd frontend && npm run typecheck
 check: lint typecheck test   ## everything CI runs, locally

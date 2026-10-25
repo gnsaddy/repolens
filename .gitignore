@@ -21,3 +21,5 @@ deploy/k8s/secret.yaml
 # private notes
 idea.md
 LEARNINGS.md
+frontend/test-results/
+frontend/playwright-report/

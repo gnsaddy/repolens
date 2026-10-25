@@ -156,6 +156,11 @@ request rate and latency into the same ring buffer for `GET /api/metrics/system`
 `services/outbound.py` builds the "what leaves this server" list from the stored connections and the server settings; it never reads
 a secret and a destination on localhost is reported as staying on the machine.
 
+## Browser tests
+`frontend/e2e` (Playwright) starts `uvicorn` on a throwaway SQLite database (port 18000) and the Vite server proxying to it (port
+15173), registers a workspace through the API and drives the UI in a real browser. They guard what unit tests cannot: that a page
+renders with the real API's answers. Run with `make e2e`; CI runs them in a separate job.
+
 ## Not implemented
 Fix generation / Blue-Red-Judge agents and a generated-code execution sandbox, a GitHub App installation flow (the webhook
 receiver for `push` re-indexing is implemented), multi-factor authentication.
