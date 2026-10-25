@@ -20,6 +20,7 @@ export const PAGES = [
   { label: "Jira", to: "/jira" },
   { label: "Token usage", to: "/usage", hint: "cost and budgets" },
   { label: "Insights", to: "/insights", hint: "usage, savings and what is indexed" },
+  { label: "Audit log", to: "/audit", hint: "who did what, and what was refused (admins)" },
   { label: "Your profile", to: "/profile", hint: "account, password and sessions" },
   { label: "Settings", to: "/settings", hint: "LLM provider, GitHub" },
 ];

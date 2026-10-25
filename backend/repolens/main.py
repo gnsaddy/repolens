@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from .api import (
+    audit,
     auth,
     bitbucket,
     feedback,
@@ -157,6 +158,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     for r in (
+        audit.router,
         auth.router,
         repos.router,
         investigations.router,

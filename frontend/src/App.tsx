@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { Activity, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, ScrollText, Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -23,6 +23,7 @@ const RepoBrowser = lazy(() => import("./pages/GitHubBrowse"));
 const JiraPage = lazy(() => import("./pages/JiraPage"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Insights = lazy(() => import("./pages/Insights"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -37,6 +38,7 @@ const nav = [
   { to: "/jira", label: "Jira", icon: Ticket },
   { to: "/insights", label: "Insights", icon: Gauge },
   { to: "/usage", label: "Token Usage", icon: BarChart3 },
+  { to: "/audit", label: "Audit log", icon: ScrollText, adminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -62,7 +64,7 @@ function Shell() {
           <Search className="h-3.5 w-3.5" />Jump to…<kbd className="ml-auto rounded border border-white/20 px-1">Ctrl K</kbd>
         </button>
         <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
-          {nav.map(({ to, label, icon: Icon, end }) => (
+          {nav.filter((n) => !("adminOnly" in n) || user.role === "admin").map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) => cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-white/10", isActive && "bg-brand text-white hover:bg-brand")}>
               <Icon className="h-4 w-4" />{label}
@@ -82,7 +84,7 @@ function Shell() {
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-8">
         <nav className="mb-4 flex gap-2 overflow-x-auto md:hidden" aria-label="Mobile">
-          {nav.map(({ to, label, end }) => (
+          {nav.filter((n) => !("adminOnly" in n) || user.role === "admin").map(({ to, label, end }) => (
             <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("whitespace-nowrap rounded-full border border-line px-3 py-1 text-xs", isActive && "bg-brand text-white")}>{label}</NavLink>
           ))}
         </nav>
@@ -113,6 +115,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<Profile />} />
         <Route path="insights" element={<Insights />} />
+        <Route path="audit" element={<AuditLog />} />
         <Route path="usage" element={<Suspense fallback={<Spinner />}><TokenUsage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

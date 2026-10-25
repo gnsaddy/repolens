@@ -58,6 +58,7 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
 - `/docs`, `/redoc` and `/openapi.json` exist only when `REPOLENS_ENV=dev`. `/metrics` can require a bearer token
   (`REPOLENS_METRICS_TOKEN`); in Kubernetes it is not reachable from outside the namespace anyway.
 - The UI only turns `http(s)` addresses into links (`safeHref`), renders Markdown without raw HTML, and loads pages on demand.
+- Admins can read the audit trail in the app (Audit log), filtered and exportable; it covers allowed and refused actions and failed sign-ins.
 - An automated audit (`tests/test_security_edge.py`) fails the build if any endpoint other than the deliberate public ones works
   without a session, if a state-changing endpoint lacks a policy check, or if a viewer can change anything.
 

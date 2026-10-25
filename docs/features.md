@@ -135,6 +135,10 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Five wrong passwords for one account from one address pause sign-in for ten minutes.
 - Adding a model needs a passing live test with its key; keys are encrypted and never returned.
 
+## Audit log
+
+Admins get an **Audit log** page: every sensitive action (who, what, on which target), everything that was refused with the reason, and failed sign-ins. Filter by area, outcome, person or text, page through it, and download a CSV. Secrets are masked, spreadsheet formulas are neutralised in the export, and reading the log is recorded too.
+
 ## What leaves this server
 
 Settings → AI & search starts with a panel listing every service this server sends data to: each connected model provider (and which models), an embedding or reranking service if one is configured, GitHub, Bitbucket, Jira (and whether publishing is on), Confluence, other wiki sources, a single sign-on provider and a trace collector. For each it shows the host, what is sent, whether it stays on the machine (a model server on localhost does), and where to manage it. A fresh install says "Nothing leaves". The default install connects nothing: no model, the local embedder, no connectors.

@@ -244,3 +244,7 @@ export interface FeedbackSummary { days: number; total: number; helpful_rate: nu
 
 export interface OutboundItem { id: string; name: string; kind: string; host: string; stays_on_machine: boolean; sends: string[]; where: string; note: string }
 export interface Outbound { items: OutboundItem[]; external: number; summary: string; local_only: string[] }
+
+export interface AuditRow { id: string; at: string; actor: string; action: string; target: string; allowed: boolean; detail: Record<string, string> }
+export interface AuditPage { total: number; items: AuditRow[] }
+export interface AuditFacets { groups: string[]; users: { id: string; email: string }[]; denied: number }
