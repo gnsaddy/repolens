@@ -8,11 +8,12 @@ when the sources do not cover the question (only with a model, and always labell
 import re
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import ChatMessage, ChatThread
+from ..models import ChatMessage, ChatThread, CodeChunk, Repository
 from ..security import redact_secrets
-from . import context
+from . import context, routes
 from . import knowledge as kb
 from .access import Scope
 from .llm import LLMClient
@@ -106,6 +107,61 @@ def _history(messages: list[ChatMessage]) -> str:
     return "\n".join(f"{'Person' if m.role == 'user' else 'Assistant'}: {m.content[:HISTORY_CHARS]}" for m in turns)
 
 
+_LIST_ALL = re.compile(
+    r"\b(list|enumerate|show|give|what are|which are|how many)\b.*\b(all|every|each|complete)\b|\ball (the )?\w*\s*(api )?(endpoints?|routes?)",
+    re.I,
+)
+_ROUTE_WORD = re.compile(r"\b(endpoints?|routes?|apis?|urls?)\b", re.I)
+MAX_LISTED_FILES = 40
+
+
+def wants_all_routes(question: str) -> bool:
+    return bool(_LIST_ALL.search(question) and _ROUTE_WORD.search(question))
+
+
+def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) -> dict | None:
+    """Every route written down at index time, as an exact list. Nothing is left out because a search had to pick the best few."""
+    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type == "routes")
+    if ids:
+        stmt = stmt.where(CodeChunk.repo_id.in_(ids))
+    rows = [c for c in db.scalars(stmt.order_by(CodeChunk.repo_id, CodeChunk.file_path)) if scope.can(c.repo_id)]
+    if not rows:
+        return None
+    names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == org))}
+    shown = rows[:MAX_LISTED_FILES]
+    results = [
+        {
+            "repo_id": c.repo_id,
+            "repo": names.get(c.repo_id, ""),
+            "file": c.file_path,
+            "kind": "code",
+            "title": c.file_path,
+            "start_line": c.start_line,
+            "end_line": c.end_line,
+            "node_id": None,
+            "via_graph": None,
+            "url": None,
+            "content": c.content,
+        }
+        for c in shown
+    ]
+    sources = kb.sources_from(results)
+    total = sum(len(routes.parse(c.content)) for c in rows)
+    out = [f"Found **{total}** endpoint{'s' if total != 1 else ''} in {len(rows)} file{'s' if len(rows) != 1 else ''}."]
+    for src, c in zip(sources, shown, strict=True):
+        found = routes.parse(c.content)
+        out.append(f"\n**{src['repo']}: `{c.file_path}`** [{src['id']}]")
+        out += [f"- `{r.method} {r.path}`" + (f" → `{r.handler}`" if r.handler else "") for r in found]
+    if len(rows) > len(shown):
+        out.append(
+            f"\n_{len(rows) - len(shown)} more file(s) not shown. Narrow the scope to a repository to see them._"
+        )
+    out.append(
+        "\n_Listed from the index of route declarations, so it is complete for routes written in the usual way._"
+    )
+    return {"content": "\n".join(out), "sources": sources, "connections": [], "mode": "extractive"}
+
+
 def answer(
     db: Session,
     org: str,
@@ -125,6 +181,10 @@ def answer(
             "mode": "none",
         }
     ids = scope.resolve(wanted or None) or None
+    if wants_all_routes(question) and not attachment:
+        listed = route_inventory(db, org, scope, ids)
+        if listed:
+            return listed
     asked = [m.content for m in before if m.role == "user"]
     query = retrieval_query(question, attachment.text if attachment else "", asked)
     results = kb.search(db, org, query, ids, k=8, scope=scope)[:11]

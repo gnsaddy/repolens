@@ -14,3 +14,6 @@
 - Diagrams: the model cannot draw images, so it is told to draw flowcharts as plain text in a fenced `text` block, which renders intact.
 - A "Not from your documents" badge now appears beside "AI answer" when part of a reply is general knowledge.
 - The Ask message box now clears the moment a question is sent (it stayed filled until the answer arrived); if sending fails, the question and any attached file are put back.
+
+### Fixed: "list all the API endpoints"
+- Asking Ask to list every endpoint returned one or two, because chat only reads the best few search matches and route decorators sit outside the indexed function chunks. Each source file's routes (method, path, handler, line; FastAPI, Flask, Express, Spring, Go) are now written down at index time as a `routes` chunk, and "list/all/every … endpoints/routes" questions are answered from that full inventory with citations. Re-index existing repositories once. New `services/routes.py`.

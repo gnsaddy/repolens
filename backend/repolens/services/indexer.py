@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import Change, CodeChunk, Document, IndexRun, Repository
 from ..security import redact_stored
-from . import embedding_state, gitops, usage
+from . import embedding_state, gitops, routes, usage
 from .embeddings import Embedder
 from .graph import build_repo_graph
 from .links import web_base
@@ -222,7 +222,7 @@ def _sync_chunks(
     for f, text in files:
         n_files += 1
         lang = detect_language(f)
-        for pc in parse_file(f, text):
+        for pc in [*parse_file(f, text), *routes.chunks(f, text)]:
             pc.content, red = redact_stored(pc.content)
             run.secrets_redacted += red
             h = _hash(f"{pc.parent}|{pc.symbol}|{pc.content}")
