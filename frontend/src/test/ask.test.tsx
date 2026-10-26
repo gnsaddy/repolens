@@ -373,6 +373,23 @@ describe("Ask: general knowledge label", () => {
   });
 });
 
+describe("Ask: names that were not found", () => {
+  it("shows a 'Check these names' badge when the answer names things that are not in the repositories", async () => {
+    server({ initial: [thread({ items: [msg("user", "how?"), msg("assistant", "It calls `ghost()`.\n\n_(Check these names, not found in your indexed repositories: `ghost()`)_", { mode: "llm" })] })] });
+    page("/ask/t1");
+    const log = await screen.findByRole("log", { name: "Conversation" });
+    expect(await within(log).findByTitle(/not found in your indexed repositories/)).toHaveTextContent("Check these names");
+  });
+
+  it("shows no such badge for an ordinary answer", async () => {
+    server({ initial: [thread({ items: [msg("user", "how?"), msg("assistant", "It calls create_user. [S1]", { mode: "llm" })] })] });
+    page("/ask/t1");
+    const log = await screen.findByRole("log", { name: "Conversation" });
+    await within(log).findByText(/It calls create_user/);
+    expect(within(log).queryByTitle(/not found in your indexed repositories/)).not.toBeInTheDocument();
+  });
+});
+
 describe("Ask: the message box", () => {
   it("clears as soon as a question is sent and gives it back if sending fails", async () => {
     server();

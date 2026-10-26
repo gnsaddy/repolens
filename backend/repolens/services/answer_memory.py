@@ -50,7 +50,7 @@ def _similarity(qv: list[float], qw: frozenset[str], row: AnswerMemory) -> tuple
     return cos, jac
 
 
-PIPELINE = "p3"  # bump when answers are produced differently, so older ones are never replayed or suggested
+PIPELINE = "p4"  # bump when answers are produced differently, so older ones are never replayed or suggested
 
 
 def scope_key(scope: Scope | None, repo_ids: list[str] | None, kinds: list[str] | None) -> str:

@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
-from . import answer_memory, context, skills, usage, walkthrough
+from . import answer_memory, context, name_check, skills, usage, walkthrough
 from .access import Scope
 from .graph import neighbors, node_dict
 from .links import file_url
@@ -286,6 +286,85 @@ def connections_from(results: list[dict]) -> list[dict]:
     return out
 
 
+KEPT = ("answer", "sources", "connections", "unknown_citations", "unsupported_names", "retrieval")
+COVERAGE_MIN = 0.6  # below this share of the question's key words in the top sources, search once more
+COVERAGE_NOTE = 0.5  # still below this after the second search: tell the reader the sources may not cover the question
+_TOP = 6  # how many of the best sources count towards coverage
+
+
+def _mentioned(word: str, seen: set[str]) -> bool:
+    if word in seen:
+        return True
+    return len(word) >= 5 and any(t.startswith(word) or (len(t) >= 5 and word.startswith(t)) for t in seen)
+
+
+def coverage(question: str, results: list[dict]) -> tuple[float, list[str]]:
+    """(share of the question's key words found in the best sources, the key words that were not found)."""
+    want = walkthrough.key_words(question)
+    if len(want) < 2:  # too little to judge
+        return 1.0, []
+    seen: set[str] = set()
+    for r in results[:_TOP]:
+        seen |= walkthrough._tokens(f"{r['title']} {r['file']} {r['content']}")
+    # the stemmer cuts 'revoked' to 'revok' but leaves 'revoke', so a long word also matches one that starts with it
+    missing = sorted(w for w in want if not _mentioned(w, seen))
+    return 1 - len(missing) / len(want), missing
+
+
+def _variants(words: list[str]) -> str:
+    """The missing words in the other forms a source might use ('assign' -> assigns, assigned, assigning)."""
+    out: list[str] = []
+    for w in words:
+        out += [w, w + "s", w + "ed", w + "ing"]
+    return " ".join(out)
+
+
+def _retrieve_once(
+    db: Session,
+    org: str,
+    query: str,
+    repo_ids: list[str] | None,
+    k: int,
+    scope: Scope | None,
+    kinds: list[str] | None,
+    kind: str,
+    route_query: str,
+) -> list[dict]:
+    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
+    if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
+        results = walkthrough.merge(results, walkthrough.route_sources(db, org, route_query, repo_ids, scope), k)
+    return results
+
+
+def retrieve_checked(
+    db: Session,
+    org: str,
+    query: str,
+    repo_ids: list[str] | None,
+    k: int = 8,
+    scope: Scope | None = None,
+    kinds: list[str] | None = None,
+    kind: str | None = None,
+    route_query: str | None = None,
+) -> tuple[list[dict], dict]:
+    """`retrieve` plus what happened: when the best sources do not mention the question's key words, search once more
+    (wider, with the missing words in other forms) and keep whichever pass covers more. No model is called, so the same
+    question always gives the same sources. `route_query` is the question the route match is made on, when `query` is a
+    longer search text (for example one built from an attached log)."""
+    route_query = route_query or query
+    kind = kind or walkthrough.task_kind(route_query)
+    results = _retrieve_once(db, org, query, repo_ids, k, scope, kinds, kind, route_query)
+    cov, missing = coverage(route_query, results)
+    info: dict = {"coverage": round(cov, 2), "missing": missing, "refined": False}
+    if cov < COVERAGE_MIN and missing:
+        more = f"{query} {_variants(missing)}"
+        wider = _retrieve_once(db, org, more, repo_ids, k + 4, scope, kinds, kind, route_query)
+        cov2, missing2 = coverage(route_query, wider)
+        if cov2 > cov:
+            results, info = wider, {"coverage": round(cov2, 2), "missing": missing2, "refined": True}
+    return results, info
+
+
 def retrieve(
     db: Session,
     org: str,
@@ -297,12 +376,8 @@ def retrieve(
     kind: str | None = None,
 ) -> list[dict]:
     """What an answer to `query` is built from: the best search matches, plus for how/why/write requests the matching
-    route, its handler and what it calls."""
-    kind = kind or walkthrough.task_kind(query)
-    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
-    if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
-        results = walkthrough.merge(results, walkthrough.route_sources(db, org, query, repo_ids, scope), k)
-    return results
+    route, its handler and what it calls, and one more search when the first results miss the question's key words."""
+    return retrieve_checked(db, org, query, repo_ids, k, scope, kinds, kind)[0]
 
 
 def ask(
@@ -327,10 +402,10 @@ def ask(
         hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
         if hit:
             return {**hit, "query": query, "mode": "llm", "cached": True}
-    results = retrieve(db, org, query, repo_ids, k, scope, kinds, kind)
+    results, retrieval = retrieve_checked(db, org, query, repo_ids, k, scope, kinds, kind)
     sources = sources_from(results)
     connections = connections_from(results)
-    base = {"query": query, "sources": sources, "connections": connections[:12]}
+    base = {"query": query, "sources": sources, "connections": connections[:12], "retrieval": retrieval}
     if not results:
         return {**base, "answer": "Nothing relevant was found in the indexed documents and code.", "mode": "none"}
     if not llm.offline:
@@ -369,6 +444,7 @@ def ask(
                 "mode": "llm",
                 "cached": True,
                 "unknown_citations": cached.value.get("unknown", []),
+                "unsupported_names": cached.value.get("unsupported", []),
             }
         try:
             task = Task(
@@ -387,19 +463,27 @@ def ask(
             )
             cited = set(re.findall(r"\[S(\d+)\]", res.text))
             unknown = sorted(f"S{n}" for n in cited if not 1 <= int(n) <= len(sources))
+            unsupported = name_check.unsupported(db, org, res.text, results, query, kind, scope)
             answer = res.text + skills.footer(chosen)
             skills.record_use(db, chosen)
-            db.add(
+            db.merge(  # a fresh answer replaces the saved one (an insert would break on the same key)
                 CacheEntry(
                     key=key,
                     org_id=org,
                     task="kb_ask",
-                    value={"answer": answer, "unknown": unknown},
+                    value={"answer": answer, "unknown": unknown, "unsupported": unsupported},
                     tokens_baseline=res.input_tokens + res.output_tokens,
                 )
             )
             db.commit()
-            out = {**base, "answer": answer, "mode": "llm", "cached": False, "unknown_citations": unknown}
+            out = {
+                **base,
+                "answer": answer,
+                "mode": "llm",
+                "cached": False,
+                "unknown_citations": unknown,
+                "unsupported_names": unsupported,
+            }
             if chosen:
                 out["skills"] = [x.title for x in chosen]
             if res.route:
@@ -412,7 +496,7 @@ def ask(
                     query,
                     mem_key,
                     fp,
-                    {k: out[k] for k in ("answer", "sources", "connections", "unknown_citations")},
+                    {k: out[k] for k in KEPT},
                     res.input_tokens + res.output_tokens,
                 )
             return out

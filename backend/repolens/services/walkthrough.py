@@ -114,6 +114,13 @@ def topic(question: str) -> frozenset[str]:
     return frozenset(stem(t) for t in terms(question) if t not in GENERIC) - frozenset(stem(g) for g in GENERIC)
 
 
+def key_words(question: str) -> frozenset[str]:
+    """The question's content words in the same form `_tokens` gives text (split on underscores, lightly stemmed), so the two
+    can be compared: what the sources must mention for an answer to be built from them."""
+    kept = " ".join(t for t in terms(question) if t not in GENERIC)
+    return _tokens(kept.replace("_", " ")) - frozenset(stem(g) for g in GENERIC)
+
+
 def _result(c: CodeChunk, repo: str, title: str, via: str, content: str | None = None, line: int | None = None) -> dict:
     return {
         "chunk_id": c.id,

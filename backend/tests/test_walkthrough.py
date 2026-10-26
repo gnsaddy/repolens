@@ -89,15 +89,16 @@ def test_nothing_is_added_when_the_question_names_no_topic(client, session, svc)
 
 
 class Spy:
-    def __init__(self):
+    def __init__(self, reply="Summary. [S1]"):
         self.calls = []
+        self.reply = reply
 
     def install(self, monkeypatch):
         monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
 
         def complete(this, agent, system, prompt, max_tokens=1500, task=None, validate=None):
             self.calls.append({"system": system, "prompt": prompt, "max_tokens": max_tokens})
-            return LLMResult("Summary. [S1]", 10, 10, route={"model": "spy"})
+            return LLMResult(self.reply, 10, 10, route={"model": "spy"})
 
         monkeypatch.setattr(LLMClient, "complete", complete)
         return self

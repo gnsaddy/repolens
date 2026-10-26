@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..models import ChatMessage, ChatThread, CodeChunk, Repository
 from ..security import redact_secrets
-from . import context, routes, skills, walkthrough
+from . import context, name_check, routes, skills, walkthrough
 from . import knowledge as kb
 from .access import Scope
 from .llm import LLMClient, describe_failure
@@ -195,9 +195,8 @@ def _answer(
     asked = [m.content for m in before if m.role == "user"]
     query = retrieval_query(question, attachment.text if attachment else "", asked)
     kind = "lookup" if attachment else walkthrough.task_kind(question)
-    results = kb.search(db, org, query, ids, k=8, scope=scope)[:11]
-    if walkthrough.needs_path(kind):  # the route, its handler and what the handler calls, not just similar text
-        results = walkthrough.merge(results, walkthrough.route_sources(db, org, question, ids, scope), 8)
+    # the best matches; for how/why questions the route, its handler and what it calls; one more search if they miss the question
+    results, retrieval = kb.retrieve_checked(db, org, query, ids, 8, scope, kind=kind, route_query=question)
     sources = kb.sources_from(results)
     connections = kb.connections_from(results)
     log_lines = error_lines(attachment.text, 8) if attachment else []
@@ -252,11 +251,15 @@ def _answer(
             general = thread.fallback and not sources
             cut = "\n\n_(The model stopped before finishing. Ask it to continue.)_" if res.truncated else ""
             unknown = sorted({f"S{n}" for n in re.findall(r"\[S(\d+)\]", res.text) if not 1 <= int(n) <= len(sources)})
+            invented = name_check.unsupported(db, org, res.text, results, question, kind, scope)
+            names = ", ".join(f"`{n}`" for n in invented)
             return {
                 **base,
                 "content": res.text
                 + cut
                 + (f"\n\n_(Unknown citations: {', '.join(unknown)})_" if unknown else "")
+                + (f"\n\n_(Check these names, not found in your indexed repositories: {names})_" if invented else "")
+                + _gap_note(retrieval, bool(sources))
                 + skills.footer(chosen),
                 "mode": "general" if general else "llm",
             }
@@ -270,6 +273,14 @@ def _answer(
             "mode": "failed",
         }
     return {**base, "content": body, "mode": "extractive" if sources or log_lines else "none"}
+
+
+def _gap_note(retrieval: dict, has_sources: bool) -> str:
+    """Said when, even after a second search, the sources do not mention much of what was asked."""
+    missing = retrieval.get("missing") or []
+    if not has_sources or not missing or retrieval.get("coverage", 1) >= kb.COVERAGE_NOTE:
+        return ""
+    return f"\n\n_(Your sources do not mention: {', '.join(missing[:6])}. The answer may be incomplete.)_"
 
 
 NO_INVENTORY = (

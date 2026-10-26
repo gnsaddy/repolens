@@ -103,6 +103,8 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
           <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
           {(a.memory || a.cached) && <button type="button" className="mt-2 text-xs text-brand hover:underline" disabled={ask.isPending} onClick={() => ask.mutate(true)}>Answer again with the model</button>}
           {!!a.unknown_citations?.length && <p className="mt-2 text-xs text-amber-700">The model cited unknown sources ({a.unknown_citations.join(", ")}) — treat those claims as unverified.</p>}
+          {!!a.unsupported_names?.length && <p className="mt-2 text-xs text-amber-700">Check these names: they were not found in your indexed repositories ({a.unsupported_names.join(", ")}).</p>}
+          {!!a.retrieval?.missing.length && a.retrieval.coverage < 0.5 && <p className="mt-2 text-xs text-amber-700">Your sources do not mention: {a.retrieval.missing.slice(0, 6).join(", ")}. The answer may be incomplete.</p>}
           {!!a.connections.length && (<div className="mt-4 border-t border-line pt-3">
             <div className="mb-1 text-xs font-medium text-muted">Connections found in the graph</div>
             <ul className="space-y-0.5 text-xs">{a.connections.slice(0, 6).map((c, i) => (

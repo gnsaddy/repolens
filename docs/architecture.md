@@ -120,18 +120,28 @@ question kept), and a finished investigation publishes a digest (`services/agent
 instead of the whole evidence. Memory and digests live in the application database rather than Redis (see features).
 
 ## How an answer is built
-One function, `knowledge.retrieve`, decides what an answer is built from, and Ask chat, the Knowledge page, the DeepMind Wiki and
-the quality checks all call it, so a retrieval check tests exactly what an answer sees. It runs the hybrid search, then
+One function, `knowledge.retrieve_checked` (`retrieve` is the same without the report), decides what an answer is built from. Ask chat
+and `knowledge.ask`, which the Knowledge page, the DeepMind Wiki, MCP and the full quality runs call, all use it, so a retrieval check
+tests exactly what an answer sees. It runs the hybrid search, then
 `services/walkthrough.py` classifies the question (`task_kind`: *lookup*, *explain* or *build*). For explain and build questions
 `route_sources` adds the routes the question is about (the `routes` chunks written at index time by `services/routes.py`), each
 followed by its handler and the functions the handler calls, permission checks first. Routes are scored by their path (twice) plus
 the question's words in the handler body. Equal scores are ordered by how often the handler uses those words (`_mentions`), and the
 top `MAX_ROUTES` are taken from different files first (`_spread`, one per file, then the best of the rest), so one module of
 near-identical routes, such as a SCIM copy of the user routes, cannot fill every slot. The route sources go ahead of the ordinary
-results (`merge`). The prompt then gets the add-on for the kind of question (walkthrough steps, or build-from-conventions), and
+results (`merge`). Then it measures **coverage**: the share of the question's key words (`walkthrough.key_words`, stemmed the same way as
+the text) that the six best sources mention. Below 60% it searches **once more**, wider and with the missing words in other forms
+(assign: assigns, assigned, assigning), and keeps whichever pass covers more. No model is called, so the same question always gets the
+same sources, and the response says whether it searched again (`retrieval`: coverage, missing words, refined). If the sources still
+miss most of the question the chat and Knowledge page say so. The prompt then gets the add-on for the kind of question (walkthrough steps, or build-from-conventions), and
 the best one or two approved **skills** (`services/skills.py`, table `skills`, migration 0024): guidance in a marked block that says it cannot override the
 citation, secret or untrusted-source rules. Matching skills use their own words, not retrieval's. If the model call fails, the
 reason is reported (`describe_failure`), never a list of loose passages passed off as an answer.
+
+After the model answers, `services/name_check.py` looks for **names that do not exist**: file paths, routes and functions the answer
+states outside code blocks. A name is fine if it appears in the sources or the question, or anywhere in the indexed repositories
+(one lookup each against `code_chunks`, within the person's access); only a name found nowhere is reported (`unsupported_names`, an amber
+"Check these names" badge in the chat). Build requests are skipped, since they write new names on purpose. No model is called.
 
 Saved answers are keyed on `answer_memory.PIPELINE`, the access scope and the skills used (`skills.fingerprint`), so changing how
 answers are produced (bump `PIPELINE`) or adding a skill never replays an older answer; build requests are never replayed.

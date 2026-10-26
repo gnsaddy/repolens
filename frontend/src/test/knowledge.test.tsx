@@ -38,6 +38,23 @@ function renderPage(url: string) {
 const me = { id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" };
 
 describe("Knowledge page", () => {
+  it("says which names were not found and what the sources do not mention", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.endsWith("/knowledge/similar")) return json([]);
+      if (u.endsWith("/knowledge/ask")) return json({ query: "q", mode: "llm", answer: "It calls ghost(). [S1]", sources: [], connections: [], unsupported_names: ["ghost()", "services/ghost.py"], retrieval: { coverage: 0.33, missing: ["assign", "role"], refined: true } });
+      if (u.endsWith("/knowledge/search")) return json([]);
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=ask");
+    await userEvent.type(await screen.findByLabelText("Question"), "how are roles assigned");
+    await userEvent.click(screen.getByRole("button", { name: /Ask/ }));
+    expect(await screen.findByText(/Check these names/)).toHaveTextContent("ghost(), services/ghost.py");
+    expect(screen.getByText(/Your sources do not mention/)).toHaveTextContent("assign, role");
+  });
+
   it("suggests similar earlier questions before the model's answer", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const u = String(input);

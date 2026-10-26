@@ -209,6 +209,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
             <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div>
             <div className="min-w-0 max-w-3xl flex-1 rounded-xl border border-line p-4">
               <div className="mb-2 flex items-center gap-2"><Badge tone={m.mode === "llm" ? "brand" : m.mode === "general" ? "amber" : m.mode === "failed" ? "red" : "gray"}>{m.mode === "llm" ? "AI answer" : m.mode === "general" ? "general knowledge" : m.mode === "failed" ? "AI unavailable" : m.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
+                {m.mode === "llm" && /\(Check these names, not found/.test(m.content) && <Badge tone="amber" title="The answer names files, routes or functions that were not found in your indexed repositories">Check these names</Badge>}
                 {m.mode === "llm" && /^\s*Not from your documents:/m.test(m.content) && <Badge tone="amber" title="Part of this answer is not backed by your sources and has no citations">Not from your documents</Badge>}
                 <span className="text-xs text-muted">{timeAgo(m.created_at)}</span>
                 {items[items.indexOf(m) - 1]?.role === "user" && m.mode !== "failed" && <button aria-label="Save as a test" title="Save as a quality check" className="ml-auto rounded p-1 text-muted hover:bg-slate-100" onClick={() => void saveTest(items.indexOf(m))}><ClipboardCheck className="h-4 w-4" /></button>}

@@ -111,6 +111,7 @@ export interface KnowledgeHit {
 }
 export interface AskResult {
   query: string; answer: string; mode: "llm" | "extractive" | "failed" | "none"; cached?: boolean; unknown_citations?: string[];
+  unsupported_names?: string[]; retrieval?: { coverage: number; missing: string[]; refined: boolean };
   memory?: { similarity: number; asked: string; tokens_saved: number }; route?: { model: string; provider: string; tier: string; why: string; escalated: boolean };
   sources: { id: string; repo: string; repo_id?: string; url?: string; file: string; kind: string; title: string; start_line: number; end_line: number;
     node_id: string | null; snippet: string; via_graph: { from: string; relation: string } | null }[];
