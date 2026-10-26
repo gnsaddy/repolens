@@ -119,6 +119,33 @@ redacted. Retrieved context is condensed before it is sent (`services/context.py
 question kept), and a finished investigation publishes a digest (`services/agent_context.py`) that the runbook writer reads
 instead of the whole evidence. Memory and digests live in the application database rather than Redis (see features).
 
+## How an answer is built
+One function, `knowledge.retrieve`, decides what an answer is built from, and Ask chat, the Knowledge page, the DeepMind Wiki and
+the quality checks all call it, so a retrieval check tests exactly what an answer sees. It runs the hybrid search, then
+`services/walkthrough.py` classifies the question (`task_kind`: *lookup*, *explain* or *build*). For explain and build questions
+`route_sources` adds the routes the question is about (the `routes` chunks written at index time by `services/routes.py`), each
+followed by its handler and the functions the handler calls, permission checks first. Routes are scored by their path (twice) plus
+the question's words in the handler body. Equal scores are ordered by how often the handler uses those words (`_mentions`), and the
+top `MAX_ROUTES` are taken from different files first (`_spread`, one per file, then the best of the rest), so one module of
+near-identical routes, such as a SCIM copy of the user routes, cannot fill every slot. The route sources go ahead of the ordinary
+results (`merge`). The prompt then gets the add-on for the kind of question (walkthrough steps, or build-from-conventions), and
+the best one or two approved **skills** (`services/skills.py`, table `skills`, migration 0024): guidance in a marked block that says it cannot override the
+citation, secret or untrusted-source rules. Matching skills use their own words, not retrieval's. If the model call fails, the
+reason is reported (`describe_failure`), never a list of loose passages passed off as an answer.
+
+Saved answers are keyed on `answer_memory.PIPELINE`, the access scope and the skills used (`skills.fingerprint`), so changing how
+answers are produced (bump `PIPELINE`) or adding a skill never replays an older answer; build requests are never replayed.
+
+**Quality checks** (`services/golden.py`, tables `golden_questions` and `golden_runs`, migration 0025). A saved question lists files a
+good answer must be built from (a path fragment is enough) and words it must contain. A *retrieval* run calls `retrieve` and checks
+the files, needs no model and is free; a *full* run calls `ask` with the memory bypassed, also checks the words, and is limited to
+20 questions (`MAX_FULL`). Every run stores a fingerprint of the index, the skills, `PIPELINE` and the search model, so a drop in the
+pass rate comes with which of those changed since the previous run.
+
+**Independent review** of an investigation is off by default and switched by an admin (`llm_settings.independent_review`, read by
+`llm_router.review_enabled`). It is advisory: its result is recorded in `verification.review` and shown in the report, and it never
+changes the confidence or the ranking.
+
 ## Investigation lifecycle
 `services/investigations.py`. Runs execute in a thread pool. A run is stopped when it exceeds
 `REPOLENS_INVESTIGATION_TIMEOUT_S` (checked between workflow steps) and marked failed; a background sweep in `main.py` also
