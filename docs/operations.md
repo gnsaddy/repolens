@@ -88,6 +88,22 @@ Steps:
 
 Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.1-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
 
+## How long indexing takes
+
+Indexing reads every file at the indexed commit, splits it into chunks, turns each chunk into a vector, saves them, and builds the knowledge graph. On one machine with the built-in embedder and SQLite, measured here:
+
+| Repository | Files | Chunks | Indexing time |
+|---|---|---|---|
+| RepoLens itself | 398 | 2,562 | 11.5 s |
+| Synthetic Go project | 307 | 2,414 | 5.9 s |
+| Synthetic Go project | 3,075 | 24,150 | 49.8 s (127.7 s before the fix below) |
+
+Time now grows in step with size, about 2 ms per chunk, so a repository ten times larger takes about ten times as long. PostgreSQL adds the cost of keeping the vector index up to date, so expect it to be slower than these numbers. A very large project (for example Kubernetes, several hundred thousand chunks) still takes many minutes; for a demo or beta, pick a repository of a few thousand files.
+
+An earlier version took far longer than size alone explains: resolving each import scanned every file path in the repository, so the work grew with files times imports times files (about 78 of 128 seconds on the 3,075-file case, and hours on Kubernetes). It now uses lookup tables built once per repository. `tests/test_import_index.py` checks that the lookups return exactly what the scan did, and that a lookup does not slow down as the repository grows.
+
+To keep a beta predictable, index a repository you have sized first, and watch the first run on a copy of the data. Per-file size is capped (`REPOLENS_MAX_FILE_BYTES`, 400,000 bytes by default); there is not yet a cap on the number of files or the total size.
+
 ## Docker Compose and local runs
 
 ```bash

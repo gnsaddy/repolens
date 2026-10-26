@@ -102,7 +102,44 @@ class _Node:
 
 
 # ---------------------------------------------------------------------------------------------- import resolving
-def resolve_import(stmt: str, lang: str, file_path: str, paths: set[str]) -> set[str]:
+class PathIndex:
+    """The repository's file paths with the lookups import resolving needs, built once.
+
+    Resolving an import used to scan every path for every import in every file: with N files that is N x imports x N,
+    which is why indexing time grew faster than the repository. These tables make each lookup a dictionary access."""
+
+    def __init__(self, paths: set[str] | frozenset[str]):
+        self.paths = paths
+        self._suffixes: dict[str, set[str]] | None = None
+        self._go_dirs: dict[str, set[str]] | None = None
+
+    def __contains__(self, p: object) -> bool:
+        return p in self.paths
+
+    def with_suffix(self, c: str) -> set[str]:
+        """Paths ending in `/` + c: the same as `{p for p in paths if p.endswith("/" + c)}`, without the scan."""
+        if self._suffixes is None:
+            table: dict[str, set[str]] = defaultdict(set)
+            for p in self.paths:
+                parts = p.split("/")
+                for i in range(1, len(parts)):  # every proper suffix that starts after a slash
+                    table["/".join(parts[i:])].add(p)
+            self._suffixes = table
+        return self._suffixes.get(c, set())
+
+    def go_files_in_dirs_named(self, name: str) -> set[str]:
+        if self._go_dirs is None:
+            table: dict[str, set[str]] = defaultdict(set)
+            for p in self.paths:
+                if p.endswith(".go"):
+                    table[posixpath.basename(posixpath.dirname(p))].add(p)
+            self._go_dirs = table
+        return self._go_dirs.get(name, set())
+
+
+def resolve_import(stmt: str, lang: str, file_path: str, paths: "set[str] | PathIndex") -> set[str]:
+    index = paths if isinstance(paths, PathIndex) else PathIndex(paths)
+    paths = index  # membership tests below work on either; the scans go through the index
     out: set[str] = set()
     if lang == "python":
         m = re.match(r"\s*from\s+(\.*)([\w.]*)\s+import\s+(.*)", stmt)
@@ -123,13 +160,13 @@ def resolve_import(stmt: str, lang: str, file_path: str, paths: set[str]) -> set
                 for n in [x.strip().split(" as ")[0] for x in names.strip("()").split(",")]:
                     if n and n != "*":
                         cands += [posixpath.join(joined, n) + ".py"]
-            out |= _match_paths(cands, paths, suffix=not dots)
+            out |= _match_paths(cands, index, suffix=not dots)
         else:
             for mod in re.findall(r"import\s+([\w., ]+)", stmt):
                 for part in mod.split(","):
                     p = part.strip().split(" as ")[0].replace(".", "/")
                     if p:
-                        out |= _match_paths([p + ".py", p + "/__init__.py"], paths, suffix=True)
+                        out |= _match_paths([p + ".py", p + "/__init__.py"], index, suffix=True)
     elif lang in ("javascript", "typescript", "tsx"):
         for spec in re.findall(r"""from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]""", stmt):
             s = spec[0] or spec[1]
@@ -142,25 +179,25 @@ def resolve_import(stmt: str, lang: str, file_path: str, paths: set[str]) -> set
         if m:
             parts = m.group(1).split(".")
             for k in range(len(parts), 0, -1):
-                out |= _match_paths(["/".join(parts[:k]) + ".java"], paths, suffix=True)
+                out |= _match_paths(["/".join(parts[:k]) + ".java"], index, suffix=True)
                 if out:
                     break
     elif lang == "go":
         for s in re.findall(r'"([^"]+)"', stmt):
             tail = s.split("/")[-1]
-            out |= {p for p in paths if p.endswith(".go") and posixpath.basename(posixpath.dirname(p)) == tail}
+            out |= index.go_files_in_dirs_named(tail)
     out.discard(file_path)
     return out
 
 
-def _match_paths(cands: list[str], paths: set[str], suffix: bool) -> set[str]:
+def _match_paths(cands: list[str], index: PathIndex, suffix: bool) -> set[str]:
     found = set()
     for c in cands:
         c = posixpath.normpath(c)
-        if c in paths:
+        if c in index:
             found.add(c)
         elif suffix:
-            found |= {p for p in paths if p.endswith("/" + c)}
+            found |= index.with_suffix(c)
     return found
 
 
@@ -312,10 +349,11 @@ def build_repo_graph(db: Session, repo: Repository) -> dict:
 
     # IMPORTS --------------------------------------------------------------------------------------------------
     resolved_imports: dict[str, set[str]] = {}
+    path_index = PathIndex(paths)  # built once for the whole repository
     for path, stmts in file_imports.items():
         targets: set[str] = set()
         for stmt in stmts:
-            targets |= resolve_import(stmt, lang_of[path], path, paths)
+            targets |= resolve_import(stmt, lang_of[path], path, path_index)
         resolved_imports[path] = targets
         for t in targets:
             add_edge(files[path].id, files[t].id, "IMPORTS", "static_analysis", 1.0, "import statement")
