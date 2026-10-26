@@ -64,3 +64,8 @@ body { @apply bg-canvas text-ink antialiased; }
 .prose-wiki th { @apply bg-slate-50 font-medium; }
 .prose-wiki a { @apply text-brand hover:underline; }
 .prose-wiki del { @apply text-red-600; }
+
+/* Graph: dashes that travel from the focused node to the nodes it connects to. */
+@keyframes rl-flow { to { stroke-dashoffset: -28; } }
+.rl-flow { animation: rl-flow 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .rl-flow { animation: none; } }

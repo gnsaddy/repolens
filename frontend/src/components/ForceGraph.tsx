@@ -1,4 +1,4 @@
-import { Download, Expand, Maximize2, Minimize2, Minus, Plus, ScanSearch } from "lucide-react";
+import { Download, Expand, Maximize2, Minimize2, Minus, Pause, Play, Plus, ScanSearch } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphEdge, GraphNode } from "@/lib/api";
 
@@ -104,6 +104,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   const [hover, setHover] = useState<string | null>(null);
   const [labelMode, setLabelMode] = useState<LabelMode>("smart");
   const [tall, setTall] = useState(false);
+  const [animate, setAnimate] = useState(true);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
 
@@ -126,6 +127,8 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   }, [centerOn?.id, centerOn?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const focus = hover ?? selectedId;
+  const calm = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const moving = animate && !calm;
   const adj = useMemo(() => {
     const m = new Map<string, Set<string>>();
     edges.forEach((e) => {
@@ -140,10 +143,30 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   const near = (id: string) => !focus || id === focus || adj.get(focus)?.has(id);
   const inArea = (id: string) => focusArea == null || nodeById.get(id)?.community === focusArea;
 
+  /** The links of the focused node (or of a highlighted path), each as a segment that starts at the node it flows out of. */
+  const flowing = useMemo(() => {
+    const out: { e: GraphEdge; x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (const e of edges) {
+      const fromFocus = !!focus && (e.source === focus || e.target === focus);
+      const onPath = !!highlight?.has(e.id);
+      if (!fromFocus && !onPath) continue;
+      const startId = fromFocus ? focus! : e.source, endId = startId === e.source ? e.target : e.source;
+      const a = pos[startId], b = pos[endId], na = nodeById.get(startId), nb = nodeById.get(endId);
+      if (!a || !b || !na || !nb || !inArea(startId) || !inArea(endId)) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+      if (len < 1) continue;
+      const ra = radius(na) + 1, rb = radius(nb) + 1;
+      out.push({ e, x1: a.x + (dx / len) * ra, y1: a.y + (dy / len) * ra, x2: b.x - (dx / len) * rb, y2: b.y - (dy / len) * rb });
+      if (out.length >= 60) break;
+    }
+    return out;
+  }, [edges, focus, highlight, pos, nodeById, focusArea]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const exportSvg = () => {
     const el = svg.current;
     if (!el) return;
     const copy = el.cloneNode(true) as SVGSVGElement;
+    copy.querySelectorAll("[data-flow]").forEach((x) => x.remove()); // motion belongs on screen, not in the file
     copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     copy.setAttribute("width", String(W)); copy.setAttribute("height", String(H));
     copy.setAttribute("style", "background:#fff;--color-ink:#0f172a;--color-surface:#ffffff");  // the page's colour variables do not exist in the file
@@ -163,6 +186,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
         <span className="w-10 text-center text-[11px] tabular-nums text-muted" aria-label="Zoom level">{Math.round(view.k * 100)}%</span>
         <button className={btn} aria-label="Fit to screen" title="Fit everything (0)" onClick={() => setView(fitView(nodes, pos))}><ScanSearch className="h-4 w-4" /></button>
         <button className={btn} aria-label="Actual size" title="Reset to 100%" onClick={() => setView({ x: 0, y: 0, k: 1 })}><Expand className="h-4 w-4" /></button>
+        <button className={btn} aria-label="Animate connections" aria-pressed={animate} title={calm ? "Your system asks for less motion, so the animation stays off" : "Show flow from the selected node to what it connects to"} onClick={() => setAnimate((a) => !a)}>{animate && !calm ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
         <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-md border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
           <option value="smart">Key labels</option><option value="all">All labels</option><option value="none">No labels</option></select>
         <button className={btn} aria-label="Download SVG" title="Download as SVG" onClick={exportSvg}><Download className="h-4 w-4" /></button>
@@ -214,6 +238,19 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
                 {on && !away && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
               </g>);
           })}
+          {moving && flowing.map(({ e, x1, y1, x2, y2 }) => {
+            const d = `M${x1} ${y1} L${x2} ${y2}`, c = REL_COLORS[e.rel] ?? "#4f46e5";
+            return (
+              <g key={`flow-${e.id}`} data-flow="" pointerEvents="none">
+                <path d={d} fill="none" stroke={c} strokeWidth={2.2} strokeLinecap="round" strokeDasharray="6 8" className="rl-flow" opacity={0.9} />
+                <circle r={3.2} fill={c}><animateMotion dur="1.6s" repeatCount="indefinite" path={d} /></circle>
+              </g>);
+          })}
+          {moving && selectedId && pos[selectedId] && nodeById.get(selectedId) && (
+            <circle data-flow="" pointerEvents="none" cx={pos[selectedId].x} cy={pos[selectedId].y} fill="none" stroke="#6366f1" strokeWidth={2}>
+              <animate attributeName="r" values={`${radius(nodeById.get(selectedId)!) + 2};${radius(nodeById.get(selectedId)!) + 16}`} dur="1.8s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.7;0" dur="1.8s" repeatCount="indefinite" />
+            </circle>)}
           {nodes.map((n) => {
             const p = pos[n.id];
             if (!p) return null;

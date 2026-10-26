@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ForceGraph from "@/components/ForceGraph";
 import type { GraphEdge, GraphNode } from "@/lib/api";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const node = (id: string, community: number | null, degree = 2): GraphNode => ({ id, type: "function", name: `fn_${id}`, qualname: `fn_${id}`, path: "a.py", start_line: 1, end_line: 3, repo_id: "r", repo: "svc", degree, meta: {}, community });
 const edge = (id: string, s: string, t: string): GraphEdge => ({ id, source: s, target: t, rel: "CALLS", provenance: "static_analysis", trust: "fact", weight: 1, evidence: "" });
 const nodes = [node("a", 0), node("b", 0), node("c", 1)];
@@ -67,5 +67,63 @@ describe("graph controls", () => {
     const opacity = (name: string) => within(drawing(container) as unknown as HTMLElement).getByRole("button", { name }).getAttribute("opacity");
     expect(opacity("function fn_c")).toBe("1"); // in the area
     expect(Number(opacity("function fn_a"))).toBeLessThan(0.2); // outside it
+  });
+
+  describe("flow animation", () => {
+    const flow = (c: HTMLElement) => drawing(c).querySelectorAll("path.rl-flow");
+    const noMotionPreference = () => vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+
+    it("flows from the selected node to every node it connects to, and pulses the selected node", () => {
+      noMotionPreference();
+      const { container } = render(<ForceGraph nodes={nodes} edges={edges} selectedId="b" onSelect={() => {}} />);
+      expect(flow(container)).toHaveLength(2); // b connects to a and to c
+      expect(drawing(container).querySelectorAll("[data-flow] animateMotion")).toHaveLength(2); // one particle per link
+      expect(drawing(container).querySelectorAll("circle[data-flow] animate")).toHaveLength(2); // the pulse ring
+      // every flowing segment starts at b, so the motion reads as outward from it
+      const b = drawing(container).querySelector("g[aria-label='function fn_b']")!.getAttribute("transform")!;
+      const [bx, by] = b.match(/-?\d+(\.\d+)?/g)!.map(Number);
+      for (const path of flow(container)) {
+        const [x, y] = path.getAttribute("d")!.match(/-?\d+(\.\d+)?/g)!.slice(0, 2).map(Number);
+        expect(Math.hypot(x - bx, y - by)).toBeLessThan(20); // starts at the edge of the node, not somewhere else
+      }
+    });
+
+    it("follows the node under the pointer", async () => {
+      noMotionPreference();
+      const { container } = render(<ForceGraph nodes={nodes} edges={edges} selectedId={null} onSelect={() => {}} />);
+      expect(flow(container)).toHaveLength(0); // nothing is focused, nothing moves
+      await userEvent.hover(within(drawing(container) as unknown as HTMLElement).getByRole("button", { name: "function fn_a" }));
+      expect(flow(container)).toHaveLength(1); // a has one link
+      await userEvent.unhover(within(drawing(container) as unknown as HTMLElement).getByRole("button", { name: "function fn_a" }));
+      expect(flow(container)).toHaveLength(0);
+    });
+
+    it("can be paused, stays off when the system asks for less motion, and is not saved into the SVG file", async () => {
+      noMotionPreference();
+      const { container } = render(<ForceGraph nodes={nodes} edges={edges} selectedId="b" onSelect={() => {}} />);
+      const toggle = screen.getByRole("button", { name: "Animate connections" });
+      expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+      const saved: Blob[] = [];
+      (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b) => { saved.push(b); return "blob:x"; };
+      (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => {};
+      await userEvent.click(screen.getByRole("button", { name: "Download SVG" }));
+      const file = await saved[0].text();
+      expect(file).not.toContain("rl-flow");
+      expect(file).not.toContain("animateMotion");
+      expect(flow(container)).toHaveLength(2); // the file is a copy; the screen keeps moving
+
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+      expect(flow(container)).toHaveLength(0);
+      expect(drawing(container).querySelector("[data-flow]")).toBeNull();
+    });
+
+    it("does not move at all for people who asked their system for less motion", () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} }));
+      const { container } = render(<ForceGraph nodes={nodes} edges={edges} selectedId="b" onSelect={() => {}} />);
+      expect(flow(container)).toHaveLength(0);
+      expect(drawing(container).querySelector("[data-flow]")).toBeNull();
+    });
   });
 });

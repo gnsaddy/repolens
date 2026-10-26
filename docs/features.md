@@ -161,7 +161,9 @@ Every connection in the graph says how far it can be trusted: **fact** (found di
 
 ## Graph view controls
 
-The graph has a toolbar: **zoom in and out** (the point under the pointer stays put), **fit to screen**, **actual size**, a **zoom level** readout, a **labels** switch (key labels, all labels or none), **download as SVG** and **enlarge** for a taller canvas. The mouse wheel zooms toward the pointer, a double click zooms in, dragging pans, and with the graph focused `+`, `-`, `0` and the arrow keys zoom, fit and pan. Picking a node from the search box moves the view to it. **Full screen** (top right of the graph page) hides the app's own sidebar and summary tiles and gives the graph the whole window, with the node details in a side card that **Hide details** folds away; **Esc** or **Exit full screen** returns to the page. When coloured by area, a legend lists the areas; click one to look at it on its own and dim the rest.
+The graph has a toolbar: **zoom in and out** (the point under the pointer stays put), **fit to screen**, **actual size**, a **zoom level** readout, a **labels** switch (key labels, all labels or none), **download as SVG** and **enlarge** for a taller canvas. The mouse wheel zooms toward the pointer, a double click zooms in, dragging pans, and with the graph focused `+`, `-`, `0` and the arrow keys zoom, fit and pan. Picking a node from the search box moves the view to it. **Animation:** the links of the node you hover or select light up with dashes and small particles that flow outward to what it connects to, and the selected node gently pulses; a highlighted path flows along its links too. The play/pause button in the toolbar turns it off, it stays off when your system is set to reduce motion, and it is left out of the SVG download.
+
+**Full screen** (top right of the graph page) hides the app's own sidebar and summary tiles and gives the graph the whole window, with the node details in a side card that **Hide details** folds away; **Esc** or **Exit full screen** returns to the page. When coloured by area, a legend lists the areas; click one to look at it on its own and dim the rest.
 
 ## Logo and About
 
