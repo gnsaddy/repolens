@@ -22,3 +22,6 @@
 ### Fixed: a failed model call looked like an answer
 - When the language model failed (bad key, quota, budget, timeout, unreachable), Ask silently showed a few loosely matching passages as if they were the answer. It now says **"The AI model could not answer"** with the reason and the model tried, shows a red **AI unavailable** badge, lists the matching passages as "not a written answer", and offers **Try again**. Message mode `failed`.
 - Extracted passages are limited to ones sharing at least half of the question's meaningful words.
+
+### Fixed: browser tests failing in CI since the chat commit
+- The floating Ask button was labelled "Ask a question", which also matched the wiki question box's `getByLabel("Question")`, so the browser test "the wiki finds, edits and answers from a page" found two elements and failed. The button is now labelled "Open Ask chat", and a browser test checks that the question box stays unique.

@@ -312,14 +312,14 @@ describe("the floating Ask button and the sidebar", () => {
   const fab = (route: string) => render(<MemoryRouter initialEntries={[route]}><AskFab /></MemoryRouter>);
   it("is on every page except the chat itself", () => {
     const { unmount } = fab("/wiki");
-    expect(screen.getByRole("link", { name: "Ask a question" })).toHaveAttribute("href", "/ask");
+    expect(screen.getByRole("link", { name: "Open Ask chat" })).toHaveAttribute("href", "/ask");
     unmount();
     fab("/ask");
-    expect(screen.queryByRole("link", { name: "Ask a question" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open Ask chat" })).toBeNull();
   });
   it("is hidden inside a chat too", () => {
     fab("/ask/t1");
-    expect(screen.queryByRole("link", { name: "Ask a question" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open Ask chat" })).toBeNull();
   });
 
   it("appear in the signed-in app: an Ask item in the sidebar and the button on other pages, but not on the chat page", async () => {
@@ -329,11 +329,11 @@ describe("the floating Ask button and the sidebar", () => {
     const items = await screen.findAllByRole("link", { name: /^Ask$/ }); // the sidebar, and the same menu on small screens
     expect(items.length).toBeGreaterThan(0);
     items.forEach((a) => expect(a).toHaveAttribute("href", "/ask"));
-    expect(screen.getByRole("link", { name: "Ask a question" })).toHaveAttribute("href", "/ask"); // the floating button
+    expect(screen.getByRole("link", { name: "Open Ask chat" })).toHaveAttribute("href", "/ask"); // the floating button
     first.unmount();
     open("/ask");
     expect(await screen.findByRole("button", { name: "New chat" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Ask a question" })).toBeNull(); // not on top of the chat itself
+    expect(screen.queryByRole("link", { name: "Open Ask chat" })).toBeNull(); // not on top of the chat itself
     expect(screen.getAllByRole("link", { name: /^Ask$/ })[0]).toHaveAttribute("aria-current", "page"); // the sidebar item is highlighted
   });
 });

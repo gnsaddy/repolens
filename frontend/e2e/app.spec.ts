@@ -80,3 +80,11 @@ test("a Jira ticket cannot be opened before Jira is connected, and says why", as
   await page.goto("/jira");
   await expect(page.getByText("Connect Jira first")).toBeVisible();
 });
+
+test("the floating Ask button never shares a label with the wiki question box", async ({ page }) => {
+  await signedIn(page, token);
+  await page.goto("/wiki");
+  await page.getByRole("tab", { name: /Ask/ }).click();
+  await expect(page.getByLabel("Question")).toHaveCount(1); // a second match would make every test that fills it fail
+  await expect(page.getByRole("link", { name: "Open Ask chat" })).toBeVisible();
+});
