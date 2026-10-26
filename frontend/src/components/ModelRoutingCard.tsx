@@ -24,6 +24,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
   const [open, setOpen] = useState(false);
   const put = (d: ModelRegistry) => qc.setQueryData(["model-registry"], d);
   const savings = useMutation({ mutationFn: (v: boolean) => api<ModelRegistry>("/settings/routing", { method: "PUT", json: { savings_mode: v } }), onSuccess: put });
+  const review = useMutation({ mutationFn: (v: boolean) => api<ModelRegistry>("/settings/review", { method: "PUT", json: { enabled: v } }), onSuccess: put });
   const patch = useMutation({ mutationFn: (v: { id: string; tier?: Tier; enabled?: boolean }) => api<ModelRegistry>(`/settings/models/${v.id}`, { method: "PUT", json: { tier: v.tier, enabled: v.enabled } }), onSuccess: put });
   const del = useMutation({ mutationFn: (id: string) => api<ModelRegistry>(`/settings/models/${id}`, { method: "DELETE" }), onSuccess: put });
   const delConn = useMutation({ mutationFn: (id: string) => api<ModelRegistry>(`/settings/models/connections/${id}`, { method: "DELETE" }), onSuccess: (d) => { put(d); toast("Provider removed"); } });
@@ -58,13 +59,17 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
               <input type="checkbox" className="mt-1" checked={data.savings_mode} disabled={!admin || savings.isPending} onChange={(e) => savings.mutate(e.target.checked)} />
               <span><span className="font-medium">Savings mode</span><span className="block text-xs text-muted">Plain tasks use the next cheaper tier. Long, multi-repository or low-confidence work moves up. Off: every task uses its normal tier.</span></span>
             </label>
+            <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+              <input type="checkbox" className="mt-1" aria-label="Independent review of investigations" checked={!!data.independent_review} disabled={!admin || review.isPending} onChange={(e) => review.mutate(e.target.checked)} />
+              <span><span className="font-medium">Independent review of investigations</span><span className="block text-xs text-muted">Off by default. When on, each investigation gets a second model pass that sees only the evidence, not the conclusion, and the report shows whether it agrees. It costs one extra model call per investigation and never changes the confidence score.</span></span>
+            </label>
             {data.active > 1 && (
               <table className="w-full text-sm" aria-label="Routing plan">
                 <thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Task</th><th className="font-normal">Model now</th><th className="font-normal">Why</th></tr></thead>
                 <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-1.5">{r.label}</td><td><code className="text-xs">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="text-xs text-muted">{r.why}</td></tr>)}</tbody>
               </table>)}
           </div>)}
-        <ErrorNote error={patch.error ?? del.error ?? savings.error} />
+        <ErrorNote error={patch.error ?? del.error ?? savings.error ?? review.error} />
       </ConnectionCard>
       {open && <Modal title="Add models" subtitle="Test the key, tick the models to use and give each a tier." onClose={() => setOpen(false)}><AddModels data={data} onDone={(d) => { put(d); setOpen(false); toast("Models added"); }} /></Modal>}
     </>

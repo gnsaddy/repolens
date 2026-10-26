@@ -13,10 +13,10 @@ from sqlalchemy.orm import Session
 
 from ..models import ChatMessage, ChatThread, CodeChunk, Repository
 from ..security import redact_secrets
-from . import context, routes
+from . import context, routes, walkthrough
 from . import knowledge as kb
 from .access import Scope
-from .llm import LLMClient
+from .llm import LLMClient, describe_failure
 from .llm_router import Task
 from .retrieval import extract_stack_refs
 
@@ -193,7 +193,10 @@ def _answer(
             return listed
     asked = [m.content for m in before if m.role == "user"]
     query = retrieval_query(question, attachment.text if attachment else "", asked)
+    explain = walkthrough.is_explain(question) and not attachment
     results = kb.search(db, org, query, ids, k=8, scope=scope)[:11]
+    if explain:  # a how/why question needs the route, its handler and what the handler calls, not just similar text
+        results = walkthrough.merge(results, walkthrough.route_sources(db, org, question, ids, scope), 8)
     sources = kb.sources_from(results)
     connections = kb.connections_from(results)
     log_lines = error_lines(attachment.text, 8) if attachment else []
@@ -234,7 +237,7 @@ def _answer(
         try:
             res = llm.complete(
                 "librarian",
-                CHAT_SYSTEM + (FALLBACK_RULE if thread.fallback else ""),
+                CHAT_SYSTEM + (FALLBACK_RULE if thread.fallback else "") + (walkthrough.WALKTHROUGH if explain else ""),
                 prompt,
                 max_tokens=4000,
                 task=task,
@@ -282,27 +285,6 @@ def answer(
     return out
 
 
-def describe_failure(e: Exception, llm: LLMClient) -> str:
-    """Why the model did not answer, in words a person can act on. Never includes keys: provider errors are already scrubbed."""
-    msg = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
-    low = msg.lower()
-    if type(e).__name__ == "BudgetExceeded":
-        why = "This workspace's token budget is used up. An admin can raise it on the Usage page."
-    elif "rejected the credentials" in low or "401" in low or "403" in low:
-        why = "The provider rejected the API key. Check it in Settings → AI & search."
-    elif "not found (404)" in low or "was not found" in low:
-        why = f"The model name was not recognised by the provider. {msg}"
-    elif "429" in low or "rate limit" in low or "quota" in low or "resource_exhausted" in low:
-        why = "The provider is limiting requests (rate limit or quota). Wait a little and try again, or check the provider's quota."
-    elif "timed out" in low or "timeout" in low:
-        why = "The model took too long to respond. Try again."
-    elif any(x in low for x in ("connect", "network", "name or service", "unreachable")):
-        why = f"The model service could not be reached from the server. {msg}"
-    else:
-        why = msg[:240]
-    return f"{why} (model: {llm.provider} / {llm.model or 'default'})"
-
-
 def _relevant(question: str, r: dict) -> bool:
     """A passage worth showing: it shares at least half of the question's meaningful words, or names a symbol asked about."""
     words = _terms(question) - _GENERIC
@@ -345,15 +327,7 @@ def _extracted(
     return "\n\n".join(lines)
 
 
-_STOP = frozenset(
-    "a an the is are was were be been do does did how what why when where which who whom can could should would will "
-    "i we you it this that these those to of in on for with from by and or not my our your me us as at if so about "
-    "there their them they any some get got use using used please tell explain show".split()
-)
-
-
-def _terms(text: str) -> frozenset[str]:
-    return frozenset(w for w in re.findall(r"[a-z][a-z0-9_]{2,}", text.lower()) if w not in _STOP)
+_terms = walkthrough.terms
 
 
 def unanswered(threads: list[ChatThread], limit: int = 30) -> list[dict]:

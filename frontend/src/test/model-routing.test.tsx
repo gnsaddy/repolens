@@ -27,6 +27,7 @@ function setup(role = "admin", registry: unknown = { connections: [gemini], savi
     if (u.endsWith("/settings/retrieval")) return json({ embedding: { provider: "hash", model: "x", dimensions: 1, offline: true }, rerank: { provider: "lexical", model: "m", configured: true, depth: 30 } });
     if (u.endsWith("/settings/llm")) return json({ provider: "gemini", model: "x", base_url: "", has_key: true, source: "org", input_price: null, output_price: null, offline: false, presets: {}, embedding_provider: "hash" });
     if (u.endsWith("/settings/models") && (!init?.method || init.method === "GET")) return json(registry);
+    if (u.endsWith("/settings/review")) return json({ connections: [gemini], savings_mode: true, independent_review: JSON.parse(String(init?.body)).enabled, plan, multi: true, active: 2 });
     if (u.endsWith("/settings/routing")) return json({ connections: [gemini], savings_mode: false, plan, multi: true, active: 2 });
     if (u.includes("/settings/memory/entries")) return json(entries);
     if (u.endsWith("/settings/memory/skill")) return json({ name: "payment-retries", filename: "payment-retries/SKILL.md", markdown: "---\nname: payment-retries\n---\n# Retries", entries: 1 });
@@ -43,6 +44,20 @@ function setup(role = "admin", registry: unknown = { connections: [gemini], savi
 }
 
 describe("Settings: models and routing", () => {
+  it("has an admin-only, off-by-default switch for the independent review", async () => {
+    const calls = setup();
+    const box = await screen.findByRole("checkbox", { name: "Independent review of investigations" });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText(/never changes the confidence score/)).toBeInTheDocument();
+    await userEvent.click(box);
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/settings/review") && (c.body as { enabled: boolean }).enabled === true)).toBe(true));
+    await waitFor(() => expect(box).toBeChecked());
+  });
+  it("shows the switch disabled for people who are not admins", async () => {
+    setup("member");
+    expect(await screen.findByRole("checkbox", { name: "Independent review of investigations" })).toBeDisabled();
+  });
+
   it("lists providers with their models and tiers, and the routing plan", async () => {
     setup();
     const g = await screen.findByRole("region", { name: "Google Gemini models" });

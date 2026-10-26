@@ -366,3 +366,24 @@ class LLMClient:
             return res
         assert last is not None
         raise last
+
+
+def describe_failure(e: Exception, llm: LLMClient) -> str:
+    """Why the model did not answer, in words a person can act on (provider errors are already scrubbed of keys)."""
+    msg = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
+    low = msg.lower()
+    if type(e).__name__ == "BudgetExceeded":
+        why = "This workspace's token budget is used up. An admin can raise it on the Usage page."
+    elif "rejected the credentials" in low or "401" in low or "403" in low:
+        why = "The provider rejected the API key. Check it in Settings → AI & search."
+    elif "not found (404)" in low or "was not found" in low:
+        why = f"The model name was not recognised by the provider. {msg}"
+    elif "429" in low or "rate limit" in low or "quota" in low or "resource_exhausted" in low:
+        why = "The provider is limiting requests (rate limit or quota). Wait and try again, or check your quota."
+    elif "timed out" in low or "timeout" in low:
+        why = "The model took too long to respond. Try again."
+    elif any(x in low for x in ("connect", "network", "name or service", "unreachable")):
+        why = f"The model service could not be reached from the server. {msg}"
+    else:
+        why = msg[:240]
+    return f"{why} (model: {llm.provider} / {llm.model or 'default'})"

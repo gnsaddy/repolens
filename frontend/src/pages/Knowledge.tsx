@@ -95,7 +95,7 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
       {a && (
         <Card>
           <CardTitle right={<div className="flex gap-1">
-            <Badge tone={a.mode === "llm" ? "brand" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
+            <Badge tone={a.mode === "llm" ? "brand" : a.mode === "failed" ? "red" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "failed" ? "AI unavailable" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
             {a.memory ? <Badge tone="green" title={`Matched an earlier question: "${a.memory.asked}"`}>From memory · saved ~{a.memory.tokens_saved.toLocaleString()} tokens</Badge> : a.cached && <Badge tone="green">cached</Badge>}
             {a.route && <Badge tone="gray" title={a.route.why}>{a.route.model}</Badge>}</div>}>Answer</CardTitle>
           <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>

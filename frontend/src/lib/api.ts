@@ -110,7 +110,7 @@ export interface KnowledgeHit {
   connections: Connection[]; via_graph: { from: string; relation: string; from_node_id: string | null } | null;
 }
 export interface AskResult {
-  query: string; answer: string; mode: "llm" | "extractive" | "none"; cached?: boolean; unknown_citations?: string[];
+  query: string; answer: string; mode: "llm" | "extractive" | "failed" | "none"; cached?: boolean; unknown_citations?: string[];
   memory?: { similarity: number; asked: string; tokens_saved: number }; route?: { model: string; provider: string; tier: string; why: string; escalated: boolean };
   sources: { id: string; repo: string; repo_id?: string; url?: string; file: string; kind: string; title: string; start_line: number; end_line: number;
     node_id: string | null; snippet: string; via_graph: { from: string; relation: string } | null }[];
@@ -209,7 +209,7 @@ export type Tier = "light" | "standard" | "strong";
 export interface RegModel { id: string; model: string; tier: Tier; enabled: boolean; input_price: number | null; output_price: number | null }
 export interface RegConnection { id: string; provider: string; base_url: string | null; has_key: boolean; legacy?: boolean; models: RegModel[] }
 export interface PlanRow { kind: string; label: string; tier: Tier; model: string | null; provider: string | null; why: string }
-export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; plan: PlanRow[]; multi: boolean; active: number }
+export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; independent_review?: boolean; plan: PlanRow[]; multi: boolean; active: number }
 export interface MemoryStats { enabled: boolean; entries: number; hits: number; tokens_saved: number; threshold: number; ttl_hours: number }
 
 export interface PageHit { repo: string; repo_id: string; path: string; title: string; snippet: string; start_line: number; score: number }

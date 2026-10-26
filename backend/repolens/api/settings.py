@@ -9,7 +9,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import LLMConnection, LLMModel, LLMSetting
-from ..schemas import ConnectionIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
+from ..schemas import ConnectionIn, IndependentReviewIn, LLMCheckIn, LLMSettingIn, ModelPatch, RoutingIn, SkillIn
 from ..security import decrypt_secret, encrypt_secret, redact_secrets
 from ..services import answer_memory, embedding_state, llm_router, retention
 from ..services import outbound as outbound_svc
@@ -321,6 +321,7 @@ def _registry_view(db: Session, org_id: str) -> dict:
     return {
         "connections": out,
         "savings_mode": savings,
+        "independent_review": llm_router.review_enabled(db, org_id),
         "plan": llm_router.plan(routes, savings),
         "multi": len(routes) > 1,
         "active": len(routes),
@@ -481,6 +482,19 @@ def set_routing(body: RoutingIn, p: Principal = Depends(current_principal), db: 
         row = LLMSetting(org_id=p.org_id)
         db.add(row)
     row.savings_mode, row.updated_by = body.savings_mode, p.user_id
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+@router.put("/review")
+def set_review(body: IndependentReviewIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Independent review: a second model pass over each investigation's evidence. Off by default; one call each."""
+    authorize(db, p, "llm.configure", "independent review", enabled=body.enabled)
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == p.org_id))
+    if row is None:
+        row = LLMSetting(org_id=p.org_id)
+        db.add(row)
+    row.independent_review, row.updated_by = body.enabled, p.user_id
     db.commit()
     return _registry_view(db, p.org_id)
 

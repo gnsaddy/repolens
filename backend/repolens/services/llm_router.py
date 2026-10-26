@@ -121,6 +121,12 @@ def all_routes(db: Session, org_id: str) -> list[Route]:
     return [Route(cfg, "standard")] if cfg.provider in CHAT_PROVIDERS else []
 
 
+def review_enabled(db: Session, org_id: str) -> bool:
+    """Whether investigations get an independent second look (an extra model call). Off until an admin turns it on."""
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
+    return bool(row and row.independent_review)
+
+
 def savings_mode(db: Session, org_id: str) -> bool:
     row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
     return True if row is None else bool(row.savings_mode)

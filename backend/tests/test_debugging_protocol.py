@@ -63,11 +63,16 @@ def test_the_review_agrees_only_when_it_points_at_the_same_code():
     assert not other["agrees"] and other["assumptions"] == []
 
 
+def enable_review(client, auth, on=True):
+    r = client.put("/api/settings/review", headers=auth, json={"enabled": on})
+    assert r.status_code == 200 and r.json()["independent_review"] is on
+
+
 def test_offline_report_includes_the_checklist_and_says_why_no_review_ran(client, auth, demo_repo):
     inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0])["id"])
     md = inv["report_md"]
     assert "### How to confirm it (debugging checklist)" in md and "**Reproduce:**" in md and "**Guard:**" in md
-    assert "Independent review: not run (needs a connected language model)" in md
+    assert "Independent review: not run (off (an admin can turn it on in Settings))" in md
     assert inv["verification"]["review"]["run"] is False
 
 
@@ -95,7 +100,7 @@ def test_with_a_model_a_second_pass_is_made_and_reported(client, auth, demo_repo
 
     monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
     monkeypatch.setattr(LLMClient, "complete", complete)
-    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
+    enable_review(client, auth)
     inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0])["id"])
     assert inv["status"] == "completed"
     md = inv["report_md"]
@@ -111,76 +116,59 @@ def test_a_failing_review_is_reported_not_hidden(client, auth, demo_repo, monkey
 
     monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
     monkeypatch.setattr(LLMClient, "complete", complete)
-    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
+    enable_review(client, auth)
     inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0])["id"])
     assert inv["status"] == "completed"
     assert "Independent review: not run (the review call failed (quota exceeded))" in inv["report_md"]
 
 
-def test_savings_mode_skips_the_review_when_confidence_is_already_high_and_says_so(
+def test_the_review_is_off_by_default_and_never_calls_the_model_until_an_admin_turns_it_on(
     client, auth, demo_repo, monkeypatch
 ):
     calls = []
 
     def complete(this, agent, *a, **k):
         calls.append(agent)
-        raise RuntimeError("down")
-
-    monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
-    monkeypatch.setattr(LLMClient, "complete", complete)
-    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: True)
-    inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0])["id"])
-    assert "reviewer" not in calls
-    assert "skipped in savings mode because confidence is already high" in inv["report_md"]
-
-
-def test_a_differing_review_lowers_confidence_marks_it_unverified_and_can_change_the_lead():
-    lead, runner = hyp(conf=0.8), hyp(2, 0.7, title="other.py")
-    lead["status"] = "supported"
-    review = {"run": True, "agrees": False}
-    out = wf.apply_dissent([lead, runner], review)
-    assert [h["title"] for h in out] == ["other.py", "user_profile.py"]  # 0.7 now beats 0.64
-    assert [h["rank"] for h in out] == [1, 2]
-    dropped = next(h for h in out if h["title"] == "user_profile.py")
-    assert dropped["confidence"] == 0.64 and dropped["status"] == "unverified"
-    assert review["confidence_before"] == 0.8 and review["confidence_after"] == 0.64
-    assert lead["confidence"] == 0.8  # the original is left alone
-    assert wf.apply_dissent([hyp(conf=0.04)], {})[0]["confidence"] == wf.CONFIDENCE_FLOOR
-
-
-def test_an_agreeing_review_never_raises_confidence(client, auth, demo_repo, monkeypatch):
-    def complete(this, agent, system, prompt, max_tokens=1500, task=None, validate=None):
-        if agent == "reviewer":
-            return LLMResult('{"likely_cause": "get_profile in user_profile.py", "check": "x"}', 5, 5)
         raise RuntimeError("synthesis down")
 
     monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
     monkeypatch.setattr(LLMClient, "complete", complete)
-    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
-    base = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
-    assert base["verification"]["review"]["agrees"] is True
-    monkeypatch.undo()
-    offline = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="b")["id"])
-    assert base["confidence"] == offline["confidence"]
+    inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
+    assert "reviewer" not in calls and inv["verification"]["review"]["run"] is False
+    assert "off (an admin can turn it on in Settings)" in inv["report_md"]
 
 
-def test_a_differing_review_changes_the_stored_confidence_and_the_report(client, auth, demo_repo, monkeypatch):
+def test_only_admins_can_switch_it_and_the_change_is_audited(client, auth):
+    client.post(
+        "/api/auth/users", headers=auth, json={"email": "m@acme.io", "password": "member-pass-12", "role": "member"}
+    )
+    tok = client.post("/api/auth/login", json={"email": "m@acme.io", "password": "member-pass-12"}).json()[
+        "access_token"
+    ]
+    member = {"Authorization": f"Bearer {tok}"}
+    assert client.put("/api/settings/review", headers=member, json={"enabled": True}).status_code == 403
+    assert client.get("/api/settings/models", headers=auth).json()["independent_review"] is False
+    enable_review(client, auth)
+    assert client.get("/api/settings/models", headers=auth).json()["independent_review"] is True
+    events = client.get("/api/audit", headers=auth).json()
+    events = events.get("items", events)
+    assert any("independent review" in str(e.get("target", "")) for e in events)
+
+
+def test_a_differing_review_is_shown_but_changes_neither_confidence_nor_ranking(client, auth, demo_repo, monkeypatch):
     def complete(this, agent, system, prompt, max_tokens=1500, task=None, validate=None):
         if agent == "reviewer":
             return LLMResult('{"likely_cause": "the cache layer returns stale rows", "alternatives": ["race"]}', 5, 5)
         raise RuntimeError("synthesis down")
 
-    offline = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
     monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
     monkeypatch.setattr(LLMClient, "complete", complete)
-    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
-    inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="b")["id"])
-    assert inv["verification"]["review"]["agrees"] is False
-    rv = inv["verification"]["review"]
-    assert rv["confidence_after"] == round(rv["confidence_before"] * 0.8, 3)
-    assert inv["confidence"] == max(h["confidence"] for h in inv["hypotheses"])  # the lead may now be the runner-up
-    assert inv["confidence"] < offline["confidence"]
-    assert any(
-        h["status"] == "unverified" and abs(h["confidence"] - rv["confidence_after"]) < 0.01 for h in inv["hypotheses"]
-    )
-    assert "confidence was lowered from" in inv["report_md"] and "**Differs:**" in inv["report_md"]
+    before = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
+    enable_review(client, auth)
+    after = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="b")["id"])
+    assert after["verification"]["review"]["agrees"] is False
+    assert after["confidence"] == before["confidence"]
+    assert [h["title"].split(" ")[0] for h in after["hypotheses"]][:1] == [
+        h["title"].split(" ")[0] for h in before["hypotheses"]
+    ][:1]
+    assert "pointed to a different cause" in after["report_md"] and "**Differs:**" in after["report_md"]

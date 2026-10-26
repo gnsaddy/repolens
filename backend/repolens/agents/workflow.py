@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import CacheEntry, Change, CodeChunk, PullRequest, Repository
-from ..services import cause_hints, retrieval, usage
+from ..services import cause_hints, llm_router, retrieval, usage
 from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
@@ -536,12 +536,10 @@ def build_graph(ctx: Ctx):
         hyps = state.get("hypotheses", [])
         if not hyps:
             return {"review": {"run": False, "reason": "no evidence to review"}}, "nothing to review"
+        if not llm_router.review_enabled(ctx.db, ctx.org_id):
+            return {"review": {"run": False, "reason": "off (an admin can turn it on in Settings)"}}, "review off"
         if ctx.llm.offline:
             return {"review": {"run": False, "reason": "needs a connected language model"}}, "offline: not run"
-        if ctx.llm.savings and hyps[0]["confidence"] >= 0.7:
-            return {
-                "review": {"run": False, "reason": "skipped in savings mode because confidence is already high"}
-            }, "savings mode: skipped"
         evidence = _evidence_only(hyps[:3])
         prompt = f"INCIDENT:\n{state['query'][:3000]}\n\nEVIDENCE:\n{evidence}"
         try:
@@ -558,13 +556,8 @@ def build_graph(ctx: Ctx):
             return {"review": {"run": False, "reason": f"the review call failed ({str(e).splitlines()[0][:140]})"}}, (
                 f"review failed ({type(e).__name__})"
             )
-        review = reconcile(hyps[0], data)
-        if review["agrees"]:
-            return {"review": review}, "independent review agrees"
-        hyps = apply_dissent(hyps, review)
-        return {"review": review, "hypotheses": hyps}, (
-            f"independent review differs: confidence {review['confidence_before']:.0%} -> {review['confidence_after']:.0%}"
-        )
+        review = reconcile(hyps[0], data)  # recorded and shown, but it never changes the confidence or the ranking
+        return {"review": review}, "independent review " + ("agrees" if review["agrees"] else "differs")
 
     # ---- Report ----------------------------------------------------------------------------------------------
     def report(state: State):
@@ -608,7 +601,7 @@ def build_graph(ctx: Ctx):
             h["evidence"] = keep
             has_code = any(e["type"] == "code" for e in keep)
             strong = has_code and any(e["type"] == "commit" for e in keep) or "stack trace" in h["explanation"]
-            h["status"] = "supported" if strong and not h.get("contested") else "unverified"
+            h["status"] = "supported" if strong else "unverified"
         v = {
             "review": state.get("review", {}),
             "checked_evidence": checked,
@@ -934,27 +927,6 @@ def reconcile(top: dict, data: dict) -> dict:
     }
 
 
-DISSENT_FACTOR = (
-    0.8  # a differing review makes the lead a lead to check: 80% of its confidence, never a boost for agreeing
-)
-CONFIDENCE_FLOOR = 0.05
-
-
-def apply_dissent(hyps: list[dict], review: dict) -> list[dict]:
-    """When the independent review points elsewhere, lower the lead's confidence, mark it unverified, and re-rank.
-
-    Agreement never raises confidence: two readings of the same evidence are not two independent pieces of evidence."""
-    out = [dict(h) for h in hyps]
-    before = out[0]["confidence"]
-    out[0]["confidence"] = max(CONFIDENCE_FLOOR, round(before * DISSENT_FACTOR, 3))
-    out[0]["status"], out[0]["contested"] = "unverified", True
-    review["confidence_before"], review["confidence_after"] = before, out[0]["confidence"]
-    out.sort(key=lambda h: -h["confidence"])  # stable: ties keep their order
-    for i, h in enumerate(out, 1):
-        h["rank"] = i
-    return out
-
-
 def red_flags(state: State) -> list[str]:
     """Reasons not to trust the leading hypothesis yet, from the evidence alone."""
     hyps = state.get("hypotheses", [])
@@ -975,8 +947,8 @@ def red_flags(state: State) -> list[str]:
     rv = state.get("review") or {}
     if rv.get("run") and not rv.get("agrees"):
         flags.append(
-            f"An independent review of the evidence pointed elsewhere, so confidence was lowered from "
-            f"{rv.get('confidence_before', 0):.0%} to {rv.get('confidence_after', 0):.0%}. Check its alternatives below."
+            "An independent review of the evidence pointed to a different cause. Confidence is unchanged; "
+            "check its alternatives below before acting."
         )
     if top["confidence"] < 0.5:
         flags.append("Confidence is low. Treat this as a lead to check, not a conclusion.")

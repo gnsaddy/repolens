@@ -219,7 +219,7 @@ function AskWiki({ open }: { open: Open }) {
       <ErrorNote error={ask.error} />
       <SimilarAnswers items={similar.data} />
       {a && (<>
-        <Card><CardTitle right={<Badge tone={a.mode === "llm" ? "brand" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>}>Answer</CardTitle>
+        <Card><CardTitle right={<Badge tone={a.mode === "llm" ? "brand" : a.mode === "failed" ? "red" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "failed" ? "AI unavailable" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>}>Answer</CardTitle>
           <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
           <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
           {!!a.connections.length && <div className="mt-4 border-t border-line pt-3 text-xs"><div className="mb-1 font-medium text-muted">Connected code and pages</div>

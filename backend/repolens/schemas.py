@@ -277,6 +277,10 @@ class RoutingIn(BaseModel):
     savings_mode: bool
 
 
+class IndependentReviewIn(BaseModel):
+    enabled: bool
+
+
 class LLMCheckIn(BaseModel):
     provider: str = Field(pattern="^(anthropic|openai|gemini)$")
     api_key: str = Field(default="", max_length=500)  # blank = use the stored key of the same provider

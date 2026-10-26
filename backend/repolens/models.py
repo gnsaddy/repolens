@@ -489,6 +489,7 @@ class LLMSetting(Base):
     updated_by: Mapped[str] = mapped_column(String(32), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     savings_mode: Mapped[bool] = mapped_column(Boolean, default=True)  # route simple tasks to cheaper models
+    independent_review: Mapped[bool] = mapped_column(Boolean, default=False)  # a second, evidence-only look in each RCA
 
 
 class LLMConnection(Base):
