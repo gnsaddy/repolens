@@ -402,3 +402,15 @@ describe("Ask: the message box", () => {
     release(new Response("{}", { status: 500 }));
   });
 });
+
+describe("Ask: a failed model call", () => {
+  it("shows why the AI could not answer and offers to try again", async () => {
+    const s = server({ initial: [thread({ items: [msg("user", "How are deleted users handled?", { id: "u1" }), msg("assistant", "**The AI model could not answer.** The provider rejected the API key. (model: gemini / x)\n\nWhat your sources contain on this (matching passages, not a written answer):\n\n- Deleted users get a default profile. [S1]", { mode: "failed", sources: SOURCES })] })] });
+    page("/ask/t1");
+    const log = await screen.findByRole("log", { name: "Conversation" });
+    expect(await within(log).findByText("AI unavailable")).toBeInTheDocument();
+    expect(log).toHaveTextContent("The provider rejected the API key");
+    await userEvent.click(within(log).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(s.calls.find((c) => c.method === "PUT")?.body).toEqual({ content: "How are deleted users handled?" }));
+  });
+});

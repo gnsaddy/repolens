@@ -112,6 +112,10 @@ _LIST_ALL = re.compile(
     re.I,
 )
 _ROUTE_WORD = re.compile(r"\b(endpoints?|routes?|apis?|urls?)\b", re.I)
+_GENERIC = frozenset(
+    "list lists enumerate show give all every each complete which endpoint endpoints route routes api apis url urls "
+    "flowchart explain describe please found many".split()
+)
 MAX_LISTED_FILES = 40
 
 
@@ -128,6 +132,7 @@ def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) 
     if not rows:
         return None
     names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == org))}
+
     shown = rows[:MAX_LISTED_FILES]
     results = [
         {
@@ -146,10 +151,11 @@ def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) 
         for c in shown
     ]
     sources = kb.sources_from(results)
-    total = sum(len(routes.parse(c.content)) for c in rows)
+    listed = {c.id: routes.parse(c.content) for c in rows}
+    total = sum(len(v) for v in listed.values())
     out = [f"Found **{total}** endpoint{'s' if total != 1 else ''} in {len(rows)} file{'s' if len(rows) != 1 else ''}."]
     for src, c in zip(sources, shown, strict=True):
-        found = routes.parse(c.content)
+        found = listed[c.id]
         out.append(f"\n**{src['repo']}: `{c.file_path}`** [{src['id']}]")
         out += [f"- `{r.method} {r.path}`" + (f" → `{r.handler}`" if r.handler else "") for r in found]
     if len(rows) > len(shown):
@@ -194,6 +200,7 @@ def _answer(
     base = {"sources": sources, "connections": connections[:12]}
 
     llm = LLMClient(db, org, "chat", thread.id)
+    failure = ""
     if not llm.offline and (sources or thread.fallback or attachment):
         parts = []
         if sources:
@@ -241,13 +248,16 @@ def _answer(
                 "content": res.text + cut + (f"\n\n_(Unknown citations: {', '.join(unknown)})_" if unknown else ""),
                 "mode": "general" if general else "llm",
             }
-        except Exception:  # budget reached, outage, no usable model: fall through to the extracted answer
-            pass
-    return {
-        **base,
-        "content": _extracted(sources, results, log_lines, thread.fallback, llm.offline),
-        "mode": "extractive" if sources or log_lines else "none",
-    }
+        except Exception as e:  # budget reached, outage, no usable model: fall through to the extracted answer
+            failure = describe_failure(e, llm)
+    body = _extracted(sources, results, log_lines, thread.fallback, llm.offline, question)
+    if failure:  # never pass off a few search matches as an answer: say that the model failed, and why
+        return {
+            **base,
+            "content": f"**The AI model could not answer.** {failure}\n\nWhat your sources contain on this (matching passages, not a written answer):\n\n{body}",
+            "mode": "failed",
+        }
+    return {**base, "content": body, "mode": "extractive" if sources or log_lines else "none"}
 
 
 NO_INVENTORY = (
@@ -272,13 +282,50 @@ def answer(
     return out
 
 
-def _extracted(sources: list[dict], results: list[dict], log_lines: list[str], fallback: bool, offline: bool) -> str:
+def describe_failure(e: Exception, llm: LLMClient) -> str:
+    """Why the model did not answer, in words a person can act on. Never includes keys: provider errors are already scrubbed."""
+    msg = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
+    low = msg.lower()
+    if type(e).__name__ == "BudgetExceeded":
+        why = "This workspace's token budget is used up. An admin can raise it on the Usage page."
+    elif "rejected the credentials" in low or "401" in low or "403" in low:
+        why = "The provider rejected the API key. Check it in Settings → AI & search."
+    elif "not found (404)" in low or "was not found" in low:
+        why = f"The model name was not recognised by the provider. {msg}"
+    elif "429" in low or "rate limit" in low or "quota" in low or "resource_exhausted" in low:
+        why = "The provider is limiting requests (rate limit or quota). Wait a little and try again, or check the provider's quota."
+    elif "timed out" in low or "timeout" in low:
+        why = "The model took too long to respond. Try again."
+    elif any(x in low for x in ("connect", "network", "name or service", "unreachable")):
+        why = f"The model service could not be reached from the server. {msg}"
+    else:
+        why = msg[:240]
+    return f"{why} (model: {llm.provider} / {llm.model or 'default'})"
+
+
+def _relevant(question: str, r: dict) -> bool:
+    """A passage worth showing: it shares at least half of the question's meaningful words, or names a symbol asked about."""
+    words = _terms(question) - _GENERIC
+    if not words:
+        return True
+    text = f"{r.get('title', '')} {r.get('file', '')} {r['content']}".lower()
+    hit = sum(1 for w in words if w in text or (len(w) > 4 and w[:-1] in text))
+    return bool(r.get("symbol_match")) or hit * 2 >= len(words)
+
+
+def _extracted(
+    sources: list[dict],
+    results: list[dict],
+    log_lines: list[str],
+    fallback: bool,
+    offline: bool,
+    question: str = "",
+) -> str:
     lines: list[str] = []
     if log_lines:
         lines.append("From your file, the lines that most likely matter:\n" + "\n".join(f"- `{x}`" for x in log_lines))
-    top = [(s, r) for s, r in zip(sources, results, strict=True) if r["kind"] == "doc"][:3] or list(
-        zip(sources, results, strict=True)
-    )[:3]
+    pairs = [(s, r) for s, r in zip(sources, results, strict=True) if not question or _relevant(question, r)]
+    top = [(s, r) for s, r in pairs if r["kind"] == "doc"][:3] or pairs[:3]
     if top:
         lines.append(
             "Most relevant passages (extracted, not generated):\n"

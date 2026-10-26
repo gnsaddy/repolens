@@ -350,11 +350,11 @@ def test_fallback_knowledge_needs_a_model_is_labelled_and_is_off_by_default(clie
     )  # no sources and no fallback: the model is not asked at all
 
 
-def test_a_model_failure_still_gives_an_extracted_answer(client, auth, repo, monkeypatch):
+def test_a_model_failure_is_named_and_still_shows_the_matching_passages(client, auth, repo, monkeypatch):
     Spy().install(monkeypatch, fail=True)
     c = new_chat(client, auth)
     bot = say(client, auth, c["id"], "How are deleted users handled?").json()["items"][1]
-    assert bot["mode"] == "extractive" and bot["sources"]
+    assert bot["mode"] == "failed" and bot["sources"] and "provider down" in bot["content"]
 
 
 def test_the_list_says_whether_a_model_is_connected(client, auth, monkeypatch):
@@ -396,3 +396,43 @@ def test_a_cut_off_reply_is_flagged_and_diagrams_are_requested_as_text(client, a
     ]
     assert "stopped before finishing" in last["content"]
     assert "cannot create images" in spy.calls[0]["system"] and "```text" in spy.calls[0]["system"]
+
+
+# ---------------------------------------------------------------- when the model fails, say so and say why
+@pytest.mark.parametrize(
+    "error,expect",
+    [
+        ("The model service rejected the credentials (401). Check the key.", "rejected the API key"),
+        ("api.example.com returned 429: quota exceeded", "limiting requests"),
+        ("api.example.com says the model 'x' was not found (404).", "model name was not recognised"),
+        ("Read timed out", "too long"),
+        ("something odd happened", "something odd happened"),
+    ],
+)
+def test_a_failed_model_call_is_reported_with_the_reason_not_passed_off_as_an_answer(
+    client, auth, repo, monkeypatch, error, expect
+):
+    def boom(this, *a, **k):
+        raise RuntimeError(error)
+
+    monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
+    monkeypatch.setattr(LLMClient, "complete", boom)
+    c = new_chat(client, auth)
+    r = say(client, auth, c["id"], "How does get_profile treat a deleted user?")
+    msg = r.json()["items"][-1]
+    assert msg["mode"] == "failed"
+    assert msg["content"].startswith("**The AI model could not answer.**") and expect in msg["content"]
+    assert "not a written answer" in msg["content"]
+
+
+def test_an_exhausted_budget_is_named(client, auth, repo, monkeypatch):
+    from repolens.services.usage import BudgetExceeded
+
+    def boom(this, *a, **k):
+        raise BudgetExceeded("limit")
+
+    monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
+    monkeypatch.setattr(LLMClient, "complete", boom)
+    c = new_chat(client, auth)
+    got = say(client, auth, c["id"], "get_profile").json()["items"][-1]
+    assert got["mode"] == "failed" and "token budget" in got["content"]

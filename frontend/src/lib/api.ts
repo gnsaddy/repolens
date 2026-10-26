@@ -296,7 +296,7 @@ export interface GraphReport {
 export interface ChatSource { id: string; repo: string; repo_id: string; file: string; kind: string; title: string; start_line: number; end_line: number; node_id: string | null; url: string | null; snippet: string }
 export interface ChatMsg {
   id: string; role: "user" | "assistant"; content: string; sources: ChatSource[]; connections: { from: string; label: string; to: string }[];
-  mode: "" | "llm" | "extractive" | "general" | "none"; attachment: { name: string; chars: number } | null; created_at: string; edited_at: string | null;
+  mode: "" | "llm" | "extractive" | "general" | "failed" | "none"; attachment: { name: string; chars: number } | null; created_at: string; edited_at: string | null;
 }
 export interface ChatSummary { id: string; title: string; repo_ids: string[]; fallback: boolean; archived: boolean; created_at: string; updated_at: string; messages: number; preview: string }
 export interface ChatThread extends ChatSummary { items: ChatMsg[] }
