@@ -1,4 +1,5 @@
 import { ClipboardCheck, FileClock, GitPullRequest, KeyRound, Lock, Network, ScrollText, Search, ShieldCheck, Sparkles, UserCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { ISSUES_URL } from "@/components/ReportIssue";
 import { APP_VERSION } from "@/lib/version";
@@ -63,7 +64,8 @@ export default function LoginShowcase() {
         <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-xs text-amber-100"><ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>Honest limits: this is a {APP_VERSION} release and has not had an independent security audit or a compliance certification. Judge it by the code and the tests.</span></p>
         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <a className="inline-flex items-center gap-1 text-indigo-300 hover:underline" href={SECURITY_URL} target="_blank" rel="noopener noreferrer"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />How we think about security</a>
+          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/security"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />How we think about security</Link>
+          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/about">About RepoLens AI</Link>
           <a className="inline-flex items-center gap-1 text-indigo-300 hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer"><GitPullRequest className="h-3.5 w-3.5" aria-hidden />Read the source</a>
           <span className="text-slate-500">Official code: github.com/gnsaddy/repolens</span>
         </p>
@@ -76,6 +78,6 @@ export default function LoginShowcase() {
 export function TrustNote() {
   return (
     <p className="mt-3 flex items-start justify-center gap-1.5 px-2 text-center text-xs text-slate-400 lg:hidden"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span>Your data stays on your server and nothing is sent to an AI service unless you connect one. <a className="text-indigo-300 underline" href={SECURITY_URL} target="_blank" rel="noopener noreferrer">How we think about security</a></span></p>
+      <span>Your data stays on your server and nothing is sent to an AI service unless you connect one. <Link className="text-indigo-300 underline" to="/security">How we think about security</Link></span></p>
   );
 }

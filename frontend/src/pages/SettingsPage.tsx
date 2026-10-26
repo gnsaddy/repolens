@@ -4,7 +4,7 @@ import Logo from "@/components/Logo";
 import { ISSUES_URL } from "@/components/ReportIssue";
 import { APP_VERSION } from "@/lib/version";
 import { PeoplePanel } from "@/pages/People";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import AccessTokens from "@/components/AccessTokens";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
@@ -52,7 +52,9 @@ export default function SettingsPage() {
           <div className="font-semibold">RepoLens AI <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{APP_VERSION}</span></div>
           <p className="text-xs text-muted">A living wiki for your code and docs, with evidence-backed investigations. Beta: expect rough edges. Apache License 2.0.</p>
         </div>
-        <div className="flex gap-3 text-sm">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          <Link className="text-brand hover:underline" to="/about">About</Link>
+          <Link className="text-brand hover:underline" to="/security">Security</Link>
           <a className="text-brand hover:underline" href={`${ISSUES_URL}/new/choose`} target="_blank" rel="noopener noreferrer">Report a bug or request a feature</a>
           <a className="text-brand hover:underline" href={ISSUES_URL.replace(/\/issues$/, "")} target="_blank" rel="noopener noreferrer">Source code</a>
         </div>

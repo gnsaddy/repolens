@@ -13,6 +13,8 @@ import { Spinner } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ReportIssue from "./components/ReportIssue";
 import Login, { SsoComplete } from "./pages/Login";
+import About from "./pages/About";
+import Security from "./pages/Security";
 import Dashboard from "./pages/Dashboard";
 const Repositories = lazy(() => import("./pages/Repositories"));
 const Knowledge = lazy(() => import("./pages/Knowledge"));
@@ -90,7 +92,7 @@ function Shell() {
             <LogOut className="h-4 w-4" />Sign out
           </button>
           <ReportIssue />
-          <div className="mt-3 px-2 text-[11px] text-slate-500" title="Beta: expect rough edges and changes">RepoLens AI <span className="font-medium text-slate-400">{APP_VERSION}</span></div>
+          <div className="mt-3 px-2 text-[11px] text-slate-500" title="Beta: expect rough edges and changes">RepoLens AI <span className="font-medium text-slate-400">{APP_VERSION}</span> <span aria-hidden>·</span> <NavLink className="hover:text-slate-300 hover:underline" to="/about">About</NavLink> <span aria-hidden>·</span> <NavLink className="hover:text-slate-300 hover:underline" to="/security">Security</NavLink></div>
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-8">
@@ -112,6 +114,8 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/sso-complete" element={<SsoComplete />} />
       <Route path="/reset" element={<ResetPassword />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/security" element={<Security />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="investigations" element={<Investigations />} />

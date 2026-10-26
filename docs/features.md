@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Security and About pages
+
+**Security** (`/security`) and **About** (`/about`) are public pages, readable without signing in and linked from the sign-in screen, the sidebar footer and Settings → About. Security gives a table of everything that can leave the server and when, plain statements on access control, secrets, the AI's limits and the audit log, how to check the claims yourself, honest limits (beta, no independent audit or certification, you run it), a private way to report a vulnerability, and the official source. About says what RepoLens is, what it does, how it is meant to behave, where it stands, who built it and how to get involved.
+
 ## Sign-in page
 
 Beside the sign-in form, a panel says what RepoLens does (ask with citations, catch stale pages, see how things connect, find a root cause) and why it can be trusted: data stays on your server, people approve outward actions, access controls and an audit log, secrets masked, open source with no phone-home, and a plain statement that this is a beta without an independent audit or certification. It links to `SECURITY.md` and the source. A small flowing-graph illustration uses the same motion as the graph page and stops for people who ask their system for less motion. On narrow screens a one-line version sits under the form. `SECURITY.md` lists where each claim is backed.

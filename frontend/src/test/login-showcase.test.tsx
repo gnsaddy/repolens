@@ -23,10 +23,8 @@ describe("sign-in page", () => {
     expect(trust).toHaveTextContent("Your data stays on your server");
     expect(trust).toHaveTextContent("People decide, not the AI");
     expect(trust).toHaveTextContent("no usage data to its authors");
-    const security = within(trust).getByRole("link", { name: /How we think about security/ });
-    expect(security).toHaveAttribute("href", expect.stringContaining("/blob/main/SECURITY.md"));
-    expect(security).toHaveAttribute("target", "_blank");
-    expect(security.getAttribute("rel")).toContain("noopener");
+    expect(within(trust).getByRole("link", { name: /How we think about security/ })).toHaveAttribute("href", "/security"); // an in-app page, readable before signing in
+    expect(within(trust).getByRole("link", { name: /About RepoLens AI/ })).toHaveAttribute("href", "/about");
     expect(within(trust).getByRole("link", { name: /Read the source/ })).toHaveAttribute("href", expect.stringMatching(/github\.com\/gnsaddy\/repolens$/));
   });
 

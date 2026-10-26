@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 import LoginShowcase, { TrustNote } from "@/components/LoginShowcase";
 import { Button, Card, ErrorNote, Input, Label } from "@/components/ui";
@@ -61,6 +61,7 @@ export default function Login() {
         <button className="mt-4 text-xs text-brand hover:underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}
         </button>
+        <nav aria-label="More about RepoLens AI" className="mt-3 flex gap-3 border-t border-line pt-3 text-xs"><Link className="text-brand hover:underline" to="/about">About</Link><Link className="text-brand hover:underline" to="/security">Security</Link></nav>
       </Card>
       <TrustNote />
       </div>

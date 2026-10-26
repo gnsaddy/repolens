@@ -103,6 +103,9 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
 ## License
 Apache License 2.0, copyright 2026 Aditya Raj (gnsaddy). See [`LICENSE`](LICENSE).
 
+## Security and About
+The running app has public **Security** (`/security`) and **About** (`/about`) pages, linked from the sign-in screen: what can leave the server, how access and the AI are kept in check, honest limits, and how to report a problem privately. The written policy is [`SECURITY.md`](SECURITY.md).
+
 ## Contributing
 Contributions are welcome: bug fixes, features, docs, tests and evals. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, a map of the code, the checks to run, and a first-contribution path) and the [Code of Conduct](CODE_OF_CONDUCT.md). To report a bug or ask for a feature, use **Report a bug / request a feature** at the bottom of the app's sidebar, or [open an issue](https://github.com/gnsaddy/repolens/issues/new/choose). Security problems go through [`SECURITY.md`](SECURITY.md), not public issues.
 

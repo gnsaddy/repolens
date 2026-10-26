@@ -1,6 +1,6 @@
 # Security
 
-Report vulnerabilities privately to the maintainers; do not open public issues for them.
+Report vulnerabilities privately to the maintainers; do not open public issues for them. Use GitHub's private reporting (the repository's Security tab, **Report a vulnerability**; the maintainer must have it switched on), or contact the maintainer through their GitHub profile. The same guidance is on the app's public **Security** page (`/security`, readable without signing in, linked from the sign-in screen).
 
 Controls implemented (see `docs/architecture.md` for the threat model summary):
 
@@ -87,3 +87,7 @@ The sign-in page tells people why they can trust the product. Each statement the
 | Secrets are masked before indexing or sending to a model | `security.redact_secrets` and `redact_stored`; `tests/test_injection.py` checks a planted key never reaches a prompt |
 | Open source, Apache 2.0, no usage data sent to the authors | `LICENSE`; the only outbound destinations are ones an administrator configures (see the table in the README's security section and `services/outbound.py`) |
 | Honest limits: no independent audit, no compliance certification | True today. Do not add certification names to the page until an audit exists |
+
+## The public Security and About pages
+
+`/security` and `/about` are in-app pages anyone can open without signing in. The Security page lists every way data can leave the server, who can do what, how secrets and the AI are kept in check, how to verify the claims, honest limits, and how to report a problem. Its statements must stay true: change `frontend/src/pages/Security.tsx` and the table above together, and never add a certification or audit name unless one exists (`frontend/src/test/public-pages.test.tsx` fails if one appears).
