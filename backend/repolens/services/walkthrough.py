@@ -85,8 +85,19 @@ def is_explain(question: str) -> bool:
 
 
 def stem(w: str) -> str:
+    """Light stemming so 'roles' meets 'role', 'users' meets 'user' and 'assigned' meets 'assign'."""
     w = w.lower()
-    return re.sub(r"(ing|ed|es|s)$", "", w) if len(w) > 4 else (w[:-1] if w.endswith("s") and len(w) > 3 else w)
+    if len(w) > 4 and w.endswith("ies"):
+        return w[:-3] + "y"
+    if len(w) > 5 and w.endswith("sses"):
+        return w[:-2]
+    if len(w) > 3 and w.endswith("s") and not w.endswith(("ss", "us", "is")):
+        w = w[:-1]
+    if len(w) > 5 and w.endswith("ing"):
+        return w[:-3]
+    if len(w) > 4 and w.endswith("ed"):
+        return w[:-2]
+    return w
 
 
 def terms(text: str) -> frozenset[str]:
@@ -147,20 +158,23 @@ def route_sources(db: Session, org: str, question: str, repo_ids: list[str] | No
         return []
     cands.sort(key=lambda x: -x[0])
     names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == org))}
-    scored = []
-    for hits, r, c in cands[:15]:
-        h = (
-            db.scalar(
-                select(CodeChunk).where(
-                    CodeChunk.repo_id == c.repo_id,
-                    CodeChunk.file_path == c.file_path,
-                    CodeChunk.symbol_name == r.handler,
-                    CodeChunk.chunk_type != "routes",
-                )
+    # Score every candidate by what its handler does, not only by its path: in a large API dozens of routes share a word
+    # like "user", and the one that answers the question is found by its body ("role"), not by being first in the list.
+    wanted = {r.handler for _h, r, _c in cands if r.handler}
+    handlers: dict[tuple[str, str, str], CodeChunk] = {}
+    if wanted:
+        for row in db.scalars(
+            select(CodeChunk).where(
+                CodeChunk.repo_id.in_({c.repo_id for _h, _r, c in cands}),
+                CodeChunk.file_path.in_({c.file_path for _h, _r, c in cands}),
+                CodeChunk.symbol_name.in_(wanted),
+                CodeChunk.chunk_type != "routes",
             )
-            if r.handler
-            else None
-        )
+        ):
+            handlers.setdefault((row.repo_id, row.file_path, row.symbol_name), row)
+    scored = []
+    for hits, r, c in cands:
+        h = handlers.get((c.repo_id, c.file_path, r.handler)) if r.handler else None
         body = len(want & _tokens(h.content)) if h else 0
         scored.append((2 * hits + body, r, c, h))
     scored.sort(key=lambda x: -x[0])

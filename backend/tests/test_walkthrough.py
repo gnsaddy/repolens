@@ -207,3 +207,24 @@ def test_task_types():
     assert wt.task_kind("How many times does it retry?") == "lookup"
     assert wt.task_kind("Where is the retry policy documented?") == "lookup"
     assert wt.task_kind("How does the system add roles?") == "explain"  # 'add' mid-sentence is not an instruction
+
+
+def test_the_right_route_is_found_among_many_that_share_a_word(client, auth, tmp_path, session):
+    """In a big API dozens of routes mention 'user'; the one that answers 'how are roles assigned' is found by its body."""
+    from repolens.models import Organization
+
+    many = "\n".join(
+        f'@router.get("/users/{{id}}/item{i}")\ndef user_item_{i}(p):\n    return {i}\n' for i in range(40)
+    )
+    d = tmp_path / "big"
+    d.mkdir()
+    (d / "a_noise.py").write_text('from fastapi import APIRouter\nrouter = APIRouter(prefix="/scim")\n' + many)
+    (d / "z_auth.py").write_text(API)
+    (d / "policy.py").write_text(POLICY)
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]):
+        subprocess.run(["git", "-C", str(d), *cmd], check=True)
+    add_repo(client, auth, str(d), name="big")
+    org = session.query(Organization).first().id
+    got = wt.route_sources(session, org, "How does the user endpoint assign roles?", None, None)
+    assert "POST /api/auth/users" in [r["title"] for r in got]
+    assert any(t["title"].startswith("authorize (called by create_user)") for t in got)

@@ -7,3 +7,7 @@
 - **Answer memory** namespace bumped (`PIPELINE = "p2"`): answers produced by the older one-line pipeline are no longer replayed or suggested.
 - Answers on the Knowledge and Wiki pages render as **Markdown** (they were plain text).
 - **Investigations** that ask for something to be explained or written and describe no failure report "a request, not a failure", claim no root cause, cap confidence at 20% and point to Ask.
+
+### Fixed (found by running a clean copy against the real repolens index)
+- The route lookup for how/why/write questions kept only the first 15 candidates before scoring, so in a large API (hundreds of routes, dozens mentioning "user") the route that answers the question was cut. Every candidate is now scored, by its path and by what its handler does.
+- The word stemmer turned "roles" into "rol" but left "role" alone, so the two never matched; plural, "-ed" and "-ing" endings are now handled consistently.
