@@ -181,6 +181,35 @@ describe("Knowledge page", () => {
     expect(opacityOf("function get_profile")).toBe(1);
   });
 
+  it("gives the graph the whole screen with a details card that can be hidden, and Escape brings the page back", async () => {
+    const nodes = [node("n1", "function", "get_profile", 3), node("n2", "file", "api.py", 1)];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.includes("/graph/stats")) return json({ nodes: { function: 1, file: 1 }, edges: [], total_nodes: 2, total_edges: 1 });
+      if (u.includes("/graph/overview")) return json({ nodes, edges: [edge("e1", "n1", "n2")] });
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=graph");
+    await screen.findByRole("button", { name: "function get_profile" });
+    expect(screen.getByText("Connections")).toBeInTheDocument(); // the summary tiles are part of the normal page
+    await userEvent.click(screen.getByRole("button", { name: "Full screen" }));
+    const dlg = screen.getByRole("dialog", { name: "Graph, full screen" });
+    expect(within(dlg).getByRole("img", { name: "Knowledge graph" }).getAttribute("class")).toContain("h-full"); // fills the height it is given
+    expect(within(dlg).queryByText("Connections")).toBeNull(); // the tiles make room for the graph
+    expect(within(dlg).queryByRole("button", { name: "Enlarge graph" })).toBeNull(); // already as large as it gets
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(within(dlg).getByText("Select a node to see what it connects to.")).toBeVisible();
+    await userEvent.click(within(dlg).getByRole("button", { name: "Hide details" }));
+    expect(within(dlg).getByRole("button", { name: "Show details" })).toBeInTheDocument();
+    expect(within(dlg).getByText("Select a node to see what it connects to.").closest("div[class*='hidden']")).not.toBeNull();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Graph, full screen" })).toBeNull();
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(screen.getByText("Connections")).toBeInTheDocument();
+  });
+
   it("uploads selected files to the collection", async () => {
     const calls: { url: string; body?: string }[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {

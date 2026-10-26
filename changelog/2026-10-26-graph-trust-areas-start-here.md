@@ -14,3 +14,4 @@
 - Choosing a node from search (or arriving from a wiki link) moves the view to it.
 - Area legend: click an area to look at it on its own and dim the rest.
 - Tests now check the graph drawing itself, not every circle on the page (the toolbar icons contain circles).
+- **Full screen** mode for the graph: the app's sidebar and tiles step aside, the graph fills the window, node details sit in a side card that can be hidden, and Esc exits. The page behind stops scrolling while it is open.

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, FileText, Network, Search, Sparkles, Trash2, Upload } from "lucide-react";
+import { Brain, FileText, Maximize2, Minimize2, Network, PanelRightClose, PanelRightOpen, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
@@ -142,6 +142,16 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
   const [factsOnly, setFactsOnly] = useState(false);
   const [focusArea, setFocusArea] = useState<number | null>(null);
   const [centerOn, setCenterOn] = useState<{ id: string; n: number } | null>(null);
+  const [full, setFull] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(false); };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // the page behind does not scroll while the graph has the screen
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+  }, [full]);
   const pick = (id: string) => { setSelected(id); setCenterOn((c) => ({ id, n: (c?.n ?? 0) + 1 })); };
   const [pathSet, setPathSet] = useState<{ nodes: Set<string>; edges: Set<string> } | undefined>();
 
@@ -190,20 +200,24 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
   const toggle = (t: string) => setTypes((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
   const s = stats.data;
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className={full ? "fixed inset-0 z-50 flex flex-col gap-3 overflow-hidden bg-white p-3 text-ink" : "space-y-4"} role={full ? "dialog" : undefined} aria-label={full ? "Graph, full screen" : undefined}>
+      {!full && <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Nodes" value={s?.total_nodes ?? "—"} hint={s ? Object.entries(s.nodes).map(([k, v]) => `${v} ${k}`).join(" · ") : undefined} />
         <Stat label="Connections" value={s?.total_edges ?? "—"} />
         <Stat label="From static analysis" value={s?.edges.filter((e) => e.provenance === "static_analysis").reduce((a, e) => a + e.count, 0) ?? "—"} hint="calls, imports, tests" />
         <Stat label="From docs & semantics" value={s?.edges.filter((e) => ["doc_mention", "doc_link", "semantic"].includes(e.provenance)).reduce((a, e) => a + e.count, 0) ?? "—"} hint="mentions, links, similarity" />
-      </div>
+      </div>}
       <div className="flex flex-wrap items-center gap-3">
         <select aria-label="Repository" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
           <option value="">All sources</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
         {ALL_TYPES.map((t) => (
           <label key={t} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={types.includes(t)} onChange={() => toggle(t)} />
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: NODE_COLORS[t] }} />{t}</label>))}
-        <div className="relative ml-auto w-64">
+        <div className="ml-auto flex items-center gap-2">
+          {full && <Button size="sm" variant="outline" aria-pressed={panelOpen} onClick={() => setPanelOpen((o) => !o)}>{panelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}{panelOpen ? "Hide details" : "Show details"}</Button>}
+          <Button size="sm" variant="outline" aria-pressed={full} title={full ? "Back to the page (Esc)" : "Give the graph the whole screen"} onClick={() => setFull((f) => !f)}>{full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{full ? "Exit full screen" : "Full screen"}</Button>
+        </div>
+        <div className="relative w-64">
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a symbol, file or section…" aria-label="Find node" />
           {query.length > 1 && found.data && (
             <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-line bg-white shadow-lg">
@@ -213,11 +227,11 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
               {!found.data.length && <li className="px-3 py-2 text-xs text-muted">No matches</li>}</ul>)}
         </div>
       </div>
-      {repoId && <StartHere repoId={repoId} />}
-      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-        <div>
+      {repoId && !full && <StartHere repoId={repoId} />}
+      <div className={full ? `grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-3 ${panelOpen ? "grid-cols-[1fr_380px]" : "grid-cols-1"}` : "grid gap-4 xl:grid-cols-[1fr_340px]"}>
+        <div className={full ? "flex min-h-0 flex-col overflow-hidden" : undefined}>
           {overview.isLoading ? <Spinner /> : !merged.nodes.length ? <Empty>The graph is empty. Index a repository or upload documents first.</Empty> : (
-            <ForceGraph focusArea={colorBy === "community" ? focusArea : null} centerOn={centerOn} byCommunity={colorBy === "community"} heat={!["type", "community"].includes(colorBy) ? (heat.data?.values ?? {}) : undefined} nodes={merged.nodes} edges={shownEdges} selectedId={selected} highlight={pathSet ? new Set([...pathSet.nodes, ...pathSet.edges]) : undefined} onSelect={setSelected} />)}
+            <ForceGraph fill={full} focusArea={colorBy === "community" ? focusArea : null} centerOn={centerOn} byCommunity={colorBy === "community"} heat={!["type", "community"].includes(colorBy) ? (heat.data?.values ?? {}) : undefined} nodes={merged.nodes} edges={shownEdges} selectedId={selected} highlight={pathSet ? new Set([...pathSet.nodes, ...pathSet.edges]) : undefined} onSelect={setSelected} />)}
           {colorBy === "community" && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Areas">
               <button className={`rounded-full border px-2 py-0.5 ${focusArea == null ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted hover:bg-slate-50"}`} aria-pressed={focusArea == null} onClick={() => setFocusArea(null)}>All areas</button>
@@ -242,7 +256,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
                 <span className="h-0.5 w-4" style={{ background: c }} />{r.toLowerCase().replace("_", " ")}</label>))}
             <span>· arrows point from caller/source to target · <b>solid</b> = found directly, <b>dashed</b> = inferred, <b>dotted</b> = weak guess · hover a node to label its links · scroll to zoom, drag to pan</span></div>
         </div>
-        <Card className="max-h-[36rem] overflow-auto">
+        <Card className={`${full ? "min-h-0" : "max-h-[36rem]"} overflow-auto${full && !panelOpen ? " hidden" : ""}`}>
           {!selected ? <Empty>Select a node to see what it connects to.</Empty> : !detail.data ? <Spinner /> : (<>
             <div className="mb-1 flex items-center gap-2"><Badge tone="gray">{detail.data.node.type}</Badge><span className="text-xs text-muted">{detail.data.node.repo}</span></div>
             <h3 className="break-words text-sm font-semibold">{detail.data.node.qualname || detail.data.node.name}</h3>

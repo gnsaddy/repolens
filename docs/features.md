@@ -161,7 +161,7 @@ Every connection in the graph says how far it can be trusted: **fact** (found di
 
 ## Graph view controls
 
-The graph has a toolbar: **zoom in and out** (the point under the pointer stays put), **fit to screen**, **actual size**, a **zoom level** readout, a **labels** switch (key labels, all labels or none), **download as SVG** and **enlarge** for a taller canvas. The mouse wheel zooms toward the pointer, a double click zooms in, dragging pans, and with the graph focused `+`, `-`, `0` and the arrow keys zoom, fit and pan. Picking a node from the search box moves the view to it. When coloured by area, a legend lists the areas; click one to look at it on its own and dim the rest.
+The graph has a toolbar: **zoom in and out** (the point under the pointer stays put), **fit to screen**, **actual size**, a **zoom level** readout, a **labels** switch (key labels, all labels or none), **download as SVG** and **enlarge** for a taller canvas. The mouse wheel zooms toward the pointer, a double click zooms in, dragging pans, and with the graph focused `+`, `-`, `0` and the arrow keys zoom, fit and pan. Picking a node from the search box moves the view to it. **Full screen** (top right of the graph page) hides the app's own sidebar and summary tiles and gives the graph the whole window, with the node details in a side card that **Hide details** folds away; **Esc** or **Exit full screen** returns to the page. When coloured by area, a legend lists the areas; click one to look at it on its own and dim the rest.
 
 ## Logo and About
 

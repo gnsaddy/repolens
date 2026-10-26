@@ -86,13 +86,15 @@ interface Props {
   focusArea?: number | null;
   /** move the view to this node; a new `n` re-centres even on the same node */
   centerOn?: { id: string; n: number } | null;
+  /** take all the height the parent gives (full-screen mode) instead of a fixed height */
+  fill?: boolean;
 }
 
 const MIN_K = 0.2, MAX_K = 6;
 const clampK = (k: number) => Math.max(MIN_K, Math.min(MAX_K, k));
 type LabelMode = "smart" | "all" | "none";
 
-export default function ForceGraph({ nodes, edges, selectedId, highlight, onSelect, heat, byCommunity, focusArea, centerOn }: Props) {
+export default function ForceGraph({ nodes, edges, selectedId, highlight, onSelect, heat, byCommunity, focusArea, centerOn, fill }: Props) {
   const posRef = useRef<Record<string, P>>({});
   const pos = useMemo(() => {
     posRef.current = layout(nodes, edges, posRef.current);
@@ -154,7 +156,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   const btn = "grid h-8 w-8 place-items-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2";
 
   return (
-    <div className="relative">
+    <div className={fill ? "relative min-h-0 flex-1" : "relative"}>
       <div role="toolbar" aria-label="Graph controls" className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-white/95 p-1 shadow-sm">
         <button className={btn} aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.3)}><Plus className="h-4 w-4" /></button>
         <button className={btn} aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.3)}><Minus className="h-4 w-4" /></button>
@@ -164,10 +166,10 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
         <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-md border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
           <option value="smart">Key labels</option><option value="all">All labels</option><option value="none">No labels</option></select>
         <button className={btn} aria-label="Download SVG" title="Download as SVG" onClick={exportSvg}><Download className="h-4 w-4" /></button>
-        <button className={btn} aria-label={tall ? "Shrink graph" : "Enlarge graph"} aria-pressed={tall} title={tall ? "Shrink" : "Enlarge"} onClick={() => setTall((t) => !t)}>{tall ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+        {!fill && <button className={btn} aria-label={tall ? "Shrink graph" : "Enlarge graph"} aria-pressed={tall} title={tall ? "Shrink" : "Enlarge"} onClick={() => setTall((t) => !t)}>{tall ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>}
       </div>
       <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Knowledge graph" tabIndex={0}
-        className={`${tall ? "h-[46rem]" : "h-[34rem]"} w-full cursor-grab rounded-lg border border-line bg-white select-none`}
+        className={`${fill ? "h-full" : tall ? "h-[46rem]" : "h-[34rem]"} w-full cursor-grab rounded-lg border border-line bg-white select-none`}
         onWheel={(e) => { e.preventDefault(); const b = toBox(e.clientX, e.clientY); zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, b.x, b.y); }}
         onDoubleClick={(e) => { const b = toBox(e.clientX, e.clientY); zoomAt(1.6, b.x, b.y); }}
         onKeyDown={(e) => {
