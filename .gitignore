@@ -22,6 +22,7 @@ deploy/k8s/secret.yaml
 idea.md
 LEARNINGS.md
 CLAUDE.md
+/local-dev/
 frontend/test-results/
 frontend/playwright-report/
 backups/
