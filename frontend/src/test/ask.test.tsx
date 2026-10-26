@@ -372,3 +372,33 @@ describe("Ask: general knowledge label", () => {
     expect(await within(log).findByTitle(/not backed by your sources/)).toHaveTextContent("Not from your documents");
   });
 });
+
+describe("Ask: the message box", () => {
+  it("clears as soon as a question is sent and gives it back if sending fails", async () => {
+    server();
+    page();
+    const box = await sendBox();
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+      const url = String(input);
+      if (url.endsWith("/auth/me")) return json({ id: "u", email: "a@b.io", name: "A", role: "member", org_id: "o" });
+      if (url.endsWith("/chats") && init?.method === "POST") return Promise.resolve(new Response(JSON.stringify({ detail: "boom" }), { status: 500, headers: { "Content-Type": "application/json" } }));
+      return json({ items: [], model_available: false });
+    });
+    await userEvent.type(box, "Will this fail?");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue("Will this fail?"));
+  });
+  it("is empty while the answer is being prepared", async () => {
+    let release: (r: Response) => void = () => undefined;
+    const s = server();
+    const base = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => String(input).endsWith("/messages") ? new Promise<Response>((res) => { release = res; }) : base(input, init));
+    void s;
+    page();
+    await userEvent.type(await sendBox(), "Slow question");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue(""));
+    expect(screen.getByText("Slow question")).toBeInTheDocument();
+    release(new Response("{}", { status: 500 }));
+  });
+});

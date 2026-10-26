@@ -136,8 +136,9 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
       const r = await api<ChatThread>(`/chats/${t.id}/messages`, { method: "POST", json: { content: v.content, ...(v.attachment ? { attachment: { name: v.attachment.name, text: v.attachment.text } } : {}) } });
       return { ...t, ...r, items: [...t.items, ...r.items] } as ChatThread;
     },
-    onMutate: (v) => setPending(v.content),
-    onSuccess: (t) => { setText(""); setAttached(null); onSaved(t); },
+    onMutate: (v) => { setPending(v.content); setText(""); setAttached(null); },  // the box clears at once; the question shows above while it is answered
+    onError: (_e, v) => { setText(v.content); setAttached(v.attachment); },  // a failed send gives the question back
+    onSuccess: (t) => onSaved(t),
     onSettled: () => setPending(null),
   });
   const edit = useMutation({
