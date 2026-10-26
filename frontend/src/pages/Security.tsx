@@ -27,7 +27,7 @@ export default function Security() {
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted"><tr><th className="px-3 py-2 font-medium">Control</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">In plain words</th></tr></thead>
             <tbody>{CONTROLS.map((c) => (
               <tr key={c.name} className="border-t border-line align-top"><td className="px-3 py-2 font-medium">{c.name}</td>
-                <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TONE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
+                <td className="px-3 py-2"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${TONE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
                 <td className="px-3 py-2 text-slate-600">{c.note}</td></tr>))}</tbody>
           </table>
         </div>

@@ -6,3 +6,6 @@
 - A footer on the public pages with Product, Trust, Developers and Community columns and a box saying there is no independent audit yet.
 - A day/night switch on the sign-in page, the reset page and all public pages. The choice is remembered and shared with the app.
 - The statements live in one file, `frontend/src/lib/trust.ts`, so the pages cannot disagree; tests check the known gaps stay marked Not yet and no certification is claimed.
+
+### Fixed
+- Day mode on the sign-in page, the reset page and the public header was dark: they used fixed dark backgrounds, and the sign-in panel was an `<aside>`, which the stylesheet keeps dark in both modes for the app sidebar. They now follow the theme, so day mode is light and night mode is dark. A test fails if a fixed dark background or an `<aside>` returns to these pages. The "Not yet" badge in the control table no longer wraps onto two lines.

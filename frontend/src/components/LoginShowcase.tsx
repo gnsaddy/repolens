@@ -31,54 +31,54 @@ function Hero() {
     <svg viewBox="0 0 390 140" className="h-auto w-full max-w-md" role="img" aria-label="A small graph: one node linked to its neighbours, with the links flowing outward">
       {links.map(([a, b], i) => (
         <g key={i}>
-          <line x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke="#475569" strokeWidth={1.5} />
+          <line x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke="#94a3b8" strokeWidth={1.5} />
           <line x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke="#818cf8" strokeWidth={2} strokeDasharray="6 8" strokeLinecap="round" className="rl-flow" />
         </g>))}
-      {nodes.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i === 0 ? 11 : 8} fill={i === 3 ? "#fbbf24" : "#6366f1"} stroke="#0f172a" strokeWidth={2} />)}
+      {nodes.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i === 0 ? 11 : 8} fill={i === 3 ? "#fbbf24" : "#6366f1"} style={{ stroke: "var(--color-slate-50)" }} strokeWidth={2} />)}
     </svg>
   );
 }
 
 export default function LoginShowcase() {
   return (
-    <aside className="hidden max-h-screen flex-col justify-center gap-7 overflow-y-auto p-12 text-slate-300 lg:flex" aria-label="About RepoLens AI">
-      <div className="flex items-center gap-2 text-white"><Logo className="h-9 w-9" /><span className="text-xl font-semibold">RepoLens AI</span><span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-slate-300">{APP_VERSION}</span></div>
+    <section className="hidden max-h-screen flex-col justify-center gap-7 overflow-y-auto border-r border-line bg-slate-50 p-12 text-slate-600 lg:flex" aria-label="About RepoLens AI">
+      <div className="flex items-center gap-2 text-ink"><Logo className="h-9 w-9" /><span className="text-xl font-semibold">RepoLens AI</span><span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{APP_VERSION}</span></div>
       <div>
-        <h2 className="max-w-lg text-3xl font-semibold leading-tight text-white">A living wiki for your code and docs.</h2>
-        <p className="mt-2 max-w-lg text-sm text-slate-400">Ask questions, see what is out of date, and trace a bug to its cause, with the evidence in front of you.</p>
+        <h2 className="max-w-lg text-3xl font-semibold leading-tight text-ink">A living wiki for your code and docs.</h2>
+        <p className="mt-2 max-w-lg text-sm text-slate-600">Ask questions, see what is out of date, and trace a bug to its cause, with the evidence in front of you.</p>
       </div>
       <Hero />
       <section aria-label="What you can do" className="max-w-lg">
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">What you can do</h3>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">What you can do</h3>
         <ul className="grid gap-3 sm:grid-cols-2">
           {CAN_DO.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="rounded-lg bg-white/5 p-3"><div className="flex items-center gap-2 text-sm font-medium text-white"><Icon className="h-4 w-4 text-indigo-300" aria-hidden />{title}</div><p className="mt-1 text-xs text-slate-400">{text}</p></li>))}
+            <li key={title} className="rounded-lg border border-line bg-white p-3"><div className="flex items-center gap-2 text-sm font-medium text-ink"><Icon className="h-4 w-4 text-brand" aria-hidden />{title}</div><p className="mt-1 text-xs text-slate-600">{text}</p></li>))}
         </ul>
       </section>
       <section aria-label="Why you can trust it" className="max-w-lg">
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Why you can trust it</h3>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Why you can trust it</h3>
         <ul className="space-y-2.5">
           {TRUST.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex gap-2.5 text-sm"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" aria-hidden /><span><b className="font-medium text-white">{title}.</b> <span className="text-slate-400">{text}</span></span></li>))}
+            <li key={title} className="flex gap-2.5 text-sm"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden /><span><b className="font-medium text-ink">{title}.</b> <span className="text-slate-600">{text}</span></span></li>))}
         </ul>
-        <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-xs text-amber-100"><ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-600/30 bg-amber-50 p-2.5 text-xs text-amber-800"><ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>Honest limits: this is a {APP_VERSION} release and has not had an independent security audit or a compliance certification. Judge it by the code and the tests.</span></p>
         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/security"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />How we think about security</Link>
-          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/about">About RepoLens AI</Link>
-          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/faq">Questions about trust</Link>
-          <a className="inline-flex items-center gap-1 text-indigo-300 hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer"><GitPullRequest className="h-3.5 w-3.5" aria-hidden />Read the source</a>
-          <span className="text-slate-500">Official code: github.com/gnsaddy/repolens</span>
+          <Link className="inline-flex items-center gap-1 text-brand hover:underline" to="/security"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />How we think about security</Link>
+          <Link className="inline-flex items-center gap-1 text-brand hover:underline" to="/about">About RepoLens AI</Link>
+          <Link className="inline-flex items-center gap-1 text-brand hover:underline" to="/faq">Questions about trust</Link>
+          <a className="inline-flex items-center gap-1 text-brand hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer"><GitPullRequest className="h-3.5 w-3.5" aria-hidden />Read the source</a>
+          <span className="text-muted">Official code: github.com/gnsaddy/repolens</span>
         </p>
       </section>
-    </aside>
+    </section>
   );
 }
 
 /** The same promise in one line, for screens too narrow to show the panel above. */
 export function TrustNote() {
   return (
-    <p className="mt-3 flex items-start justify-center gap-1.5 px-2 text-center text-xs text-slate-400 lg:hidden"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span>Your data stays on your server and nothing is sent to an AI service unless you connect one. <Link className="text-indigo-300 underline" to="/security">How we think about security</Link></span></p>
+    <p className="mt-3 flex items-start justify-center gap-1.5 px-2 text-center text-xs text-muted lg:hidden"><Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>Your data stays on your server and nothing is sent to an AI service unless you connect one. <Link className="text-brand underline" to="/security">How we think about security</Link></span></p>
   );
 }

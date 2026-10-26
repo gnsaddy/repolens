@@ -13,12 +13,12 @@ export const SECURITY_MD_URL = `${REPO_URL}/blob/main/SECURITY.md`;
 /** The frame for pages anyone may read without signing in: About and Security. */
 export default function PublicLayout({ title, intro, children }: { title: string; intro: string; children: ReactNode }) {
   const { user } = useAuth();
-  const link = ({ isActive }: { isActive: boolean }) => cn("rounded-md px-3 py-1.5 text-sm", isActive ? "bg-white/15 text-white" : "text-slate-300 hover:bg-white/10");
+  const link = ({ isActive }: { isActive: boolean }) => cn("rounded-md px-3 py-1.5 text-sm", isActive ? "bg-slate-100 text-ink" : "text-slate-600 hover:bg-slate-100");
   return (
     <div className="min-h-screen bg-white text-ink">
-      <header className="bg-sidebar">
+      <header className="border-b border-line bg-slate-50">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link to={user ? "/" : "/login"} className="flex items-center gap-2 text-white" aria-label="RepoLens AI home"><Logo className="h-8 w-8" /><span className="font-semibold">RepoLens AI</span><span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-slate-300">{APP_VERSION}</span></Link>
+          <Link to={user ? "/" : "/login"} className="flex items-center gap-2 text-ink" aria-label="RepoLens AI home"><Logo className="h-8 w-8" /><span className="font-semibold">RepoLens AI</span><span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{APP_VERSION}</span></Link>
           <nav aria-label="Public pages" className="ml-auto flex items-center gap-1">
             <NavLink to="/about" className={link}>About</NavLink>
             <NavLink to="/security" className={link}>Security</NavLink>

@@ -158,3 +158,16 @@ describe("day and night mode before signing in", () => {
     expect(await screen.findByRole("button", { name: /Switch to (night|day) mode/ })).toBeInTheDocument();
   });
 });
+
+describe("day mode really is light", () => {
+  // Fixed dark backgrounds, or an <aside> (which the stylesheet keeps dark in both modes for the app sidebar), made these pages dark in day mode.
+  for (const route of ["/login", "/about", "/security", "/faq", "/reset?token=abc"]) {
+    it(`${route} follows the theme instead of using a fixed dark background`, async () => {
+      open(route);
+      await screen.findAllByRole("button", { name: /Switch to (night|day) mode/ });
+      expect(document.querySelector(".bg-sidebar")).toBeNull();
+      expect(document.querySelector("aside")).toBeNull();
+      expect(document.querySelector("[class*='bg-white/']")).toBeNull(); // white-on-dark overlays only make sense on a dark page
+    });
+  }
+});

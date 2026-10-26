@@ -39,7 +39,7 @@ export default function Login() {
     } finally { setBusy(false); }
   }
   return (
-    <div className="relative grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+    <div className="relative grid min-h-screen bg-canvas lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
       <ThemeToggle className="absolute right-3 top-3 z-10" />
       <LoginShowcase />
       <div className="grid place-items-center p-4">
@@ -84,7 +84,7 @@ export function SsoComplete() {
     completeSso(code).then(() => nav("/", { replace: true })).catch(setErr);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="grid min-h-screen place-items-center bg-sidebar p-4">
+    <div className="grid min-h-screen place-items-center bg-canvas p-4">
       <Card className="w-full max-w-sm text-center">
         {err ? (<><p role="alert" className="mb-3 text-sm text-red-600">{(err as Error).message}</p><a className="text-sm text-brand hover:underline" href="/login">Back to sign in</a></>) : <p className="text-sm text-muted">Signing you in…</p>}
       </Card>
