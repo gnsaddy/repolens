@@ -132,3 +132,55 @@ def test_savings_mode_skips_the_review_when_confidence_is_already_high_and_says_
     inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0])["id"])
     assert "reviewer" not in calls
     assert "skipped in savings mode because confidence is already high" in inv["report_md"]
+
+
+def test_a_differing_review_lowers_confidence_marks_it_unverified_and_can_change_the_lead():
+    lead, runner = hyp(conf=0.8), hyp(2, 0.7, title="other.py")
+    lead["status"] = "supported"
+    review = {"run": True, "agrees": False}
+    out = wf.apply_dissent([lead, runner], review)
+    assert [h["title"] for h in out] == ["other.py", "user_profile.py"]  # 0.7 now beats 0.64
+    assert [h["rank"] for h in out] == [1, 2]
+    dropped = next(h for h in out if h["title"] == "user_profile.py")
+    assert dropped["confidence"] == 0.64 and dropped["status"] == "unverified"
+    assert review["confidence_before"] == 0.8 and review["confidence_after"] == 0.64
+    assert lead["confidence"] == 0.8  # the original is left alone
+    assert wf.apply_dissent([hyp(conf=0.04)], {})[0]["confidence"] == wf.CONFIDENCE_FLOOR
+
+
+def test_an_agreeing_review_never_raises_confidence(client, auth, demo_repo, monkeypatch):
+    def complete(this, agent, system, prompt, max_tokens=1500, task=None, validate=None):
+        if agent == "reviewer":
+            return LLMResult('{"likely_cause": "get_profile in user_profile.py", "check": "x"}', 5, 5)
+        raise RuntimeError("synthesis down")
+
+    monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
+    monkeypatch.setattr(LLMClient, "complete", complete)
+    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
+    base = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
+    assert base["verification"]["review"]["agrees"] is True
+    monkeypatch.undo()
+    offline = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="b")["id"])
+    assert base["confidence"] == offline["confidence"]
+
+
+def test_a_differing_review_changes_the_stored_confidence_and_the_report(client, auth, demo_repo, monkeypatch):
+    def complete(this, agent, system, prompt, max_tokens=1500, task=None, validate=None):
+        if agent == "reviewer":
+            return LLMResult('{"likely_cause": "the cache layer returns stale rows", "alternatives": ["race"]}', 5, 5)
+        raise RuntimeError("synthesis down")
+
+    offline = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="a")["id"])
+    monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
+    monkeypatch.setattr(LLMClient, "complete", complete)
+    monkeypatch.setattr("repolens.services.llm_router.savings_mode", lambda db, org: False)
+    inv = run_investigation(client, auth, add_repo(client, auth, demo_repo[0], name="b")["id"])
+    assert inv["verification"]["review"]["agrees"] is False
+    rv = inv["verification"]["review"]
+    assert rv["confidence_after"] == round(rv["confidence_before"] * 0.8, 3)
+    assert inv["confidence"] == max(h["confidence"] for h in inv["hypotheses"])  # the lead may now be the runner-up
+    assert inv["confidence"] < offline["confidence"]
+    assert any(
+        h["status"] == "unverified" and abs(h["confidence"] - rv["confidence_after"]) < 0.01 for h in inv["hypotheses"]
+    )
+    assert "confidence was lowered from" in inv["report_md"] and "**Differs:**" in inv["report_md"]

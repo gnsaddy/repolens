@@ -559,7 +559,12 @@ def build_graph(ctx: Ctx):
                 f"review failed ({type(e).__name__})"
             )
         review = reconcile(hyps[0], data)
-        return {"review": review}, "independent review " + ("agrees" if review["agrees"] else "differs")
+        if review["agrees"]:
+            return {"review": review}, "independent review agrees"
+        hyps = apply_dissent(hyps, review)
+        return {"review": review, "hypotheses": hyps}, (
+            f"independent review differs: confidence {review['confidence_before']:.0%} -> {review['confidence_after']:.0%}"
+        )
 
     # ---- Report ----------------------------------------------------------------------------------------------
     def report(state: State):
@@ -603,7 +608,7 @@ def build_graph(ctx: Ctx):
             h["evidence"] = keep
             has_code = any(e["type"] == "code" for e in keep)
             strong = has_code and any(e["type"] == "commit" for e in keep) or "stack trace" in h["explanation"]
-            h["status"] = "supported" if strong else "unverified"
+            h["status"] = "supported" if strong and not h.get("contested") else "unverified"
         v = {
             "review": state.get("review", {}),
             "checked_evidence": checked,
@@ -929,6 +934,27 @@ def reconcile(top: dict, data: dict) -> dict:
     }
 
 
+DISSENT_FACTOR = (
+    0.8  # a differing review makes the lead a lead to check: 80% of its confidence, never a boost for agreeing
+)
+CONFIDENCE_FLOOR = 0.05
+
+
+def apply_dissent(hyps: list[dict], review: dict) -> list[dict]:
+    """When the independent review points elsewhere, lower the lead's confidence, mark it unverified, and re-rank.
+
+    Agreement never raises confidence: two readings of the same evidence are not two independent pieces of evidence."""
+    out = [dict(h) for h in hyps]
+    before = out[0]["confidence"]
+    out[0]["confidence"] = max(CONFIDENCE_FLOOR, round(before * DISSENT_FACTOR, 3))
+    out[0]["status"], out[0]["contested"] = "unverified", True
+    review["confidence_before"], review["confidence_after"] = before, out[0]["confidence"]
+    out.sort(key=lambda h: -h["confidence"])  # stable: ties keep their order
+    for i, h in enumerate(out, 1):
+        h["rank"] = i
+    return out
+
+
 def red_flags(state: State) -> list[str]:
     """Reasons not to trust the leading hypothesis yet, from the evidence alone."""
     hyps = state.get("hypotheses", [])
@@ -946,6 +972,12 @@ def red_flags(state: State) -> list[str]:
         flags.append("No test was found covering this code, so a fix has nothing guarding it yet.")
     if len(hyps) > 1 and top["confidence"] - hyps[1]["confidence"] < 0.1:
         flags.append(f"The next hypothesis ('{hyps[1]['title'][:70]}') is almost as likely. Do not pick one yet.")
+    rv = state.get("review") or {}
+    if rv.get("run") and not rv.get("agrees"):
+        flags.append(
+            f"An independent review of the evidence pointed elsewhere, so confidence was lowered from "
+            f"{rv.get('confidence_before', 0):.0%} to {rv.get('confidence_after', 0):.0%}. Check its alternatives below."
+        )
     if top["confidence"] < 0.5:
         flags.append("Confidence is low. Treat this as a lead to check, not a conclusion.")
     return flags
