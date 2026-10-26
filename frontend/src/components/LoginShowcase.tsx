@@ -66,6 +66,7 @@ export default function LoginShowcase() {
         <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/security"><ShieldCheck className="h-3.5 w-3.5" aria-hidden />How we think about security</Link>
           <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/about">About RepoLens AI</Link>
+          <Link className="inline-flex items-center gap-1 text-indigo-300 hover:underline" to="/faq">Questions about trust</Link>
           <a className="inline-flex items-center gap-1 text-indigo-300 hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer"><GitPullRequest className="h-3.5 w-3.5" aria-hidden />Read the source</a>
           <span className="text-slate-500">Official code: github.com/gnsaddy/repolens</span>
         </p>

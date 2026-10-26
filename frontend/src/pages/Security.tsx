@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CONTROLS, STATUS_LABEL, type Status } from "@/lib/trust";
 import PublicLayout, { Points, REPO_URL, SECURITY_MD_URL, Section } from "@/components/PublicLayout";
 
 // Every statement on this page must stay true, and each is backed by code or a test (the table at the end of SECURITY.md lists where).
@@ -14,9 +15,24 @@ const FLOWS: [string, string, string][] = [
   ["RepoLens' authors", "Nothing", "There is no analytics, usage ping or crash reporting."],
 ];
 
+const TONE: Record<Status, string> = { built: "bg-emerald-50 text-emerald-700", partly: "bg-amber-50 text-amber-700", "not-yet": "bg-slate-100 text-slate-600" };
+
 export default function Security() {
   return (
     <PublicLayout title="Security" intro="Short statements you can check against the code, including what we do not do. RepoLens is a beta, so we say plainly where it falls short.">
+      <Section id="status" title="Where each control stands">
+        <p>Each control is marked <b>Built</b>, <b>Partly</b> or <b>Not yet</b>. A page that rounds these up is worth less than none, so the gaps are listed too.</p>
+        <div className="overflow-x-auto rounded-lg border border-line">
+          <table className="w-full text-left text-sm" aria-label="Control status">
+            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted"><tr><th className="px-3 py-2 font-medium">Control</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">In plain words</th></tr></thead>
+            <tbody>{CONTROLS.map((c) => (
+              <tr key={c.name} className="border-t border-line align-top"><td className="px-3 py-2 font-medium">{c.name}</td>
+                <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TONE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
+                <td className="px-3 py-2 text-slate-600">{c.note}</td></tr>))}</tbody>
+          </table>
+        </div>
+      </Section>
+
       <Section id="data" title="Where your data goes">
         <p>Your code and documents are indexed and stored on the server you run RepoLens on. These are the only ways anything leaves it:</p>
         <div className="overflow-x-auto rounded-lg border border-line">
@@ -89,7 +105,7 @@ export default function Security() {
       </Section>
 
       <Section id="official" title="Official channels">
-        <p>The official source is <code>github.com/gnsaddy/repolens</code>. Copies on other sites or under other names are not affiliated with it, so install only from there. <Link className="text-brand hover:underline" to="/about">About RepoLens AI</Link></p>
+        <p>The official source is <code>github.com/gnsaddy/repolens</code>. Copies on other sites or under other names are not affiliated with it, so install only from there. <Link className="text-brand hover:underline" to="/about">About RepoLens AI</Link> · <Link className="text-brand hover:underline" to="/faq">Questions about trust</Link></p>
       </Section>
     </PublicLayout>
   );

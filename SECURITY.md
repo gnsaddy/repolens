@@ -88,6 +88,8 @@ The sign-in page tells people why they can trust the product. Each statement the
 | Open source, Apache 2.0, no usage data sent to the authors | `LICENSE`; the only outbound destinations are ones an administrator configures (see the table in the README's security section and `services/outbound.py`) |
 | Honest limits: no independent audit, no compliance certification | True today. Do not add certification names to the page until an audit exists |
 
-## The public Security and About pages
+## The public Security, FAQ and About pages
 
-`/security` and `/about` are in-app pages anyone can open without signing in. The Security page lists every way data can leave the server, who can do what, how secrets and the AI are kept in check, how to verify the claims, honest limits, and how to report a problem. Its statements must stay true: change `frontend/src/pages/Security.tsx` and the table above together, and never add a certification or audit name unless one exists (`frontend/src/test/public-pages.test.tsx` fails if one appears).
+`/security`, `/faq` and `/about` are in-app pages anyone can open without signing in. The Security page lists every way data can leave the server, who can do what, how secrets and the AI are kept in check, how to verify the claims, honest limits, and how to report a problem. Its statements must stay true: change `frontend/src/pages/Security.tsx` and the table above together, and never add a certification or audit name unless one exists (`frontend/src/test/public-pages.test.tsx` fails if one appears).
+
+The control status table on the Security page and the FAQ answers come from `frontend/src/lib/trust.ts`. A control may be marked **Built** only when the code and a test back it, **Partly** when it works with a stated limit, and **Not yet** when it does not exist. `frontend/src/test/public-pages.test.tsx` checks that the known gaps (SAML, penetration test, certification) stay marked Not yet and that no certification is claimed.

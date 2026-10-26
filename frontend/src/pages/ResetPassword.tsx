@@ -1,3 +1,4 @@
+import ThemeToggle from "@/components/ThemeToggle";
 import { useMutation } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -15,7 +16,8 @@ export default function ResetPassword() {
   const mismatch = !!again && pw !== again;
   const submit = (e: FormEvent) => { e.preventDefault(); if (!mismatch) set.mutate(); };
   return (
-    <div className="grid min-h-screen place-items-center bg-sidebar p-4">
+    <div className="relative grid min-h-screen place-items-center bg-sidebar p-4">
+      <ThemeToggle className="absolute right-3 top-3" />
       <Card className="w-full max-w-sm">
         <div className="mb-5 flex items-center gap-2"><Activity className="h-5 w-5 text-brand" /><span className="font-semibold">RepoLens AI</span></div>
         {set.isSuccess ? (<>

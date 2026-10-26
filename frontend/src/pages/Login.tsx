@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams, Link } from "react-router-dom";
 import Logo from "@/components/Logo";
+import ThemeToggle from "@/components/ThemeToggle";
 import LoginShowcase, { TrustNote } from "@/components/LoginShowcase";
 import { Button, Card, ErrorNote, Input, Label } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -38,7 +39,8 @@ export default function Login() {
     } finally { setBusy(false); }
   }
   return (
-    <div className="grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+    <div className="relative grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <ThemeToggle className="absolute right-3 top-3 z-10" />
       <LoginShowcase />
       <div className="grid place-items-center p-4">
       <div className="w-full max-w-sm">
@@ -61,7 +63,7 @@ export default function Login() {
         <button className="mt-4 text-xs text-brand hover:underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}
         </button>
-        <nav aria-label="More about RepoLens AI" className="mt-3 flex gap-3 border-t border-line pt-3 text-xs"><Link className="text-brand hover:underline" to="/about">About</Link><Link className="text-brand hover:underline" to="/security">Security</Link></nav>
+        <nav aria-label="More about RepoLens AI" className="mt-3 flex gap-3 border-t border-line pt-3 text-xs"><Link className="text-brand hover:underline" to="/about">About</Link><Link className="text-brand hover:underline" to="/security">Security</Link><Link className="text-brand hover:underline" to="/faq">FAQ</Link></nav>
       </Card>
       <TrustNote />
       </div>

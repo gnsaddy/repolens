@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Security, FAQ and About pages
+
+The public pages now also include **FAQ** (`/faq`, "Questions about trust": is it safe, does it send my code anywhere, do I need a model, does it train on my data, who builds it, what are the official channels, is it production-ready, what if the AI is wrong, can I delete my data, how big a repository, what does it cost, how to report a problem), and the Security page opens with **Where each control stands**: every control marked Built, Partly or Not yet, including the gaps (no SAML, no database encryption of our own, no export of everything, no penetration test, no SOC 2 or ISO 27001). The footer groups Product, Trust, Developers and Community links and states the audit position. A day/night switch is on the sign-in page, the reset page and every public page, and the choice is remembered and shared with the app. The statements live in `frontend/src/lib/trust.ts`; change them only with the code that backs them.
+
 ## Security and About pages
 
 **Security** (`/security`) and **About** (`/about`) are public pages, readable without signing in and linked from the sign-in screen, the sidebar footer and Settings → About. Security gives a table of everything that can leave the server and when, plain statements on access control, secrets, the AI's limits and the audit log, how to check the claims yourself, honest limits (beta, no independent audit or certification, you run it), a private way to report a vulnerability, and the official source. About says what RepoLens is, what it does, how it is meant to behave, where it stands, who built it and how to get involved.
