@@ -45,6 +45,15 @@ Reports follow the debugging practice described in Addy Osmani's [agent-skills](
 * **Independent review (opt-in):** off by default. An admin turns it on under Settings → AI & search → "Independent review of investigations" (audited). With a connected model, a second pass is then shown only the incident and the evidence, never the hypothesis titles, confidence or conclusion, and asked what it thinks the cause is, what else fits, what must be true, and the quickest experiment to tell them apart. The report says whether it **agrees** (it points at the same file or function) or **differs**, and lists the alternatives. It costs one extra light model call per investigation and **never changes the confidence score or the ranking**: whether it agreed is recorded (`verification.review`) so that, once people have confirmed or rejected enough investigations, you can check whether a differing review predicts a wrong answer before giving it any weight. When it is off, skipped or fails, the report says why.
 * Errors, logs and stack traces stay untrusted data: they are analysed, never obeyed.
 
+## Quality checks: saved questions you re-run after every change
+
+**Settings → Quality.** Save the questions your team expects to be answered well (add one here, or choose **Save as a test** under any answer in Ask, which records the files that answer cited). Each question can say which **files** a good answer must be built from and which **words** the written answer must contain.
+
+* **Two kinds of run:** *Retrieval only* is free: it re-runs the search and checks the expected files were found (no model, no tokens). *Full* also has the model write each answer and checks the words and that the model actually answered (a failed model call fails the question); it uses one model call per question, up to 20 questions.
+* **What you see:** the pass rate, how it moved since the run before ("-50 points"), the questions that **got worse** and **got better**, and for each failure the check that failed and what was found instead.
+* **"Something changed" banner:** each run records what answers depend on: the indexed code and documents, the skills, how answers are produced, the search model. After any of these changes the page says which one and asks you to run again.
+* **Private and bounded:** questions are shared in the workspace (anyone but viewers can add; only the author or an admin can delete); a run shows the files found under its runner's access, so it is visible to the runner and admins only. 100 questions per workspace; secrets in a question or expectation are masked. Table `golden_questions` and `golden_runs` (migration 0025); `GET /api/golden`, `POST /api/golden/questions`, `DELETE /api/golden/questions/{id}`, `POST /api/golden/run`, `GET /api/golden/runs/{id}`.
+
 ## Skills: teach the model how your team works
 
 **Settings → Skills.** A skill is guidance for the model written by your team: how your APIs are written ("every endpoint calls `authorize()` first"), what a runbook looks like, how you debug. When a question fits, the best one or two skills are added to the prompt, and the answer ends with *Guidance applied: …*.

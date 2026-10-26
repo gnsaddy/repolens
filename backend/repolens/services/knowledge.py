@@ -286,6 +286,25 @@ def connections_from(results: list[dict]) -> list[dict]:
     return out
 
 
+def retrieve(
+    db: Session,
+    org: str,
+    query: str,
+    repo_ids: list[str] | None,
+    k: int = 8,
+    scope: Scope | None = None,
+    kinds: list[str] | None = None,
+    kind: str | None = None,
+) -> list[dict]:
+    """What an answer to `query` is built from: the best search matches, plus for how/why/write requests the matching
+    route, its handler and what it calls."""
+    kind = kind or walkthrough.task_kind(query)
+    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
+    if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
+        results = walkthrough.merge(results, walkthrough.route_sources(db, org, query, repo_ids, scope), k)
+    return results
+
+
 def ask(
     db: Session,
     org: str,
@@ -308,9 +327,7 @@ def ask(
         hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
         if hit:
             return {**hit, "query": query, "mode": "llm", "cached": True}
-    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
-    if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
-        results = walkthrough.merge(results, walkthrough.route_sources(db, org, query, repo_ids, scope), k)
+    results = retrieve(db, org, query, repo_ids, k, scope, kinds, kind)
     sources = sources_from(results)
     connections = connections_from(results)
     base = {"query": query, "sources": sources, "connections": connections[:12]}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Bot, Check, Copy, FileText, GitBranch, MessageSquarePlus, MoreVertical, Paperclip, Pencil, Send, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, Bot, Check, ClipboardCheck, Copy, FileText, GitBranch, MessageSquarePlus, MoreVertical, Paperclip, Pencil, Send, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
@@ -122,6 +122,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
   const [editText, setEditText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const toast = useToast();
   const end = useRef<HTMLDivElement>(null);
   const scope = thread ? (thread.repo_ids[0] ?? "") : draft.scope;
   const fallback = thread ? thread.fallback : draft.fallback;
@@ -153,6 +154,11 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
     if (!/\.(txt|log)$/i.test(f.name)) { setFileError("Only .txt and .log files can be attached."); return; }
     const raw = await f.text();
     setAttached({ name: f.name, text: raw.slice(0, MAX_ATTACH_CHARS), cut: raw.length > MAX_ATTACH_CHARS });
+  };
+  const saveTest = async (i: number) => {
+    const q = items[i - 1];
+    const files = [...new Set(items[i].sources.filter((s) => new RegExp(`\\[${s.id}\\]`).test(items[i].content)).map((s) => s.file))].slice(0, 5);
+    try { await api("/golden/questions", { method: "POST", json: { question: q.content.slice(0, 1000), expect_files: files } }); toast(files.length ? "Saved as a quality check: this question should keep finding these files" : "Saved as a quality check"); } catch (e) { toast((e as Error).message, "error"); }
   };
   const copy = async (m: ChatMsg) => { try { await navigator.clipboard.writeText(m.content); setCopied(m.id); setTimeout(() => setCopied(null), 1500); } catch { /* clipboard unavailable */ } };
 
@@ -205,7 +211,8 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
               <div className="mb-2 flex items-center gap-2"><Badge tone={m.mode === "llm" ? "brand" : m.mode === "general" ? "amber" : m.mode === "failed" ? "red" : "gray"}>{m.mode === "llm" ? "AI answer" : m.mode === "general" ? "general knowledge" : m.mode === "failed" ? "AI unavailable" : m.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
                 {m.mode === "llm" && /^\s*Not from your documents:/m.test(m.content) && <Badge tone="amber" title="Part of this answer is not backed by your sources and has no citations">Not from your documents</Badge>}
                 <span className="text-xs text-muted">{timeAgo(m.created_at)}</span>
-                <button aria-label="Copy answer" title="Copy" className="ml-auto rounded p-1 text-muted hover:bg-slate-100" onClick={() => void copy(m)}>{copied === m.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</button></div>
+                {items[items.indexOf(m) - 1]?.role === "user" && m.mode !== "failed" && <button aria-label="Save as a test" title="Save as a quality check" className="ml-auto rounded p-1 text-muted hover:bg-slate-100" onClick={() => void saveTest(items.indexOf(m))}><ClipboardCheck className="h-4 w-4" /></button>}
+                <button aria-label="Copy answer" title="Copy" className={cn("rounded p-1 text-muted hover:bg-slate-100", items[items.indexOf(m) - 1]?.role !== "user" && "ml-auto")} onClick={() => void copy(m)}>{copied === m.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</button></div>
               <div className="text-sm leading-6"><Markdown text={m.content} onOpen={() => {}} /></div>
               {m.mode === "failed" && (() => { const i = items.indexOf(m); const q = items[i - 1]; return q?.role === "user" && i === items.length - 1 ? <Button size="sm" variant="outline" className="mt-3" disabled={edit.isPending} onClick={() => edit.mutate({ mid: q.id, content: q.content })}>{edit.isPending ? "Trying…" : "Try again"}</Button> : null; })()}
               <Sources sources={m.sources} />

@@ -797,3 +797,36 @@ class Skill(Base):
     uses: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class GoldenQuestion(Base):
+    """A question a workspace expects to be answered well, with what a good answer must contain."""
+
+    __tablename__ = "golden_questions"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    expect_files: Mapped[list] = mapped_column(JSON, default=list)  # path fragments that must appear among the sources
+    expect_phrases: Mapped[list] = mapped_column(JSON, default=list)  # words the written answer must contain
+    repo_ids: Mapped[list] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GoldenRun(Base):
+    """One pass over the saved questions, so quality can be compared before and after a change."""
+
+    __tablename__ = "golden_runs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), default="")
+    mode: Mapped[str] = mapped_column(String(20), default="retrieval")  # retrieval (free) | full (uses the model)
+    status: Mapped[str] = mapped_column(String(20), default="running")  # running | completed | failed
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    done: Mapped[int] = mapped_column(Integer, default=0)
+    passed: Mapped[int] = mapped_column(Integer, default=0)
+    results: Mapped[list] = mapped_column(JSON, default=list)
+    fingerprint: Mapped[dict] = mapped_column(JSON, default=dict)  # what the answers depended on when this ran
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

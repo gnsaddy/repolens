@@ -414,3 +414,15 @@ describe("Ask: a failed model call", () => {
     await waitFor(() => expect(s.calls.find((c) => c.method === "PUT")?.body).toEqual({ content: "How are deleted users handled?" }));
   });
 });
+
+describe("Ask: save as a test", () => {
+  it("saves the question with the files the answer cited", async () => {
+    const s = server({ initial: [thread()] });
+    page("/ask/t1");
+    await userEvent.click(await screen.findByRole("button", { name: "Save as a test" }));
+    await waitFor(() => {
+      const c = s.calls.find((x) => x.url.endsWith("/golden/questions"));
+      expect(c?.body).toEqual({ question: "How are deleted users handled?", expect_files: ["runbook/deleted-users.md"] });
+    });
+  });
+});

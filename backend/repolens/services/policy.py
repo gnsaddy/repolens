@@ -43,6 +43,8 @@ ACTION_MIN_ROLE = {
     "wiki.publish": "admin",
     "skill.submit": "member",  # an admin's submission is approved at once; a member's waits for review
     "skill.review": "admin",
+    "golden.write": "member",
+    "golden.run": "member",
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}
 

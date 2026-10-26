@@ -315,3 +315,12 @@ export interface SkillRow {
   always: boolean; status: "pending" | "approved" | "rejected" | "disabled"; note: string; uses: number; mine: boolean; created_at: string; updated_at: string;
 }
 export interface SkillList { items: SkillRow[]; builtin: { name: string; title: string; description: string; applies: string }[]; pending: number }
+
+export interface GoldenCheck { name: string; ok: boolean; detail: string }
+export interface GoldenResult { id: string; question: string; passed: boolean; checks: GoldenCheck[]; files: string[]; answer: string }
+export interface GoldenRunRow { id: string; mode: "retrieval" | "full"; status: "running" | "completed" | "failed"; total: number; done: number; passed: number; error: string | null; started_at: string; finished_at: string | null; results?: GoldenResult[] }
+export interface GoldenQuestion { id: string; question: string; expect_files: string[]; expect_phrases: string[]; repo_ids: string[]; mine: boolean; last: GoldenResult | null }
+export interface GoldenOverview {
+  questions: GoldenQuestion[]; runs: GoldenRunRow[]; latest: GoldenRunRow | null; active: GoldenRunRow | null; max_full: number;
+  compare: { delta: number | null; broke: string[]; fixed: string[] }; changed: string[];
+}
