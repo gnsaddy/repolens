@@ -159,10 +159,10 @@ def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) 
     out.append(
         "\n_Listed from the index of route declarations, so it is complete for routes written in the usual way._"
     )
-    return {"content": "\n".join(out), "sources": sources, "connections": [], "mode": "extractive"}
+    return {"content": "\n".join(out), "sources": sources, "connections": [], "mode": "extractive", "listed": True}
 
 
-def answer(
+def _answer(
     db: Session,
     org: str,
     scope: Scope,
@@ -248,6 +248,28 @@ def answer(
         "content": _extracted(sources, results, log_lines, thread.fallback, llm.offline),
         "mode": "extractive" if sources or log_lines else "none",
     }
+
+
+NO_INVENTORY = (
+    "\n\n_This list may be incomplete: no route inventory was found for the repositories in scope. Click **Re-index** on the "
+    "repository (Repositories page) once, then ask again._"
+)
+
+
+def answer(
+    db: Session,
+    org: str,
+    scope: Scope,
+    thread: ChatThread,
+    question: str,
+    attachment: Attachment | None,
+    before: list[ChatMessage],
+) -> dict:
+    """The assistant's reply to `question`, given the earlier messages of the thread. Never raises for a model failure."""
+    out = _answer(db, org, scope, thread, question, attachment, before)
+    if wants_all_routes(question) and not attachment and not out.get("listed"):
+        out = {**out, "content": out["content"] + NO_INVENTORY}  # asked for everything, but only search results exist
+    return out
 
 
 def _extracted(sources: list[dict], results: list[dict], log_lines: list[str], fallback: bool, offline: bool) -> str:

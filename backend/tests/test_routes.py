@@ -68,3 +68,10 @@ def test_questions_that_are_not_list_everything_still_search():
 
     assert w("List all the API endpoint in repolens") and w("show me every route") and w("what are all the endpoints?")
     assert not w("how does the login endpoint work?") and not w("list all the files") and not w("what is a route")
+
+
+def test_without_an_inventory_the_answer_says_to_reindex(client, auth, demo_repo):
+    repo = add_repo(client, auth, demo_repo[0])  # a repository without route declarations
+    c = new_chat(client, auth, repo_ids=[repo["id"]])
+    text = say(client, auth, c["id"], "List all the API endpoints").json()["items"][-1]["content"]
+    assert "Re-index" in text
