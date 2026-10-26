@@ -234,10 +234,12 @@ _SEP = "\x1e"
 _FIELD = "\x1f"
 
 
-def log(path: str, limit: int = 300, since_sha: str | None = None, ref: str = "HEAD") -> list[CommitInfo]:
+def log(
+    path: str, limit: int = 300, since_sha: str | None = None, ref: str = "HEAD", timeout: int = 120
+) -> list[CommitInfo]:
     rng = f"{since_sha}..{ref}" if since_sha else ref
     fmt = _SEP + _FIELD.join(["%H", "%P", "%an", "%cI", "%B"]) + _FIELD
-    out = _git(path, "log", rng, f"-n{limit}", "--numstat", f"--format={fmt}")
+    out = _git(path, "log", rng, f"-n{limit}", "--numstat", f"--format={fmt}", timeout=timeout)
     commits: list[CommitInfo] = []
     for block in out.split(_SEP):
         if not block.strip():

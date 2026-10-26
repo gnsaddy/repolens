@@ -294,7 +294,8 @@ def _index_commits(
     ref: str = "HEAD",
 ) -> int:
     known = set(db.scalars(select(Change.sha).where(Change.repo_id == repo.id)).all())
-    commits = [c for c in gitops.log(path, limit=limit, ref=ref) if c.sha not in known]
+    wait = get_settings().git_history_timeout  # a blob-less clone downloads what each commit changed as git goes
+    commits = [c for c in gitops.log(path, limit=limit, ref=ref, timeout=wait) if c.sha not in known]
     if not commits:
         return 0
     rows = []

@@ -174,3 +174,21 @@ def test_a_remotes_latest_commit_can_be_read_without_cloning(tmp_path, monkeypat
     assert gitops.remote_head(f"file://{d}", "no-such-branch") == ""
     with pytest.raises(gitops.GitError):
         gitops.remote_head("ftp://example.com/x")
+
+
+def test_reading_the_history_may_take_much_longer_than_other_git_calls(client, auth, session, tmp_path, monkeypatch):
+    """A blob-less clone downloads what each commit changed while git log runs; OpenSSL died on the 120 second default."""
+    from repolens.services import gitops
+
+    seen = []
+    real = gitops.log
+    monkeypatch.setattr(gitops, "log", lambda *a, **k: (seen.append(k.get("timeout")), real(*a, **k))[1])
+    make_repo(client, auth, tmp_path)
+    assert seen and seen[0] == config.get_settings().git_history_timeout == 900
+
+    captured = {}
+    monkeypatch.setattr(gitops, "_git", lambda *a, **k: captured.update(k) or "")
+    gitops.log("/nowhere")
+    assert captured["timeout"] == 120  # the default for any other caller is unchanged
+    gitops.log("/nowhere", timeout=77)
+    assert captured["timeout"] == 77
