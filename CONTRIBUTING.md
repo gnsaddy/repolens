@@ -7,7 +7,7 @@ See [docs/quickstart.md](docs/quickstart.md). `make help` lists every target.
 
 ## Before you open a pull request
 ```bash
-make check        # lint, types and tests, the same as CI
+make check        # what CI runs: lint (ruff, mypy, eslint), types, all tests, the production build and the evaluation gate. Run it before every push.
 make eval         # if you touched retrieval, memory or routing: scores must not drop below evals/baselines
 ```
 Backend: `ruff check . && ruff format .` (run on the whole folder), `mypy repolens`, `pytest`. Frontend: `npm test`, `npx tsc --noEmit`.

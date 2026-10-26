@@ -23,8 +23,8 @@ from .docs import slugify
 from .graph import TEST_PATH, neighbors, node_dict
 
 FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
-WIKI_LINK = re.compile(r"\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|([^\]]*))?\]\]")
-MD_LINK = re.compile(r"(?<!!)\[([^\]]*)\]\(([^)\s]+)\)")
+WIKI_LINK = re.compile(r"(?<!\\)\[\[([^\]|#]+)(?:#([^\]|]*))?(?:\|([^\]]*))?\]\]")
+MD_LINK = re.compile(r"(?<![!\\])\[([^\]]*)\]\(([^)\s]+)\)")
 STOP_TERMS = {
     "the",
     "and",

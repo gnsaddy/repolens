@@ -16,7 +16,7 @@ const page = { repo_id: "n1", repo: "team-notes", path: "guide.md", title: "Guid
   source: { type: "upload", url: "", version: null, synced_at: null, updated_at: null, repo_url: "" }, backlinks: [], links_out: [], related: [], concepts: [], mentions_code: [],
   insights: { kind: "runbook", kind_label: "Runbook", purpose: "Use this when the API stops answering.", commands: ["kubectl rollout restart deploy/payments"], endpoints: ["GET /healthz"], settings: ["RETRY_LIMIT"], owners: [{ role: "owner", who: "platform-team" }], warnings: [{ level: "warning", text: "Never restart during settlement." }], steps: 3, last_dated: "2026-09-30", words: 120, reading_minutes: 1 } };
 
-function setup(url = "/wiki") {
+function setup(url = "/wiki", markdown?: string) {
   const calls: { url: string; method?: string; body?: unknown }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const u = String(input);
@@ -26,7 +26,7 @@ function setup(url = "/wiki") {
     if (u.includes("/wiki/tree")) return json([{ key: "g", title: "Guide", path: "guide.md", children: [] }]);
     if (u.includes("/wiki/page/source")) return json({ content: "# Guide\n\nHello.", editable: true, reason: null, updated_at: "" });
     if (u.includes("/wiki/page") && init?.method === "PUT") return json({ path: JSON.parse(String(init.body)).path, created: false, secrets_redacted: 0 });
-    if (u.includes("/wiki/page")) return json(page);
+    if (u.includes("/wiki/page")) return json(markdown ? { ...page, markdown, insights: undefined, outline: [...markdown.matchAll(/^## (.+)$/gm)].map((m, i) => ({ title: m[1], anchor: m[1].toLowerCase().replace(/ /g, "-"), line: i + 1 })) } : page);
     if (u.includes("/wiki/search")) return json([{ repo: "team-notes", repo_id: "n1", path: "deploy.md", title: "Deploy checklist", snippet: "Run the migrations first", start_line: 1, score: 0.8 }]);
     if (u.includes("/graph/report")) return json({ repo: { id: "r1", name: "shop" }, stats: { nodes: 40, edges: 90, communities: 2 },
       communities: [{ id: 0, size: 25, files: 6, label: "src/billing", top: [{ id: "n1", name: "compute_total", type: "function", degree: 9 }] }],
@@ -95,5 +95,61 @@ describe("DeepMind Wiki core", () => {
     expect(within(panel).getByLabelText("Hubs")).toHaveTextContent("compute_total");
     expect(within(panel).getByLabelText("Surprising connections")).toHaveTextContent("inferred");
     expect(within(panel).getByLabelText("Good first questions")).toHaveTextContent("what depends on it");
+  });
+
+  describe("a long page, such as an imported PDF", () => {
+    const pages = (n: number) => `> Imported from Book.pdf\n\n# Book\n\n${Array.from({ length: n }, (_, i) => `## Page ${i + 1}\n\nText of page ${i + 1}.`).join("\n\n")}\n`;
+
+    it("opens one section at a time instead of loading every page at once", async () => {
+      setup("/wiki", pages(60));
+      const text = await screen.findByText(/Imported from Book\.pdf/);
+      expect(text).toBeInTheDocument();
+      expect(screen.queryByText("Text of page 1.")).toBeNull(); // not all of it
+      expect(screen.queryByText("Text of page 60.")).toBeNull();
+      expect(screen.getAllByLabelText("Position")[0]).toHaveTextContent("1 of 61"); // the title block and 60 pages
+      await userEvent.click(screen.getAllByRole("button", { name: "Next" })[0]);
+      expect(await screen.findByText("Text of page 1.")).toBeInTheDocument();
+      expect(screen.queryByText("Text of page 2.")).toBeNull();
+      await userEvent.selectOptions(screen.getAllByLabelText("Jump to section")[0], "7");
+      expect(await screen.findByText("Text of page 7.")).toBeInTheDocument();
+      await userEvent.click(screen.getAllByRole("button", { name: "Previous" })[0]);
+      expect(await screen.findByText("Text of page 6.")).toBeInTheDocument();
+    });
+
+    it("lists the sections in the side card, jumps to one, and shows the rest on request", async () => {
+      setup("/wiki", pages(60));
+      const card = await screen.findByLabelText("On this page");
+      expect(within(card).getAllByRole("button").filter((b) => /^Page \d+$/.test(b.textContent ?? "")).length).toBeLessThanOrEqual(40); // a long list starts short
+      await userEvent.click(within(card).getByRole("button", { name: "Show all 61" }));
+      await userEvent.click(within(card).getByRole("button", { name: "Page 50" }));
+      expect(await screen.findByText("Text of page 50.")).toBeInTheDocument();
+      expect(within(card).getByRole("button", { name: "Page 50" })).toHaveAttribute("aria-current", "true");
+      expect(screen.getAllByLabelText("Position")[0]).toHaveTextContent("51 of 61");
+    });
+
+    it("can show everything together and go back to one section at a time", async () => {
+      setup("/wiki", pages(60));
+      await userEvent.click(await screen.findByRole("button", { name: "Show all 61 sections" }));
+      expect(await screen.findByText("Text of page 1.")).toBeInTheDocument();
+      expect(screen.getByText("Text of page 60.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Read one section at a time" }));
+      expect(screen.queryByText("Text of page 60.")).toBeNull();
+    });
+
+    it("asks before showing a very large page all at once", async () => {
+      setup("/wiki", pages(200));
+      await userEvent.click(await screen.findByRole("button", { name: "Show all 201 sections" }));
+      const dlg = await screen.findByRole("alertdialog");
+      expect(dlg).toHaveTextContent("Show all 201 sections at once?");
+      await userEvent.click(within(dlg).getByRole("button", { name: "Show everything" }));
+      expect(await screen.findByText("Text of page 200.")).toBeInTheDocument();
+    });
+
+    it("leaves a normal page exactly as it was", async () => {
+      setup("/wiki", pages(5));
+      expect(await screen.findByText("Text of page 5.")).toBeInTheDocument(); // short enough to show whole
+      expect(screen.queryByLabelText("Position")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Show all \d+ sections/ })).toBeNull();
+    });
   });
 });

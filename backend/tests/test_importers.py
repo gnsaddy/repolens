@@ -113,7 +113,8 @@ def make_pdf(pages: list[str], pad: int = 0) -> bytes:
     for text in pages:
         content_id, page_id = 4 + 2 * len(kids) + 1, 4 + 2 * len(kids)
         kids.append(page_id)
-        stream = f"BT /F1 14 Tf 40 700 Td ({text}) Tj ET".encode() if text else b""
+        lit = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        stream = f"BT /F1 14 Tf 40 700 Td ({lit}) Tj ET".encode() if text else b""
         objs.append(
             f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents {content_id} 0 R /Resources << /Font << /F1 3 0 R >> >> >>".encode()
         )
@@ -362,3 +363,140 @@ def test_only_imports_may_be_larger_than_the_normal_request_cap(client, auth, mo
     assert post(client, auth, cid, **{"two.md": b"# x" + b"y" * (2 * MB)}).status_code == 200  # an import may be bigger
     refused = post(client, auth, cid, **{"four.md": b"y" * (4 * MB)})
     assert refused.status_code == 413 and "3 MB" in refused.json()["detail"]  # but not without limit
+
+
+# ---------------------------------------------------------------- text from PDF and Word is kept literal
+CODEY = "tensor([[1, 14350, 385]]) x = a[0](b) # a comment *starred* max_new_tokens"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("tensor([[1, 14350, 385]])", "tensor(\\[\\[1, 14350, 385\\]\\])"),
+        ("see [1](2) and [link](http://x)", "see \\[1\\](2) and \\[link\\](http://x)"),
+        ("# a comment", "\\# a comment"),
+        ("## heading-like", "\\## heading-like"),
+        ("> quoted", "\\> quoted"),
+        ("- item", "\\- item"),
+        ("+ item", "\\+ item"),
+        ("1. first", "1\\. first"),
+        ("2) second", "2\\) second"),
+        ("---", "\\---"),
+        ("=====", "\\====="),
+        ("*bold* and `code`", "\\*bold\\* and \\`code\\`"),
+        ("max_new_tokens and _private", "max_new_tokens and \\_private"),  # a word's inner underscores stay readable
+        ("C:\\path\\file", "C:\\\\path\\\\file"),
+        ("    indented code", "indented code"),
+        ("plain words", "plain words"),
+    ],
+)
+def test_text_is_made_literal_so_it_cannot_become_links_headings_or_lists(raw, expected):
+    assert importers.escape_line(raw) == expected
+
+
+def test_a_pdf_full_of_code_listings_makes_no_links_headings_or_lists():
+    doc = importers.convert("Book.pdf", make_pdf([CODEY, "# Load the model", "1, 14350, 385]]"]))[0][0]
+    from repolens.services.docs import extract_links, parse_markdown
+
+    assert "[[" not in doc.content and "](" not in doc.content.replace("\\](", "")
+    assert extract_links(doc.content) == []  # no phantom links to pages called "1, 14350, 385"
+    titles = [c.symbol for c in parse_markdown("Book.md", doc.content)]
+    assert [t for t in titles if t != "Book"] == ["Page 1", "Page 2", "Page 3"]  # only the pages are sections
+    assert "Load the model" not in titles  # a "# comment" line in a listing is not a heading
+
+
+def test_word_text_is_kept_literal_but_its_own_headings_and_lists_still_work():
+    [doc], _ = importers.convert(
+        "Notes.docx",
+        docx(
+            para("Setup", "Heading1")
+            + para("tensor([[1, 2]]) and *x*")
+            + para("# not a heading")
+            + para("keep [a](b) literal", list_level=0)
+        ),
+    )
+    assert "# Setup" in doc.content and "- keep \\[a\\](b) literal" in doc.content
+    assert "tensor(\\[\\[1, 2\\]\\]) and \\*x\\*" in doc.content and "\\# not a heading" in doc.content
+
+
+def test_csv_cells_are_literal_too():
+    [t], _ = importers.convert("D.csv", b"Name,Note\nAda,see [[Page]] and [x](y)\n")
+    assert "\\[\\[Page\\]\\]" in t.content
+
+
+def test_the_link_detectors_ignore_escaped_brackets_and_still_find_real_links():
+    from repolens.services import wiki
+    from repolens.services.docs import extract_links
+
+    assert extract_links("[x](y.md) and [[Some Page]]") == ["y.md", "wiki:Some Page"]
+    assert extract_links("\\[x\\](y.md) and \\[\\[Some Page\\]\\]") == []
+    assert wiki.MD_LINK.findall("\\[x\\](y)") == [] and wiki.WIKI_LINK.findall("\\[\\[a\\]\\]") == []
+    assert wiki.MD_LINK.findall("[x](y)") == [("x", "y")] and wiki.WIKI_LINK.findall("[[a]]")
+
+
+def test_the_wiki_shows_an_imported_pdf_without_broken_links_or_stray_headings(client, auth):
+    cid = make_collection(client, auth)["id"]
+    r = post(
+        client, auth, cid, **{"Book.pdf": make_pdf([CODEY, "# Load the model", "output: [[ 1, 14350, 385, 4876 ]]"])}
+    )
+    assert r.status_code == 200 and [i["path"] for i in r.json()["imported"]] == ["Book.md"], r.text
+    page = client.get("/api/wiki/page", headers=auth, params={"repo_id": cid, "path": "Book.md"}).json()
+    assert page["unresolved_links"] == []  # these were "5 links point to pages that do not exist: 1, 14350, 385..."
+    titles = [o["title"] for o in page["outline"]]
+    assert [t for t in titles if t != "Book"] == ["Page 1", "Page 2", "Page 3"] and "Load the model" not in titles
+
+
+# ---------------------------------------------------------------- a warning for very large documents (never a refusal)
+def test_a_normal_document_gets_no_warning():
+    for name, data in (
+        ("Notes.md", b"# Notes\n\nshort"),
+        ("Runbook.docx", docx(para("Hi") + para("there"))),
+        ("Spec.pdf", make_pdf(["one page of text here", "and another"])),
+    ):
+        docs, skips = importers.convert(name, data)
+        assert len(docs) == 1 and docs[0].warning == "" and skips == [], name
+
+
+def test_a_long_pdf_is_imported_with_a_warning_that_says_why():
+    pages = [f"Page number {i} has some text on it" for i in range(1, importers.LARGE_PAGES + 21)]
+    [doc], skips = importers.convert("Big Book.pdf", make_pdf(pages))
+    assert skips == [] and "## Page 120" in doc.content  # still imported in full
+    assert "Big Book.pdf has 120 pages" in doc.warning
+    assert "crowd search results" in doc.warning and "up to about 100 pages" in doc.warning
+
+
+def test_a_pdf_longer_than_the_page_limit_says_what_was_left_out(monkeypatch):
+    monkeypatch.setattr(importers, "MAX_PDF_PAGES", 3)
+    monkeypatch.setattr(importers, "LARGE_PAGES", 2)
+    [doc], _ = importers.convert("Long.pdf", make_pdf([f"text on page {i} here" for i in range(1, 6)]))
+    assert "has 5 pages" in doc.warning and "Only the first 3 pages were imported" in doc.warning
+    assert "page 4" not in doc.content
+
+
+def test_very_long_text_and_text_cut_at_the_limit_are_both_flagged(monkeypatch):
+    [doc], _ = importers.convert("Wall.txt", b"word " * 70_000)  # about 350,000 characters
+    assert "Wall.txt is very long" in doc.warning and "cut off" not in doc.warning
+    monkeypatch.setattr(importers, "MAX_TEXT", 1000)
+    [cut], _ = importers.convert("Huge.md", b"word " * 1000)
+    assert "cut off" in cut.warning and "cut here" in cut.content
+
+
+def test_a_zip_that_adds_hundreds_of_pages_gets_one_warning_for_the_whole_zip(monkeypatch):
+    monkeypatch.setattr(importers, "LARGE_ZIP_DOCS", 3)
+    docs, _ = importers.convert("Everything.zip", zipped({f"p{i}.md": f"# P{i}" for i in range(5)}))
+    warned = [d.warning for d in docs if d.warning]
+    assert len(docs) == 5 and len(warned) == 1 and "Everything.zip added 5 pages at once" in warned[0]
+    assert "only the sections your team uses" in warned[0]
+
+
+def test_the_import_answer_carries_the_warnings_and_still_imports(client, auth):
+    cid = make_collection(client, auth)["id"]
+    pages = [f"Page number {i} has some text on it" for i in range(1, importers.LARGE_PAGES + 6)]
+    r = post(client, auth, cid, **{"Book.pdf": make_pdf(pages), "Short.md": b"# Short\n\nfine"})
+    out = r.json()
+    assert r.status_code == 200 and {i["path"] for i in out["imported"]} == {
+        "Book.md",
+        "Short.md",
+    }  # a warning is not a refusal
+    assert len(out["warnings"]) == 1 and "Book.pdf has 105 pages" in out["warnings"][0]
+    assert post(client, auth, cid, **{"Only.md": b"# Only"}).json()["warnings"] == []

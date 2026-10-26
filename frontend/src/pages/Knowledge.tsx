@@ -361,10 +361,11 @@ function DocsTab({ repos }: { repos: Repo[] }) {
             <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}
             {user?.role === "admin" && <button aria-label="Delete collection" title="Delete this collection and all its documents" className="ml-2 align-middle text-muted hover:text-red-600"
               onClick={async () => { if (await ask({ title: `Delete the collection "${active.name}"?`, message: `All ${active.file_count} documents, their search entries and graph nodes are removed.`, confirmLabel: "Delete collection", danger: true })) dropCollection.mutate(active.id); }}><Trash2 className="inline h-4 w-4" /></button>}</CardTitle>
-          <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (text up to 1 MB; Word, PDF, CSV and zip up to 25 MB each). Notion: Export as Markdown &amp; CSV, then upload the .zip. Scanned PDFs are not read (no OCR).</div>
+          <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (text up to 1 MB; Word, PDF, CSV and zip up to 25 MB each). Notion: Export as Markdown &amp; CSV, then upload the .zip. Scanned PDFs are not read (no OCR). Documents up to about 100 pages work best; longer ones import with a warning.</div>
           <ErrorNote error={upload.error ?? importer.error ?? remove.error} />
           {report && (<div role="status" aria-label="Import result" className="mb-2 rounded-lg bg-slate-50 p-3 text-xs">
             <p className="font-medium">{summarize(report)}</p>
+            {!!report.warnings?.length && <ul aria-label="Warnings" className="mt-1 list-disc space-y-0.5 pl-5 text-amber-700">{report.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
             {!!report.skipped.length && <ul className="mt-1 list-disc space-y-0.5 pl-5 text-amber-700">{report.skipped.slice(0, 12).map((x, i) => <li key={i}><b>{x.name}</b>: {x.reason}</li>)}{report.skipped.length > 12 && <li>…and {report.skipped.length - 12} more</li>}</ul>}</div>)}
           {note && <p className="mb-2 text-xs text-amber-700">{note}</p>}
           {(upload.isPending || importer.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 text-xs text-muted"><Spinner />Indexing and linking…</div>}

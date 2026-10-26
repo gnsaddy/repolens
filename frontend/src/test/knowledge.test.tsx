@@ -284,6 +284,28 @@ describe("Knowledge page", () => {
       expect(sentFiles(calls).map((f) => f.name)).toEqual(["ok.pdf"]); // exactly 25 MB goes up; 26 MB does not
     });
 
+    it("shows a warning for a very large document, next to what was imported", async () => {
+      setup({ received: 1, changed: 1, secrets_redacted: 0, imported: [{ path: "Book.md", source: "Book.pdf", kind: "pdf" }], skipped: [],
+        warnings: ["Book.pdf has 500 pages. Long documents add many sections that can crowd search results and the wiki's health counts. Documents your team works from, up to about 100 pages, work best. Only the first 400 pages were imported."] });
+      renderPage("/knowledge?tab=docs");
+      await userEvent.upload(await screen.findByLabelText("Upload documents"), new File([new Uint8Array([37, 80])], "Book.pdf"));
+      const result = await screen.findByLabelText("Import result");
+      expect(result).toHaveTextContent("Imported 1 document, 1 warning.");
+      const warnings = within(result).getByRole("list", { name: "Warnings" });
+      expect(warnings).toHaveTextContent("Book.pdf has 500 pages");
+      expect(warnings).toHaveTextContent("up to about 100 pages, work best");
+      expect(warnings).toHaveTextContent("Only the first 400 pages were imported");
+    });
+
+    it("shows no warning list for an ordinary import", async () => {
+      setup({ received: 1, changed: 1, secrets_redacted: 0, imported: [{ path: "a.md", source: "a.docx", kind: "docx" }], skipped: [], warnings: [] });
+      renderPage("/knowledge?tab=docs");
+      await userEvent.upload(await screen.findByLabelText("Upload documents"), new File([new Uint8Array([80, 75])], "a.docx"));
+      const result = await screen.findByLabelText("Import result");
+      expect(result).toHaveTextContent("Imported 1 document.");
+      expect(within(result).queryByRole("list", { name: "Warnings" })).toBeNull();
+    });
+
     it("does not send more than 100 MB in one upload", async () => {
       const calls = setup({ received: 1, changed: 1, secrets_redacted: 0, imported: [], skipped: [] });
       renderPage("/knowledge?tab=docs");

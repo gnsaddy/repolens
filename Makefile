@@ -51,7 +51,7 @@ e2e:       ## browser tests against the real API and web app (needs Playwright b
 	cd frontend && npm run e2e
 typecheck: ## TypeScript
 	cd frontend && npm run typecheck
-check: lint typecheck test   ## everything CI runs, locally
+check: lint typecheck test build eval   ## what CI runs (lint, types, tests, build, quality gate); browser tests and image scan run only in CI
 build:     ## production build of the web app
 	cd frontend && npm run build
 migrate:   ## apply database migrations (uses REPOLENS_DATABASE_URL)

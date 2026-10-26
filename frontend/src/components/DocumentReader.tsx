@@ -6,33 +6,11 @@ import Markdown from "@/pages/wiki/Markdown";
 import { Badge, Button, ErrorNote, Input, Spinner } from "@/components/ui";
 import { api, type WikiPage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PAGED_FROM, splitSections } from "@/lib/sections";
 
-export interface ReaderSection { title: string; text: string }
-
-/** Cut a document at its level-2 headings (a PDF import has one "## Page N" per page); level 1 if there are none. Fenced code is left whole. */
-export function splitSections(markdown: string): ReaderSection[] {
-  const lines = markdown.split("\n");
-  for (const level of ["## ", "# "]) {
-    const out: ReaderSection[] = [];
-    let cur: ReaderSection | null = null, fence = false, pre: string[] = [];
-    for (const line of lines) {
-      if (/^(```|~~~)/.test(line)) fence = !fence;
-      if (!fence && line.startsWith(level) && !line.startsWith(`${level}#`)) {
-        if (cur) out.push({ ...cur, text: cur.text.trimEnd() });
-        else if (pre.some((l) => l.trim())) out.push({ title: pre.find((l) => /^# \S/.test(l))?.slice(2).trim() || "Start", text: pre.join("\n").trimEnd() });
-        cur = { title: line.slice(level.length).trim() || "Untitled", text: line };
-      } else if (cur) cur.text += `\n${line}`;
-      else pre.push(line);
-    }
-    if (cur) out.push({ ...cur, text: cur.text.trimEnd() });
-    if (out.length > 1) return out;
-    pre = [];
-  }
-  return [{ title: "Document", text: markdown }];
-}
+export { splitSections };
 
 const SIZES = [14, 16, 18, 20, 22];
-const PAGED_FROM = 12; // a document with more sections than this opens one section at a time
 
 /** A document, big enough to read: an outline of its sections, one section at a time or all of it, find in the document, text size, full screen. */
 export default function DocumentReader({ repoId, path, onClose }: { repoId: string; path: string; onClose: () => void }) {

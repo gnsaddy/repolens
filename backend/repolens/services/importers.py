@@ -23,6 +23,9 @@ MAX_ZIP_TOTAL = 60 * 1024 * 1024  # everything in a zip, unpacked
 MAX_ZIP_ENTRIES = 1500
 MAX_TEXT = 1_000_000  # characters kept from one document
 MAX_PDF_PAGES = 400
+LARGE_PAGES = 100  # past this, a document is worth a warning: it adds many sections that crowd search and the wiki's health counts
+LARGE_CHARS = 300_000
+LARGE_ZIP_DOCS = 200
 MAX_TABLE_ROWS = 300
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _NOTION_ID = re.compile(r"[ _-][0-9a-f]{32}(?=\.|/|$)", re.I)  # Notion adds " <32 hex characters>" to every name
@@ -34,6 +37,7 @@ class Doc:
     content: str
     kind: str  # text | docx | pdf | notion | csv
     source: str  # the file it came from
+    warning: str = ""  # worth telling the person: the document is very large, or was cut
 
 
 @dataclass
@@ -87,7 +91,7 @@ def _table(rows: list[list[str]]) -> str:
         return ""
     width = min(max(len(r) for r in rows), 20)
     norm = [
-        ([c.replace("|", "\\|").replace("\n", " ").strip() for c in r] + [""] * width)[:width]
+        ([escape_inline(c).replace("|", "\\|").replace("\n", " ").strip() for c in r] + [""] * width)[:width]
         for r in rows[: MAX_TABLE_ROWS + 1]
     ]
     out = ["| " + " | ".join(norm[0]) + " |", "|" + " --- |" * width]
@@ -95,6 +99,54 @@ def _table(rows: list[list[str]]) -> str:
     if len(rows) > MAX_TABLE_ROWS + 1:
         out.append(f"\n_({len(rows) - MAX_TABLE_ROWS - 1} more rows not imported)_")
     return "\n".join(out)
+
+
+_ADVICE = "Long documents add many sections that can crowd search results and the wiki's health counts. Documents your team works from, up to about {n} pages, work best."
+
+
+def _advise(label: str, chars: int, pages: int | None = None) -> str:
+    """A warning when a document is very large (never a refusal), else an empty string."""
+    out = []
+    if pages is not None and pages > LARGE_PAGES:
+        out.append(f"{label} has {pages} pages. {_ADVICE.format(n=LARGE_PAGES)}")
+        if pages > MAX_PDF_PAGES:
+            out.append(f"Only the first {MAX_PDF_PAGES} pages were imported.")
+    elif chars > LARGE_CHARS:
+        out.append(
+            f"{label} is very long (about {chars // 1000:,} thousand characters). {_ADVICE.format(n=LARGE_PAGES)}"
+        )
+    if chars > MAX_TEXT:
+        out.append("It was longer than the import limit, so the end was cut off.")
+    return " ".join(out)
+
+
+def _doc(path: str, text: str, kind: str, source: str, label: str, pages: int | None = None) -> Doc:
+    return Doc(path, _cap(text), kind, source, _advise(label, len(text), pages))
+
+
+# ------------------------------------------------------------------------------------------------ plain text inside Markdown
+# PDF and Word text is prose or code, not Markdown. Left alone, `tensor([[1, 2, 3]])` becomes a wiki link to a page called "1, 2, 3",
+# a `# comment` line in a code listing becomes a heading, and `*` starts emphasis. These helpers keep such text literal.
+_INLINE_SPECIAL = re.compile(r"([\\`*\[\]~])")
+_EDGE_UNDERSCORE = re.compile(
+    r"(?<!\w)_|_(?!\w)"
+)  # an underscore inside a word (max_new_tokens) is not emphasis and stays readable
+
+
+def escape_inline(text: str) -> str:
+    """Make characters that would start links, emphasis or code literal."""
+    return _EDGE_UNDERSCORE.sub(r"\\_", _INLINE_SPECIAL.sub(r"\\\1", text))
+
+
+def escape_line(line: str) -> str:
+    """One line of prose or code from a PDF, as literal Markdown text: no headings, lists, quotes or rules from its first characters."""
+    s = escape_inline(line.strip())
+    s = re.sub(r"^(#{1,6})(?=\s|$)", r"\\\1", s)  # heading
+    s = re.sub(r"^>", r"\\>", s)  # quote
+    s = re.sub(r"^([-+])(?=\s|$)", r"\\\1", s)  # bullet
+    s = re.sub(r"^(\d{1,9})([.)])(?=\s|$)", r"\1\\\2", s)  # numbered item
+    s = re.sub(r"^([-=_]{3,})\s*$", lambda m: "\\" + m.group(1), s)  # rule, or the underline of a heading
+    return s
 
 
 # ------------------------------------------------------------------------------------------------ Word
@@ -140,17 +192,17 @@ def docx_to_markdown(data: bytes) -> str:
                 num = None
             m = re.fullmatch(r"heading([1-6])", style)
             if style == "title":
-                lines.append(f"# {text}")
+                lines.append(f"# {escape_inline(text)}")
             elif m:
-                lines.append(f"{'#' * int(m.group(1))} {text}")
+                lines.append(f"{'#' * int(m.group(1))} {escape_inline(text)}")
             elif num is not None or style.startswith("listparagraph"):
                 lvl = 0
                 if num is not None:
                     il = num.find(W + "ilvl")
                     lvl = int(il.get(W + "val") or 0) if il is not None and (il.get(W + "val") or "0").isdigit() else 0
-                lines.append("  " * min(lvl, 6) + f"- {text}")
+                lines.append("  " * min(lvl, 6) + f"- {escape_inline(text)}")
             else:
-                lines.append(text)
+                lines.append("\n".join(escape_line(x) for x in text.split("\n")))
         elif el.tag == W + "tbl":
             rows = [
                 [" ".join(filter(None, (_para_text(p) for p in tc.iter(W + "p")))) for tc in tr.findall(W + "tc")]
@@ -164,7 +216,7 @@ def docx_to_markdown(data: bytes) -> str:
 
 
 # ------------------------------------------------------------------------------------------------ PDF
-def pdf_to_markdown(data: bytes, title: str) -> str:
+def pdf_to_markdown(data: bytes, title: str) -> tuple[str, int]:
     """The text of a PDF that has selectable text, read with `pypdf`. No OCR."""
     try:
         from pypdf import PdfReader
@@ -179,7 +231,7 @@ def pdf_to_markdown(data: bytes, title: str) -> str:
         for i, page in enumerate(reader.pages[:MAX_PDF_PAGES], 1):
             text = (page.extract_text() or "").strip()
             if text:
-                sections.append(f"## Page {i}\n\n{text}")
+                sections.append(f"## Page {i}\n\n" + "\n".join(escape_line(x) for x in text.splitlines()))
     except ImportError_:
         raise
     except Exception as e:  # a damaged or unusual file: say so instead of failing the upload
@@ -190,7 +242,7 @@ def pdf_to_markdown(data: bytes, title: str) -> str:
             "it has no selectable text; it looks like a scanned document, and reading text out of pictures (OCR) is not supported"
         )
     note = f"\n\n_(only the first {MAX_PDF_PAGES} of {n} pages were imported)_" if n > MAX_PDF_PAGES else ""
-    return f"# {title}\n\n{body}{note}\n"
+    return f"# {title}\n\n{body}{note}\n", n
 
 
 # ------------------------------------------------------------------------------------------------ zip (Notion export or any folder of documents)
@@ -288,11 +340,14 @@ def import_zip(name: str, data: bytes) -> tuple[list[Doc], list[Skip]]:
                 text = f"# {_stem(new)}\n\n{table}\n"
             else:
                 text = _rewrite_links(_decode(blob), posixpath.dirname(old), mapping, new)
-            docs.append(Doc(new, _cap(text), kind, f"{name}:{old}"))
+            docs.append(_doc(new, text, kind, f"{name}:{old}", new))
         except (ImportError_, csv.Error) as e:
             skips.append(Skip(f"{name}:{old}", str(e)))
     if not docs and not skips:
         skips.append(Skip(name, "it has no documents (Markdown, text or CSV files) to import"))
+    if len(docs) > LARGE_ZIP_DOCS:  # one warning for the whole zip, carried by its first document
+        note = f"{name} added {len(docs)} pages at once. {_ADVICE.format(n=LARGE_PAGES)} Consider importing only the sections your team uses."
+        docs[0].warning = f"{docs[0].warning} {note}".strip()
     return docs, skips
 
 
@@ -307,26 +362,19 @@ def convert(name: str, data: bytes) -> tuple[list[Doc], list[Skip]]:
         if low.endswith(".zip"):
             return import_zip(base, data)
         if low.endswith(".docx"):
-            return [
-                Doc(f"{_stem(base)}.md", _cap(f"> Imported from {base}\n\n{docx_to_markdown(data)}"), "docx", base)
-            ], []
+            body = docx_to_markdown(data)
+            return [_doc(f"{_stem(base)}.md", f"> Imported from {base}\n\n{body}", "docx", base, base)], []
         if low.endswith(".pdf"):
-            return [
-                Doc(
-                    f"{_stem(base)}.md",
-                    _cap(f"> Imported from {base}\n\n{pdf_to_markdown(data, _stem(base))}"),
-                    "pdf",
-                    base,
-                )
-            ], []
+            body, pages = pdf_to_markdown(data, _stem(base))
+            return [_doc(f"{_stem(base)}.md", f"> Imported from {base}\n\n{body}", "pdf", base, base, pages)], []
         if low.endswith(".csv"):
             table = _table(list(csv.reader(io.StringIO(_decode(data), newline=""))))
             if not table:
                 raise ImportError_("it is empty")
-            return [Doc(f"{_stem(base)}.md", _cap(f"# {_stem(base)}\n\n{table}\n"), "csv", base)], []
+            return [_doc(f"{_stem(base)}.md", f"# {_stem(base)}\n\n{table}\n", "csv", base, base)], []
         if low.endswith(TEXT_EXT):
             return [
-                Doc(_clean_segment(base) if _NOTION_ID.search(base) else base, _cap(_decode(data)), "text", base)
+                _doc(_clean_segment(base) if _NOTION_ID.search(base) else base, _decode(data), "text", base, base)
             ], []
         return [], [Skip(name, f"this file type is not supported (use {', '.join(IMPORT_EXT)})")]
     except (ImportError_, csv.Error) as e:

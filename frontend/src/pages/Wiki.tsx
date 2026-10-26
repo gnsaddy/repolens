@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, BookOpen, Check, FileEdit, Map as MapIcon, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";
 import AnswerFeedback from "@/components/AnswerFeedback";
@@ -8,6 +8,8 @@ import SimilarAnswers from "@/components/SimilarAnswers";
 import { api, type SimilarAnswer, type AskResult, type ConceptDetail, type ConceptRow, type DriftAlertRow, type ProposalDetail, type ProposalRow, type PageInsights, type PageRef, type WikiHealth, type WikiOverview, type WikiPage, type WikiSource, type WikiTreeNode } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { useConfirm, useToast } from "@/components/feedback";
+import SectionNav from "@/components/SectionNav";
+import { PAGED_FROM, VERY_LARGE, splitSections } from "@/lib/sections";
 import Markdown, { slug } from "./wiki/Markdown";
 import Sources from "./wiki/Sources";
 import { AtlasTab, EditButton, NewPageButton, PageEditor, PageSearch } from "./wiki/WikiCore";
@@ -80,8 +82,8 @@ function AtAGlance({ i }: { i: PageInsights }) {
         {!!i.warnings.length && <ul className="space-y-1">{i.warnings.map((w, k) => <li key={k} className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900"><b className="capitalize">{w.level}:</b> {w.text}</li>)}</ul>}
         {!!i.owners.length && <div className="text-xs"><span className="text-muted">Who to ask: </span>{i.owners.map((o) => `${o.who} (${o.role})`).join(", ")}</div>}
         {!!i.commands.length && <div><div className="mb-1 text-xs text-muted">Commands{i.steps ? ` · ${i.steps} steps` : ""}</div><pre className="max-h-32 overflow-auto rounded bg-slate-900 p-2 font-mono text-xs text-slate-100">{i.commands.join("\n")}</pre></div>}
-        {!!i.endpoints.length && <div className="text-xs"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-1.5">{e}</code>)}</div>}
-        {!!i.settings.length && <div className="text-xs"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-1.5">{e}</code>)}</div>}
+        {!!i.endpoints.length && <div className="text-xs"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
+        {!!i.settings.length && <div className="text-xs"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
         {i.last_dated && <div className="text-xs text-muted">Last dated {i.last_dated}</div>}
       </div>
     </Card>
@@ -115,6 +117,14 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
     onError: (e) => toast((e as Error).message, "error"),
   });
   useEffect(() => { if (page.data && anchor) document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [page.data, anchor]);
+  // A long page (a PDF import has one section per page) is read one section at a time instead of all at once.
+  const sections = useMemo(() => splitSections(page.data?.markdown ?? ""), [page.data?.markdown]);
+  const [sec, setSec] = useState(0);
+  const [everything, setEverything] = useState(false);
+  const [allOutline, setAllOutline] = useState(false);
+  useEffect(() => { setSec(0); setEverything(false); setAllOutline(false); }, [repoId, pagePath]);
+  const paged = sections.length > PAGED_FROM && !everything;
+  const showAll = async () => { if (sections.length <= VERY_LARGE || await ask({ title: `Show all ${sections.length} sections at once?`, message: "A page this long can be slow to display and hard to scroll. Reading it one section at a time is easier.", confirmLabel: "Show everything" })) setEverything(true); };
 
   if (!sources.length) return (
     <Card className="mx-auto max-w-2xl text-center">
@@ -143,6 +153,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
       <div className="min-w-0">
         {editing === "new" ? <Card><CardTitle>New page in {current?.name}</CardTitle><PageEditor repoId={repoId!} path={null} onDone={finish} /></Card> : editing === "edit" && p ? <Card><CardTitle>Edit {p.title}</CardTitle><PageEditor repoId={repoId!} path={p.path} onDone={finish} /></Card> : page.isLoading || (!p && !page.error) ? <Spinner /> : page.error ? <ErrorNote error={page.error} /> : p && (
           <Card>
+            <span id="wiki-page-top" />
             <nav aria-label="Breadcrumbs" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted">{p.breadcrumbs.map((b, i) => <span key={i} className="flex items-center gap-1">{i > 0 && <ChevronRight className="h-3 w-3" />}{b.path ? <button className="hover:underline" onClick={() => open(p.repo_id, b.path!)}>{b.title}</button> : b.title}</span>)}</nav>
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone={ORIGIN_TONE[p.source.type] ?? "gray"}>{p.source.type}</Badge>
@@ -158,13 +169,28 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
               {p.source.url && /^https?:\/\//.test(p.source.url) && <a className="inline-flex items-center gap-1 text-brand hover:underline" href={p.source.url} target="_blank" rel="noopener noreferrer">Open original<ExternalLink className="h-3 w-3" /></a>}
             </div>
             {!!p.unresolved_links.length && <p role="alert" className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{p.unresolved_links.length} link(s) on this page point to pages that do not exist: {p.unresolved_links.map((l) => l.link).join(", ")}</p>}
-            <Markdown text={p.markdown} onOpen={open} />
+            {paged ? (<div className="space-y-4">
+              <SectionNav sections={sections} index={Math.min(sec, sections.length - 1)} onIndex={setSec} onAll={showAll} label="Jump to section" />
+              <Markdown key={`${pagePath}:${sec}`} text={sections[Math.min(sec, sections.length - 1)].text} onOpen={open} />
+              <div className="border-t border-line pt-3"><SectionNav sections={sections} index={Math.min(sec, sections.length - 1)} onIndex={(i) => { setSec(i); document.getElementById("wiki-page-top")?.scrollIntoView({ block: "start" }); }} label="Jump to section (bottom)" /></div>
+            </div>) : (<>
+              {sections.length > PAGED_FROM && <p className="mb-3 text-xs text-muted">Showing all {sections.length} sections. <button className="text-brand hover:underline" onClick={() => setEverything(false)}>Read one section at a time</button></p>}
+              <Markdown text={p.markdown} onOpen={open} />
+            </>)}
           </Card>)}
       </div>
       <div className="space-y-3">
         {p && (<>
           {p.insights && <AtAGlance i={p.insights} />}
-          {p.outline.length > 1 && <Card className="p-4"><CardTitle>On this page</CardTitle><ul className="space-y-1 text-xs">{p.outline.map((o, i) => <li key={i}><button className="text-left text-brand hover:underline" onClick={() => document.getElementById(slug(o.title))?.scrollIntoView({ behavior: "smooth" })}>{o.title}</button></li>)}</ul></Card>}
+          {p.outline.length > 1 && (
+            <Card className="p-4" aria-label="On this page"><CardTitle>On this page</CardTitle>
+              <ul className="max-h-80 space-y-1 overflow-auto text-xs">
+                {(paged ? sections.map((x, i) => ({ title: x.title, i })) : p.outline.map((o) => ({ title: o.title, i: -1 }))).slice(0, allOutline ? undefined : 40).map((o, k) => (
+                  <li key={k}><button aria-current={paged && o.i === sec ? "true" : undefined} className={cn("text-left text-brand hover:underline", paged && o.i === sec && "font-semibold")}
+                    onClick={() => (paged && o.i >= 0 ? setSec(o.i) : document.getElementById(slug(o.title))?.scrollIntoView({ behavior: "smooth" }))}>{o.title}</button></li>))}
+              </ul>
+              {(paged ? sections.length : p.outline.length) > 40 && !allOutline && <button className="mt-2 text-xs text-brand hover:underline" onClick={() => setAllOutline(true)}>Show all {paged ? sections.length : p.outline.length}</button>}
+            </Card>)}
           <RefList title="Linked from" items={p.backlinks} open={open} empty="No other page links here." />
           <RefList title="Links to" items={p.links_out} open={open} />
           {!!p.mentions_code.length && (

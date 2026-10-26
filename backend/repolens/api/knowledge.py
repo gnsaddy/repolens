@@ -141,8 +141,12 @@ def import_files(
             clean.append((path, d.content))
             kind_of[path] = (d.source, d.kind)
     changed, redacted = _store(db, p, repo, clean) if clean else (0, 0)
+    warnings = list(dict.fromkeys(d.warning for d in docs if d.warning))[
+        :20
+    ]  # very large documents: worth knowing, never refused
     return {
         "received": len(files),
+        "warnings": warnings,
         "imported": [{"path": path, "source": kind_of[path][0], "kind": kind_of[path][1]} for path, _ in clean],
         "skipped": skipped,
         "changed": changed,

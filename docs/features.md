@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Long pages in the wiki
+
+A wiki page with more than 12 sections (an imported PDF has one per page) opens **one section at a time**, with Previous, Next, a picker and a "Show all N sections" link, instead of loading everything at once. The "On this page" list becomes the list of sections (the first 40, then "Show all"), highlights the one you are on and jumps between them. Showing all of a very large page (over 150 sections) asks first. Shorter pages look exactly as before.
+
 ## Reading a document in the Knowledge page
 
 In Knowledge → Documents, **Read** (or the document's name) opens the document in a reader instead of the small list. The reader has a contents list of its sections (for a PDF, one per page), shows a long document one section at a time with Previous and Next, or all of it together; **Find in this document** lists every section that contains a word with a snippet and jumps to it; **A− / A+** changes the text size (14 to 22 px); **Full screen** gives it the whole window (Esc leaves); **Download** saves the Markdown; and **Open in wiki** goes to the same page in the DeepMind Wiki. How the text was made and searched is described in `docs/architecture.md` ("How a document, such as a PDF, becomes knowledge").
@@ -166,7 +170,7 @@ Knowledge → Documents → **Upload files** accepts, besides Markdown and text 
 * **CSV**: becomes a page with a table (first 300 rows).
 * **PDF**: the text of a PDF that has selectable text, one section per page (read with the `pypdf` library, which is part of the install). **No OCR**: a scanned PDF (pictures of pages) has no text to read, and is skipped with a clear explanation.
 
-Nothing needs a model, and nothing leaves the server. After an upload a short result says how many documents were imported, how many files were skipped, and why. A file that cannot be read never stops the others. Limits: text files 1 MB; Word, PDF, CSV and zip files **25 MB each**; up to 20 files and 100 MB in one upload; a zip up to 1,500 files and 60 MB unpacked; a PDF's first 400 pages.
+Nothing needs a model, and nothing leaves the server. **Large documents get a warning, never a refusal:** a PDF over 100 pages, text of over about 300,000 characters, a zip that adds more than 200 pages, or anything cut at the import limit is imported, and the result explains that long documents add many sections that can crowd search results and the wiki's health counts, and that documents up to about 100 pages work best. After an upload a short result says how many documents were imported, how many files were skipped, and why. A file that cannot be read never stops the others. Limits: text files 1 MB; Word, PDF, CSV and zip files **25 MB each**; up to 20 files and 100 MB in one upload; a zip up to 1,500 files and 60 MB unpacked; a PDF's first 400 pages.
 
 ## Security, FAQ and About pages
 
