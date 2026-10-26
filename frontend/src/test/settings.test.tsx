@@ -163,12 +163,13 @@ describe("GitHub connect", () => {
 
   it("runs the device flow: shows the code, polls, then shows the connected account", async () => {
     let connected = false;
+    let approved = false; // the person approves on github.com only after the code card has been checked
     let polls = 0;
     let started: Record<string, string> | undefined;
     mount("admin", (u, init) => {
       if (u.endsWith("/github/connection") && !init?.method) return json(connected ? { connected: true, api_base: "https://api.github.com", auth_method: "oauth", login: "octo-admin", oauth_client_id: "Iv1.abc" } : { connected: false, api_base: null, oauth_client_id: "Iv1.abc" });
       if (u.endsWith("/github/oauth/device/start")) { started = JSON.parse(init!.body as string); return json({ flow_id: "f1", user_code: "ABCD-1234", verification_uri: "https://github.com/login/device", expires_in: 900, interval: 0 }); }
-      if (u.endsWith("/github/oauth/device/poll")) { polls++; if (polls < 2) return json({ status: "pending", interval: 0 }); connected = true; return json({ status: "success" }); }
+      if (u.endsWith("/github/oauth/device/poll")) { polls++; if (!approved) return json({ status: "pending", interval: 0 }); connected = true; return json({ status: "success" }); }
       return undefined;
     });
     await openGithub();
@@ -177,9 +178,10 @@ describe("GitHub connect", () => {
     expect(await screen.findByLabelText("Device code")).toHaveTextContent("ABCD-1234");
     expect(screen.getByRole("link", { name: /github.com\/login\/device/ })).toHaveAttribute("href", "https://github.com/login/device");
     expect(started).toEqual({ client_id: "Iv1.abc", scope: "repo read:user" });
+    await waitFor(() => expect(polls).toBeGreaterThanOrEqual(2)); // it keeps polling while pending
+    approved = true;
     expect(await screen.findByText(/OAuth · @octo-admin/)).toBeInTheDocument(); // moved to the Connected list
     expect(screen.queryByLabelText("Device code")).not.toBeInTheDocument(); // the card closed itself
-    expect(polls).toBe(2);
   });
 
   it("explains a denied authorisation", async () => {
