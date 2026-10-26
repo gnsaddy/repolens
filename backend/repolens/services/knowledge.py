@@ -15,7 +15,7 @@ from .graph import neighbors, node_dict
 from .links import file_url
 from .llm import LLMClient, LLMUnavailable, describe_failure
 from .llm_router import Task
-from .retrieval import search_chunks
+from .retrieval import Hit, search_chunks
 
 ASK_PROMPT_VERSION = "kb-ask-v2"
 ASK_SYSTEM = (
@@ -117,14 +117,35 @@ def search(
     expand: bool = True,
     scope: Scope | None = None,
 ) -> list[dict]:
-    repos = [
-        r for r in db.scalars(select(Repository).where(Repository.org_id == org)) if scope is None or scope.can(r.id)
-    ]
-    names = {r.id: r.name for r in repos}
-    webs = {r.id: r.web_url for r in repos}
+    names, webs = _repo_maps(db, org, scope)
     hits = search_chunks(db, org, query, repo_ids, k=k * 2 if kinds else k)
     if kinds:  # kinds: any of "doc" | "code" | "pr"
         hits = [h for h in hits if _kind(h.chunk.chunk_type) in kinds][:k]
+    results = _results_from_hits(db, org, hits, names, webs, scope, expand)
+    if expand:
+        results += _graph_expansion(db, org, results, names, webs, limit=max(3, k // 2))
+        if kinds:  # expansion must respect the requested kinds too
+            results = [r for r in results if r["kind"] in kinds]
+    return results
+
+
+def _repo_maps(db: Session, org: str, scope: Scope | None) -> tuple[dict[str, str], dict[str, str]]:
+    """Repository id -> name and -> web address, for the repositories this person may see."""
+    repos = [
+        r for r in db.scalars(select(Repository).where(Repository.org_id == org)) if scope is None or scope.can(r.id)
+    ]
+    return {r.id: r.name for r in repos}, {r.id: r.web_url for r in repos}
+
+
+def _results_from_hits(
+    db: Session,
+    org: str,
+    hits: list[Hit],
+    names: dict[str, str],
+    webs: dict[str, str],
+    scope: Scope | None,
+    expand: bool,
+) -> list[dict]:
     chunks = [h.chunk for h in hits]
     node_of = _nodes_for_chunks(db, org, chunks)
     doc_urls = _doc_urls(db, chunks)
@@ -160,10 +181,6 @@ def search(
                 "via_graph": None,
             }
         )
-    if expand:
-        results += _graph_expansion(db, org, results, names, webs, limit=max(3, k // 2))
-        if kinds:  # expansion must respect the requested kinds too
-            results = [r for r in results if r["kind"] in kinds]
     return results
 
 
@@ -322,15 +339,41 @@ def _variants(words: list[str]) -> str:
     return " ".join(out)
 
 
-def _joined_hits(leg: list[dict], joined: list[str]) -> list[dict]:
-    """From a search for joined names: the chunks whose file or symbol name contains one (up to three), and up to two of
-    their direct neighbours in the code graph (who calls them), which is how the code that uses a helper is found."""
-    direct = [
-        r for r in leg if not r["via_graph"] and any(j in f"{r['file']} {r['symbol'] or ''}".lower() for j in joined)
-    ][:3]
-    ids = {r["node_id"] for r in direct if r["node_id"]}
-    near = [r for r in leg if r["via_graph"] and r["via_graph"].get("from_node_id") in ids][:2]
-    return direct + near
+def _named_leg(
+    db: Session,
+    org: str,
+    joined: list[str],
+    repo_ids: list[str] | None,
+    scope: Scope | None,
+    kinds: list[str] | None,
+    question: str,
+) -> list[dict]:
+    """The chunks whose file path or symbol name contains a joined name (up to three, the ones that say most about
+    the question first), and up to two of their direct neighbours in the code graph (who calls them). Taken from the
+    index by name, so it does not depend on how a search ranks them: code that never writes the word is still found."""
+    like = [or_(CodeChunk.file_path.ilike(f"%{j}%"), CodeChunk.symbol_name.ilike(f"%{j}%")) for j in joined]
+    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type.notin_(("routes", "pr")), or_(*like))
+    if repo_ids:
+        stmt = stmt.where(CodeChunk.repo_id.in_(repo_ids))
+    rows = [
+        c
+        for c in db.scalars(stmt.order_by(CodeChunk.file_path, CodeChunk.start_line).limit(80))
+        if (scope is None or scope.can(c.repo_id)) and (not kinds or _kind(c.chunk_type) in kinds)
+    ]
+    want = walkthrough.key_words(question)
+    rows.sort(
+        key=lambda c: (
+            -len(want & walkthrough._tokens(c.content)),
+            c.chunk_type not in ("function", "class", "method"),
+            c.file_path,
+            c.start_line,
+        )
+    )
+    if not rows:
+        return []
+    names, webs = _repo_maps(db, org, scope)
+    direct = _results_from_hits(db, org, [Hit(c, 1.0, symbol_match=True) for c in rows[:3]], names, webs, scope, True)
+    return direct + _graph_expansion(db, org, direct, names, webs, limit=2)
 
 
 def _with_joined(results: list[dict], extra: list[dict], limit: int) -> list[dict]:
@@ -360,11 +403,10 @@ def _retrieve_once(
 ) -> list[dict]:
     results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
     # code often writes two words as one ('rate limiting' -> ratelimit.py), which a search on the words never finds:
-    # search the joined names that exist in the index on their own, so prose that spells it out cannot drown them
+    # take the chunks those names point at straight from the index, so prose that spells it out cannot drown them
     joined = walkthrough.joined_terms(db, org, route_query)
     if joined:
-        leg = search(db, org, " ".join(joined), repo_ids, k=30, kinds=kinds, scope=scope)
-        results = _with_joined(results, _joined_hits(leg, joined), k + 4)
+        results = _with_joined(results, _named_leg(db, org, joined, repo_ids, scope, kinds, route_query), k + 4)
     if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
         results = walkthrough.merge(results, walkthrough.route_sources(db, org, route_query, repo_ids, scope), k)
     return results
