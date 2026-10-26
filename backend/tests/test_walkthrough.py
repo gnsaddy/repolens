@@ -228,3 +228,47 @@ def test_the_right_route_is_found_among_many_that_share_a_word(client, auth, tmp
     got = wt.route_sources(session, org, "How does the user endpoint assign roles?", None, None)
     assert "POST /api/auth/users" in [r["title"] for r in got]
     assert any(t["title"].startswith("authorize (called by create_user)") for t in got)
+
+
+def test_tied_routes_in_one_file_do_not_crowd_out_the_route_in_another(client, auth, tmp_path, session):
+    """Routes in a protocol module (SCIM) can tie with the main API on score; one file must not take every slot."""
+    from repolens.models import Organization
+
+    scim = 'from fastapi import APIRouter\nrouter = APIRouter(prefix="/scim/v2")\n' + "\n".join(
+        f'@router.{verb}("/Users{extra}")\ndef {name}(body, p):\n    role = body.role\n    return role\n'
+        for verb, extra, name in (
+            ("post", "", "create_user"),
+            ("put", "/{uid}", "replace_user"),
+            ("patch", "/{uid}", "patch_user"),
+        )
+    )
+    d = tmp_path / "tied"
+    d.mkdir()
+    (d / "a_scim.py").write_text(scim)  # sorts first, so it used to win every tie
+    (d / "z_auth.py").write_text(API)
+    (d / "policy.py").write_text(POLICY)
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]):
+        subprocess.run(["git", "-C", str(d), *cmd], check=True)
+    add_repo(client, auth, str(d), name="tied")
+    org = session.query(Organization).first().id
+    got = wt.route_sources(session, org, "How does the user endpoint assign roles?", None, None)
+    routes = [r["title"] for r in got if r["via_graph"] == "route"]
+    assert "POST /api/auth/users" in routes
+    assert len({r["file"] for r in got if r["via_graph"] == "route"}) > 1
+    assert any(t["title"].startswith("authorize (called by create_user)") for t in got)
+
+
+def test_spread_takes_one_per_file_then_the_best_of_the_rest():
+    class C:
+        def __init__(self, f):
+            self.repo_id, self.file_path = "r", f
+
+    items = [
+        (4, 0, None, C("a"), None),
+        (4, 0, None, C("a"), None),
+        (4, 0, None, C("a"), None),
+        (4, 0, None, C("b"), None),
+    ]
+    assert [i[3].file_path for i in wt._spread(items, 3)] == ["a", "a", "b"]
+    assert [i[3].file_path for i in wt._spread(items, 2)] == ["a", "b"]
+    assert len(wt._spread(items[:1], 3)) == 1

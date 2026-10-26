@@ -176,11 +176,13 @@ def route_sources(db: Session, org: str, question: str, repo_ids: list[str] | No
     for hits, r, c in cands:
         h = handlers.get((c.repo_id, c.file_path, r.handler)) if r.handler else None
         body = len(want & _tokens(h.content)) if h else 0
-        scored.append((2 * hits + body, r, c, h))
-    scored.sort(key=lambda x: -x[0])
+        scored.append((2 * hits + body, _mentions(want, h.content) if h else 0, r, c, h))
+    # Equal scores are common (several routes share the word and one body word), so the handler that mentions the topic
+    # most often goes first, and the top slots are spread over files so one module of near-identical routes cannot fill them.
+    scored.sort(key=lambda x: (-x[0], -x[1]))
     out: list[dict] = []
     seen: set[str] = set()
-    for _score, r, c, h in scored[:MAX_ROUTES]:
+    for _score, _mentioned, r, c, h in _spread(scored, MAX_ROUTES):
         repo = names.get(c.repo_id, "")
         out.append(
             _result(
@@ -199,6 +201,31 @@ def route_sources(db: Session, org: str, question: str, repo_ids: list[str] | No
         out.append(_result(h, repo, f"{h.symbol_name} (handler for {r.method} {r.path})", "handler"))
         out += _callees(db, h, repo, want, seen)
     return out
+
+
+def _mentions(want: frozenset[str], text: str) -> int:
+    """How many times the text uses any of the wanted words (same splitting and stemming as `_tokens`)."""
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    return sum(1 for w in re.findall(r"[A-Za-z]{3,}", spaced) if stem(w) in want)
+
+
+def _spread(scored: list, limit: int) -> list:
+    """The best `limit` entries, taking at most one per file first and then the best of the rest, in score order."""
+    picked: list[int] = []
+    files: set[tuple[str, str]] = set()
+    for i, item in enumerate(scored):
+        key = (item[3].repo_id, item[3].file_path)
+        if key not in files:
+            files.add(key)
+            picked.append(i)
+        if len(picked) >= limit:
+            break
+    for i in range(len(scored)):
+        if len(picked) >= limit:
+            break
+        if i not in picked:
+            picked.append(i)
+    return [scored[i] for i in sorted(picked)]
 
 
 def _callees(db: Session, handler: CodeChunk, repo: str, want: frozenset[str], seen: set[str]) -> list[dict]:
