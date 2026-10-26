@@ -299,15 +299,16 @@ def ask(
 ) -> dict:
     llm = LLMClient(db, org, "knowledge", "")
     failure = ""
-    explain = walkthrough.is_explain(query)
-    mem_key = answer_memory.scope_key(scope, repo_ids, kinds) + ("|walkthrough" if explain else "")
+    kind = walkthrough.task_kind(query)
+    mem_key = answer_memory.scope_key(scope, repo_ids, kinds)
     fp = answer_memory.fingerprint(db, org, scope, repo_ids)
-    if not llm.offline and not fresh:
+    reuse = kind != "build"  # something written to order is made for this request, never replayed from memory
+    if not llm.offline and not fresh and reuse:
         hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
         if hit:
             return {**hit, "query": query, "mode": "llm", "cached": True}
     results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
-    if explain and not kinds:  # a how/why question needs the route, its handler and what the handler calls
+    if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
         results = walkthrough.merge(results, walkthrough.route_sources(db, org, query, repo_ids, scope), k)
     sources = sources_from(results)
     connections = connections_from(results)
@@ -323,14 +324,14 @@ def ask(
             )
             + f"\n\nQUESTION: {query[:2000]}"
         )
-        system = ASK_SYSTEM.replace(" Be concise.", "") + walkthrough.WALKTHROUGH if explain else ASK_SYSTEM
+        system = (ASK_SYSTEM.replace(" Be concise.", "") + walkthrough.addon(kind)) if kind != "lookup" else ASK_SYSTEM
         key = hashlib.sha256(
             json.dumps(
                 [ASK_PROMPT_VERSION, llm.cache_id, hashlib.sha256((system + prompt).encode()).hexdigest()]
             ).encode()
         ).hexdigest()
         cached = db.get(CacheEntry, key)
-        if cached and not fresh:
+        if cached and not fresh and reuse:
             usage.record_event(
                 db,
                 org,
@@ -360,7 +361,7 @@ def ask(
                 "librarian",
                 system,
                 prompt,
-                max_tokens=walkthrough.MAX_TOKENS_WALKTHROUGH if explain else 900,
+                max_tokens=walkthrough.max_tokens(kind, 900),
                 task=task,
                 validate=_grounded,
             )
@@ -379,16 +380,17 @@ def ask(
             out = {**base, "answer": res.text, "mode": "llm", "cached": False, "unknown_citations": unknown}
             if res.route:
                 out["route"] = res.route
-            answer_memory.remember(
-                db,
-                org,
-                "ask",
-                query,
-                mem_key,
-                fp,
-                {k: out[k] for k in ("answer", "sources", "connections", "unknown_citations")},
-                res.input_tokens + res.output_tokens,
-            )
+            if reuse:
+                answer_memory.remember(
+                    db,
+                    org,
+                    "ask",
+                    query,
+                    mem_key,
+                    fp,
+                    {k: out[k] for k in ("answer", "sources", "connections", "unknown_citations")},
+                    res.input_tokens + res.output_tokens,
+                )
             return out
         except LLMUnavailable:
             pass

@@ -661,11 +661,18 @@ def health(
 
 @router.post("/ask")
 def ask(body: WikiAskIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    """Ask the wiki: answers come from documentation first (cited), with the code they connect to listed alongside."""
+    """Ask the wiki: documents and code by default, as everywhere else. `docs_only` limits it to documents."""
     scope = scope_for(db, p)
     ids = scope.resolve(body.repo_ids)
     return kb.ask(
-        db, p.org_id, body.query, ids or None, k=min(body.k, 10), scope=scope, kinds=["doc"], fresh=body.fresh
+        db,
+        p.org_id,
+        body.query,
+        ids or None,
+        k=min(body.k, 10),
+        scope=scope,
+        kinds=["doc"] if body.docs_only else None,
+        fresh=body.fresh,
     )
 
 
@@ -750,4 +757,6 @@ def similar_questions(body: WikiAskIn, p: Principal = Depends(current_principal)
     """Questions already answered that are close to this one (free, nothing is sent to a model)."""
     scope = scope_for(db, p)
     ids = scope.resolve(body.repo_ids)
-    return answer_memory.suggest(db, p.org_id, "ask", body.query, scope, ids or None, ["doc"])
+    return answer_memory.suggest(
+        db, p.org_id, "ask", body.query, scope, ids or None, ["doc"] if body.docs_only else None
+    )

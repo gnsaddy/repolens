@@ -133,12 +133,17 @@ def test_similar_questions_are_suggested_before_the_model_answers(client, auth, 
         client.post("/api/wiki/similar", headers=auth, json={"query": "kubernetes ingress certificate rotation"}).json()
         == []
     )
+    assert client.post(  # the wiki and the Knowledge page now search the same sources, so they share what was answered
+        "/api/knowledge/similar", headers=auth, json={"query": "payment service retry failed requests"}
+    ).json()
     assert (
         client.post(
-            "/api/knowledge/similar", headers=auth, json={"query": "payment service retry failed requests"}
+            "/api/wiki/similar",
+            headers=auth,
+            json={"query": "payment service retry failed requests", "docs_only": True},
         ).json()
         == []
-    )  # kind=docs vs all sources are separate
+    )  # documents-only answers are kept apart from answers that also drew on code
     assert (
         client.post(
             "/api/wiki/similar", headers=register(client, "q@other.io", "Q"), json={"query": "payment service retry"}

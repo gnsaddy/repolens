@@ -426,6 +426,7 @@ class WikiAskIn(BaseModel):
     repo_ids: list[str] = Field(default_factory=list, max_length=100)
     k: int = Field(default=8, ge=1, le=10)
     fresh: bool = False
+    docs_only: bool = False  # off: documents and code, like the other places you can ask
 
 
 class InviteIn(BaseModel):

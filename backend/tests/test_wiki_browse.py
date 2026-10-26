@@ -216,7 +216,7 @@ def test_wiki_ask_answers_from_docs_with_citations_and_code_connections(client, 
     r = client.post(
         "/api/wiki/ask",
         headers=auth,
-        json={"query": "What should I do when deleted users get HTTP 500 on the profile endpoint?"},
+        json={"query": "What should I do when deleted users get HTTP 500 on the profile endpoint?", "docs_only": True},
     ).json()
     assert r["mode"] == "extractive" and r["sources"] and all(s["kind"] == "doc" for s in r["sources"])
     assert any(

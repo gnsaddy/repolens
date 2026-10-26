@@ -50,9 +50,12 @@ def _similarity(qv: list[float], qw: frozenset[str], row: AnswerMemory) -> tuple
     return cos, jac
 
 
+PIPELINE = "p2"  # bump when answers are produced differently, so older ones are never replayed or suggested
+
+
 def scope_key(scope: Scope | None, repo_ids: list[str] | None, kinds: list[str] | None) -> str:
     seen = None if scope is None or scope.allowed is None else sorted(scope.allowed)
-    raw = json.dumps([seen, sorted(repo_ids or []), sorted(kinds or [])])
+    raw = json.dumps([PIPELINE, seen, sorted(repo_ids or []), sorted(kinds or [])])
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 

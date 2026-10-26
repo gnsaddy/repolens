@@ -44,7 +44,8 @@ CHAT_SYSTEM = (
 )
 FALLBACK_RULE = (
     " If the sources do not cover the question you may answer from general knowledge, but begin that part with "
-    "'Not from your documents:' and keep it short."
+    "'Not from your documents:' and keep it short. Any code you write from general knowledge must also be labelled "
+    "'Illustrative, not from your repository' and must not invent modules, functions or settings that the sources do not show."
 )
 
 
@@ -193,9 +194,9 @@ def _answer(
             return listed
     asked = [m.content for m in before if m.role == "user"]
     query = retrieval_query(question, attachment.text if attachment else "", asked)
-    explain = walkthrough.is_explain(question) and not attachment
+    kind = "lookup" if attachment else walkthrough.task_kind(question)
     results = kb.search(db, org, query, ids, k=8, scope=scope)[:11]
-    if explain:  # a how/why question needs the route, its handler and what the handler calls, not just similar text
+    if walkthrough.needs_path(kind):  # the route, its handler and what the handler calls, not just similar text
         results = walkthrough.merge(results, walkthrough.route_sources(db, org, question, ids, scope), 8)
     sources = kb.sources_from(results)
     connections = kb.connections_from(results)
@@ -237,7 +238,7 @@ def _answer(
         try:
             res = llm.complete(
                 "librarian",
-                CHAT_SYSTEM + (FALLBACK_RULE if thread.fallback else "") + (walkthrough.WALKTHROUGH if explain else ""),
+                CHAT_SYSTEM + (FALLBACK_RULE if thread.fallback else "") + walkthrough.addon(kind),
                 prompt,
                 max_tokens=4000,
                 task=task,

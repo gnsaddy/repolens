@@ -9,6 +9,7 @@ import StartHere from "@/components/StartHere";
 import { IMPORT_ACCEPT, MAX_IMPORT_BYTES, MAX_IMPORT_TOTAL, MAX_TEXT_BYTES, needsImport, summarize, type ImportResult } from "@/lib/importFiles";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
 import AnswerFeedback from "@/components/AnswerFeedback";
+import Markdown from "./wiki/Markdown";
 import MemoryBrowser from "@/components/MemoryBrowser";
 import SimilarAnswers from "@/components/SimilarAnswers";
 import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphReport, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type MemoryStats, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
@@ -98,7 +99,7 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
             <Badge tone={a.mode === "llm" ? "brand" : a.mode === "failed" ? "red" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "failed" ? "AI unavailable" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
             {a.memory ? <Badge tone="green" title={`Matched an earlier question: "${a.memory.asked}"`}>From memory · saved ~{a.memory.tokens_saved.toLocaleString()} tokens</Badge> : a.cached && <Badge tone="green">cached</Badge>}
             {a.route && <Badge tone="gray" title={a.route.why}>{a.route.model}</Badge>}</div>}>Answer</CardTitle>
-          <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
+          <div className="text-sm leading-6"><Markdown text={a.answer} onOpen={() => {}} /></div>
           <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
           {(a.memory || a.cached) && <button type="button" className="mt-2 text-xs text-brand hover:underline" disabled={ask.isPending} onClick={() => ask.mutate(true)}>Answer again with the model</button>}
           {!!a.unknown_citations?.length && <p className="mt-2 text-xs text-amber-700">The model cited unknown sources ({a.unknown_citations.join(", ")}) — treat those claims as unverified.</p>}

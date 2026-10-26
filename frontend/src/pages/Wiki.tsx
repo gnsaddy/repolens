@@ -208,7 +208,8 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
 // ------------------------------------------------------------------------------------------------ ask
 function AskWiki({ open }: { open: Open }) {
   const [q, setQ] = useState("");
-  const ask = useMutation({ mutationFn: () => api<AskResult>("/wiki/ask", { method: "POST", json: { query: q } }) });
+  const [docsOnly, setDocsOnly] = useState(false);
+  const ask = useMutation({ mutationFn: () => api<AskResult>("/wiki/ask", { method: "POST", json: { query: q, docs_only: docsOnly } }) });
   const similar = useMutation({ mutationFn: () => api<SimilarAnswer[]>("/wiki/similar", { method: "POST", json: { query: q } }) });
   const submit = (e: FormEvent) => { e.preventDefault(); if (q.trim().length > 1) { similar.reset(); similar.mutate(); ask.mutate(); } };
   const a = ask.data;
@@ -216,11 +217,12 @@ function AskWiki({ open }: { open: Open }) {
     <div className="space-y-4">
       <form onSubmit={submit} className="flex gap-2"><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the wiki — e.g. What do we do when the profile endpoint returns 500?" aria-label="Question" />
         <Button disabled={ask.isPending}><Sparkles className="h-4 w-4" />Ask</Button></form>
+      <label className="flex items-center gap-2 text-xs text-muted"><input type="checkbox" checked={docsOnly} onChange={(e) => setDocsOnly(e.target.checked)} />Documents only (leave off to include code)</label>
       <ErrorNote error={ask.error} />
       <SimilarAnswers items={similar.data} />
       {a && (<>
         <Card><CardTitle right={<Badge tone={a.mode === "llm" ? "brand" : a.mode === "failed" ? "red" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "failed" ? "AI unavailable" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>}>Answer</CardTitle>
-          <p className="whitespace-pre-wrap text-sm leading-6">{a.answer}</p>
+          <div className="text-sm leading-6"><Markdown text={a.answer} onOpen={open} /></div>
           <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
           {!!a.connections.length && <div className="mt-4 border-t border-line pt-3 text-xs"><div className="mb-1 font-medium text-muted">Connected code and pages</div>
             <ul className="space-y-0.5">{a.connections.slice(0, 6).map((c, i) => <li key={i}><b>{c.from}</b> <span className="text-muted">{c.label}</span> <code>{c.to}</code></li>)}</ul></div>}

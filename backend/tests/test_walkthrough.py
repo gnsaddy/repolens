@@ -144,3 +144,66 @@ def test_the_knowledge_box_names_a_model_failure_instead_of_showing_loose_passag
     r = client.post("/api/knowledge/ask", headers=auth, json={"query": "Where is authorize defined?"}).json()
     assert r["mode"] == "failed" and r["answer"].startswith("**The AI model could not answer.**")
     assert "limiting requests" in r["answer"]
+
+
+@pytest.mark.parametrize(
+    "q,failure",
+    [
+        ("Write an API for the repolens to list the admin users?", False),
+        ("Explain how user roles are assigned", False),
+        ("KeyError: 'name' in rows", True),
+        ("Profile page returns 500 for deleted users", True),
+        ("How does the login flow work and why does it fail for SSO users?", True),
+        ("deleted users profile blank", True),  # not clearly a request: investigate
+    ],
+)
+def test_only_requests_that_describe_no_failure_are_not_investigated(q, failure):
+    from repolens.agents.workflow import is_failure_report
+
+    assert is_failure_report(q, False) is failure
+
+
+def test_a_feature_request_gets_no_root_cause_and_low_confidence(client, auth, svc):
+    inv = client.post(
+        "/api/investigations",
+        headers=auth,
+        json={"query": "Write an API to list the admin users", "repo_ids": [svc["id"]]},
+    ).json()
+    got = client.get(f"/api/investigations/{inv['id']}", headers=auth).json()
+    assert got["status"] == "completed"
+    assert "not a failure to investigate" in got["root_cause"]
+    assert got["confidence"] <= 0.2 and all(h["status"] == "unverified" for h in got["hypotheses"])
+    assert "Use Ask" in got["report_md"] or "Open Ask" in got["report_md"]
+
+
+def test_a_build_request_is_grounded_in_the_existing_route_and_never_replayed_from_memory(
+    client, auth, svc, monkeypatch
+):
+    spy = Spy().install(monkeypatch)
+    q = {"query": "Write an API to list the admin users"}
+    client.post("/api/knowledge/ask", headers=auth, json=q)
+    client.post("/api/knowledge/ask", headers=auth, json=q)
+    assert len(spy.calls) == 2  # asked twice, answered twice: written to order, not replayed
+    assert "Illustrative, not from your repository" in spy.calls[0]["system"]
+    assert "use only modules, functions and settings that appear there" in spy.calls[0]["system"]
+    assert "GET /api/auth/users" in spy.calls[0]["prompt"] and "create_user" in spy.calls[0]["prompt"]
+    assert spy.calls[0]["max_tokens"] == wt.MAX_TOKENS_BUILD
+
+
+def test_wiki_ask_includes_code_unless_asked_for_documents_only(client, auth, svc, monkeypatch):
+    spy = Spy().install(monkeypatch)
+    body = {"query": "How does the user endpoint assign roles?"}
+    r = client.post("/api/wiki/ask", headers=auth, json=body).json()
+    assert "auth.py" in {s["file"] for s in r["sources"]}
+    r = client.post("/api/wiki/ask", headers=auth, json={**body, "docs_only": True}).json()
+    assert all(s["kind"] == "doc" for s in r["sources"])
+    _ = spy
+
+
+def test_task_types():
+    assert wt.task_kind("Write an API for the repolens to list the admin users?") == "build"
+    assert wt.task_kind("Please create a runbook for restores") == "build"
+    assert wt.task_kind("How does the user endpoint assign roles?") == "explain"
+    assert wt.task_kind("How many times does it retry?") == "lookup"
+    assert wt.task_kind("Where is the retry policy documented?") == "lookup"
+    assert wt.task_kind("How does the system add roles?") == "explain"  # 'add' mid-sentence is not an instruction

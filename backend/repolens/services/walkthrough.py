@@ -31,7 +31,8 @@ STOP = frozenset(
 )
 GENERIC = frozenset(
     "list lists enumerate show give all every each complete which endpoint endpoints route routes api apis url urls "
-    "flowchart explain describe please found many work works working process step steps flow code function".split()
+    "flowchart explain describe please found many work works working process step steps flow code function "
+    "write create add implement build generate draft develop make".split()
 )
 MAX_ROUTES = 3
 MAX_CALLEES = 2
@@ -43,6 +44,40 @@ WALKTHROUGH = (
     "'Not covered by your sources' list for anything you could not find. Do not invent steps. Use Markdown."
 )
 MAX_TOKENS_WALKTHROUGH = 2500
+
+
+BUILD = re.compile(
+    r"(^|[.?!:]\s*|\b(please|can you|could you|let'?s|ok|okay|now)\W+)(write|create|add|implement|build|generate|draft|develop|make)\b",
+    re.I,
+)
+BUILD_ADDON = (
+    " The person wants something written (code, a document or a plan). Base it on the conventions, names and imports shown in "
+    "the SOURCES, and use only modules, functions and settings that appear there. If something you need is not shown, say "
+    "so and mark that part as an assumption instead of inventing it. Anything you write from general knowledge, not from the "
+    "sources, must be labelled 'Illustrative, not from your repository'. Say first whether the sources already contain "
+    "something that does what is asked, and cite it."
+)
+MAX_TOKENS_BUILD = 3000
+
+
+def task_kind(question: str) -> str:
+    """'build' (write or create something), 'explain' (how or why), or 'lookup' (find a fact)."""
+    if BUILD.search(question) and not LOOKUP.search(question):
+        return "build"
+    return "explain" if is_explain(question) else "lookup"
+
+
+def addon(kind: str) -> str:
+    return {"explain": WALKTHROUGH, "build": BUILD_ADDON}.get(kind, "")
+
+
+def max_tokens(kind: str, default: int) -> int:
+    return {"explain": MAX_TOKENS_WALKTHROUGH, "build": MAX_TOKENS_BUILD}.get(kind, default)
+
+
+def needs_path(kind: str) -> bool:
+    """Questions that need the route, its handler and what it calls, not just similar text."""
+    return kind in ("explain", "build")
 
 
 def is_explain(question: str) -> bool:

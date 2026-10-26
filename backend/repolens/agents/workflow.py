@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import CacheEntry, Change, CodeChunk, PullRequest, Repository
-from ..services import cause_hints, llm_router, retrieval, usage
+from ..services import cause_hints, llm_router, retrieval, usage, walkthrough
 from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
@@ -440,6 +440,31 @@ def build_graph(ctx: Ctx):
                 },
                 "no evidence to synthesize",
             )
+        if not is_failure_report(state["query"], bool(state.get("stack_refs"))):
+            capped = [
+                {
+                    **h,
+                    "confidence": min(h["confidence"], REQUEST_CONFIDENCE),
+                    "status": "unverified",
+                    "not_a_failure": True,
+                }
+                for h in hyps
+            ]
+            return (
+                {
+                    "hypotheses": capped,
+                    "narrative": {
+                        "root_cause": "This reads as a request to explain or build something, not a failure to investigate, "
+                        "so there is no root cause to find.",
+                        "explanation": "No error, failure or unexpected behaviour is described. The code below only matches "
+                        "the words of the request. Use Ask for explanations and for writing code or documents.",
+                        "suggested_fix": "Open Ask and put the same question there. If something is actually failing, "
+                        "add what happens, what you expected, and any error text.",
+                    },
+                    "llm_used": False,
+                },
+                "not a failure report: no root cause claimed",
+            )
         top = hyps[0]
         deterministic = _deterministic_narrative(top, state["query"], hyps)
         if ctx.llm.offline:
@@ -601,7 +626,7 @@ def build_graph(ctx: Ctx):
             h["evidence"] = keep
             has_code = any(e["type"] == "code" for e in keep)
             strong = has_code and any(e["type"] == "commit" for e in keep) or "stack trace" in h["explanation"]
-            h["status"] = "supported" if strong else "unverified"
+            h["status"] = "supported" if strong and not h.get("not_a_failure") else "unverified"
         v = {
             "review": state.get("review", {}),
             "checked_evidence": checked,
@@ -925,6 +950,22 @@ def reconcile(top: dict, data: dict) -> dict:
         "assumptions": clean(data.get("assumptions"), 3),
         "check": str(data.get("check", ""))[:300],
     }
+
+
+REQUEST_CONFIDENCE = 0.2  # matching words is not evidence of a cause
+FAILURE = re.compile(
+    r"\b(errors?|exceptions?|fail(s|ed|ing|ure|ures)?|crash(es|ed|ing)?|bugs?|broken|not working|doesn'?t work|does not work|"
+    r"wrong|incorrect|unexpected|regress(ion|ed)|time(d)? ?out|traceback|stack ?trace|panic|denied|refused|hangs?|stuck|"
+    r"slow|leak|missing|null|undefined|\b[45]\d\d\b|cannot|can'?t|unable|invalid)\b",
+    re.I,
+)
+
+
+def is_failure_report(query: str, has_trace: bool) -> bool:
+    """False only when the text asks for something to be explained or written and describes nothing going wrong."""
+    if has_trace or FAILURE.search(query):
+        return True
+    return walkthrough.task_kind(query) == "lookup"
 
 
 def red_flags(state: State) -> list[str]:
