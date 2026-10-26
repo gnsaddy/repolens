@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Sign-in page
+
+Beside the sign-in form, a panel says what RepoLens does (ask with citations, catch stale pages, see how things connect, find a root cause) and why it can be trusted: data stays on your server, people approve outward actions, access controls and an audit log, secrets masked, open source with no phone-home, and a plain statement that this is a beta without an independent audit or certification. It links to `SECURITY.md` and the source. A small flowing-graph illustration uses the same motion as the graph page and stops for people who ask their system for less motion. On narrow screens a one-line version sits under the form. `SECURITY.md` lists where each claim is backed.
+
 ## Graph trust, areas and Start here
 
 Every connection in the graph says how far it can be trusted: **fact** (found directly in the code, a document link, git or GitHub), **inferred** (guessed from shared words or meaning) or **uncertain** (a weak guess). The graph draws facts solid, inferred links dashed and uncertain ones dotted, and **Facts only** hides the rest. **Colour by → Area** groups nodes into communities, the parts of a repository that hang together (found from the connections themselves, without a model).

@@ -1,7 +1,7 @@
-import { APP_VERSION } from "@/lib/version";
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import Logo from "@/components/Logo";
+import LoginShowcase, { TrustNote } from "@/components/LoginShowcase";
 import { Button, Card, ErrorNote, Input, Label } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -39,15 +39,9 @@ export default function Login() {
   }
   return (
     <div className="grid min-h-screen bg-sidebar lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      <aside className="hidden flex-col justify-center gap-6 p-14 text-slate-300 lg:flex" aria-label="About RepoLens AI">
-        <div className="flex items-center gap-2 text-white"><Logo className="h-9 w-9" /><span className="text-xl font-semibold">RepoLens AI</span><span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-slate-300">{APP_VERSION}</span></div>
-        <h2 className="max-w-md text-3xl font-semibold leading-tight text-white">Answers from your docs, pull requests and code, with the cost kept low.</h2>
-        <ul className="max-w-md space-y-3 text-sm">
-          {[["DeepMind Wiki", "One connected knowledge base over READMEs, Confluence and your code."], ["Root-cause investigations", "From a Jira ticket or CI failure to a cited, reviewable report."], ["Fewer tokens", "Cheap models for easy work, shared context and remembered answers."]].map(([t, d]) => (
-            <li key={t}><b className="text-white">{t}.</b> {d}</li>))}
-        </ul>
-      </aside>
+      <LoginShowcase />
       <div className="grid place-items-center p-4">
+      <div className="w-full max-w-sm">
       <Card className="w-full max-w-sm">
         <div className="mb-5 flex items-center gap-2"><Logo className="h-7 w-7" /><span className="font-semibold">RepoLens AI</span></div>
         <h1 className="mb-4 text-lg font-semibold">{mode === "login" ? "Sign in" : "Create your workspace"}</h1>
@@ -68,6 +62,8 @@ export default function Login() {
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}
         </button>
       </Card>
+      <TrustNote />
+      </div>
       </div>
     </div>
   );

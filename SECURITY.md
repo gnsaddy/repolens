@@ -74,3 +74,16 @@ absence of raw HTML rendering to stay out of reach of injected scripts (an HttpO
 of CSRF handling); tokens issued before server-side sessions existed cannot be revoked individually (they expire); remembered answers are stored in the database unencrypted (redacted and
 access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
 once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).
+
+## What the sign-in page claims, and what backs it
+
+The sign-in page tells people why they can trust the product. Each statement there must stay true; change the page and this table together.
+
+| Claim on the page | Where it is true |
+|---|---|
+| Your data stays on your server; no AI service is contacted unless you connect one | Bring-your-own-model design; the default `heuristic` model and local hash embedder call no service. Settings → AI & search → "What leaves this server" lists every destination (`services/outbound.py`, `tests/test_outbound.py`) |
+| People decide, not the AI | Fixes are drafts until approved and become a *draft* pull request (`services/fixes.py`); reports and wiki edits go through proposals; RepoLens never merges |
+| Roles, per-repository access, authenticator-app sign-in, single sign-on, audit log | `services/policy.py`, `services/access.py`, `services/account_mfa.py`, `api/sso.py`, `api/audit.py`; `tests/test_security_edge.py` fails the build if an endpoint skips authorisation |
+| Secrets are masked before indexing or sending to a model | `security.redact_secrets` and `redact_stored`; `tests/test_injection.py` checks a planted key never reaches a prompt |
+| Open source, Apache 2.0, no usage data sent to the authors | `LICENSE`; the only outbound destinations are ones an administrator configures (see the table in the README's security section and `services/outbound.py`) |
+| Honest limits: no independent audit, no compliance certification | True today. Do not add certification names to the page until an audit exists |
