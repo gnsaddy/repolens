@@ -153,6 +153,10 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Reading a document in the Knowledge page
+
+In Knowledge → Documents, **Read** (or the document's name) opens the document in a reader instead of the small list. The reader has a contents list of its sections (for a PDF, one per page), shows a long document one section at a time with Previous and Next, or all of it together; **Find in this document** lists every section that contains a word with a snippet and jumps to it; **A− / A+** changes the text size (14 to 22 px); **Full screen** gives it the whole window (Esc leaves); **Download** saves the Markdown; and **Open in wiki** goes to the same page in the DeepMind Wiki. How the text was made and searched is described in `docs/architecture.md` ("How a document, such as a PDF, becomes knowledge").
+
 ## Importing documents from your laptop
 
 Knowledge → Documents → **Upload files** accepts, besides Markdown and text (`.md .mdx .rst .txt .adoc`):

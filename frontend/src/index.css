@@ -69,3 +69,8 @@ body { @apply bg-canvas text-ink antialiased; }
 @keyframes rl-flow { to { stroke-dashoffset: -28; } }
 .rl-flow { animation: rl-flow 0.9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .rl-flow { animation: none; } }
+
+/* Reading a document: the text size is the reader's choice */
+.reader .prose-wiki { font-size: var(--reader-size, 16px); line-height: 1.75; }
+.reader .prose-wiki h1 { font-size: 1.6em; } .reader .prose-wiki h2 { font-size: 1.3em; } .reader .prose-wiki h3 { font-size: 1.1em; }
+.reader .prose-wiki code, .reader .prose-wiki pre { font-size: 0.85em; }

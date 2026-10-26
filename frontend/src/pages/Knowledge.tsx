@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { communityColor, HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
+import DocumentReader from "@/components/DocumentReader";
 import StartHere from "@/components/StartHere";
 import { IMPORT_ACCEPT, MAX_IMPORT_BYTES, MAX_IMPORT_TOTAL, MAX_TEXT_BYTES, needsImport, summarize, type ImportResult } from "@/lib/importFiles";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
@@ -308,6 +309,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
   const upload = useMutation({ mutationFn: (documents: { path: string; content: string }[]) => api(`/knowledge/collections/${active!.id}/documents`, { method: "POST", json: { documents } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["repos"] }); qc.invalidateQueries({ queryKey: ["docs"] }); } });
   const [report, setReport] = useState<ImportResult | null>(null);
+  const [reading, setReading] = useState<string | null>(null);
   const importer = useMutation({
     mutationFn: (files: File[]) => {
       const form = new FormData();
@@ -338,6 +340,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
   const dropCollection = useMutation({ mutationFn: (id: string) => api(`/knowledge/collections/${id}`, { method: "DELETE" }),
     onSuccess: () => { setSel(null); qc.invalidateQueries({ queryKey: ["repos"] }); toast("Collection deleted"); } });
   const writable = canWrite(user);
+  if (reading && active) return <DocumentReader repoId={active.id} path={reading} onClose={() => setReading(null)} />;
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
       <div className="space-y-4">
@@ -367,8 +370,8 @@ function DocsTab({ repos }: { repos: Repo[] }) {
           {(upload.isPending || importer.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 text-xs text-muted"><Spinner />Indexing and linking…</div>}
           {!docs.data?.length ? <Empty>No documents yet.</Empty> : (
             <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Path</th><th className="font-medium">Size</th><th /></tr></thead>
-              <tbody>{docs.data.map((d) => (<tr key={d.id} className="border-t border-line"><td className="py-2">{d.path}</td><td className="text-muted">{(d.size / 1024).toFixed(1)} KB</td>
-                <td className="text-right">{writable && d.deletable !== false && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "It is removed from search, the graph and the wiki.", confirmLabel: "Delete document", danger: true })) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}{writable && d.deletable === false && <span className="text-xs text-muted" title="Synced from a connected source; remove the source to delete it">synced</span>}</td></tr>))}</tbody></table>)}
+              <tbody>{docs.data.map((d) => (<tr key={d.id} className="border-t border-line"><td className="py-2"><button className="text-left text-brand hover:underline" title="Read this document here" onClick={() => setReading(d.path)}>{d.path}</button></td><td className="text-muted">{(d.size / 1024).toFixed(1)} KB</td>
+                <td className="whitespace-nowrap text-right"><button aria-label={`Read ${d.path}`} className="mr-3 text-xs text-brand hover:underline" onClick={() => setReading(d.path)}>Read</button>{writable && d.deletable !== false && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "It is removed from search, the graph and the wiki.", confirmLabel: "Delete document", danger: true })) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}{writable && d.deletable === false && <span className="text-xs text-muted" title="Synced from a connected source; remove the source to delete it">synced</span>}</td></tr>))}</tbody></table>)}
         </>)}
       </Card>
     </div>
