@@ -100,6 +100,7 @@ def me(p: Principal = Depends(current_principal), db: Session = Depends(get_db))
 
 @router.get("/users", response_model=list[UserOut])
 def list_users(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    authorize(db, p, "user.list", "users")
     return db.scalars(select(User).where(User.org_id == p.org_id)).all()
 
 

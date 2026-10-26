@@ -153,6 +153,9 @@ OWN_ACCOUNT_OR_READ = {  # POSTs that read, or act only on the caller's own acco
     "/api/auth/password",
     "/api/auth/sessions/{session_id}",
     "/api/auth/me",
+    "/api/auth/totp/setup",  # the authenticator app: each acts only on the caller's own account
+    "/api/auth/totp/enable",
+    "/api/auth/totp/disable",
     "/api/investigations/ci/parse",
     "/api/graph/heat",
     "/api/knowledge/ask",
@@ -187,25 +190,11 @@ def test_every_operation_requires_a_session_unless_it_is_deliberately_public(cli
 
 
 def test_every_mutating_operation_runs_a_policy_check(client):
-    mods = [
-        "auth",
-        "repos",
-        "investigations",
-        "knowledge",
-        "ownership",
-        "proposals",
-        "sso",
-        "scim",
-        "github",
-        "bitbucket",
-        "risk",
-        "settings",
-        "usage",
-        "metrics",
-        "jira",
-        "webhooks",
-        "wiki",
-    ]
+    import pkgutil
+
+    import repolens.api as api_package
+
+    mods = [m.name for m in pkgutil.iter_modules(api_package.__path__)]  # every API module, including new ones
     unguarded = []
     for m in mods:
         mod = importlib.import_module("repolens.api." + m)
@@ -221,6 +210,7 @@ def test_every_mutating_operation_runs_a_policy_check(client):
     assert {p for _, p in unguarded} <= OWN_ACCOUNT_OR_READ | {
         "/api/auth/register",
         "/api/auth/login",
+        "/api/auth/reset",  # the one-time link is the credential
         "/api/auth/sso/exchange",
         "/api/webhooks/github",
         "/scim/v2/Users",

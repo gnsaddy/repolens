@@ -17,6 +17,7 @@ ACTION_MIN_ROLE = {
     "jira.read": "member",
     "jira.publish": "member",
     "user.create": "admin",
+    "user.list": "admin",  # emails, roles and sign-in methods of everyone: only needed to manage who sees a repository
     "collection.create": "member",
     "collection.delete": "admin",
     "document.write": "member",

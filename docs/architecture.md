@@ -76,6 +76,17 @@ out of scope disappear together with every edge touching them, and paths never r
 they were derived from), risk dependents and dashboard counts. `tests/test_access.py` crawls the read endpoints as a
 non-granted user and asserts the restricted repository never appears.
 
+**Roles.** `policy.ACTION_MIN_ROLE` maps each action to the lowest role that may do it (`user.list` is admin: the list holds everyone's
+email, role and sign-in method, and only the repository Access panel needs it). A handler calls `authorize(db, p, action, ...)`, which
+raises 403 and writes an audit event for allowed and denied calls. `tests/test_role_matrix.py` builds a schema-valid request for every
+operation from the OpenAPI document and calls it as viewer, member and admin on a real workspace. A 2xx counts as allowed (a 404 or 422
+can come before the check). It compares the lowest successful role with the one the code declares (`authorize` actions, `require_role`),
+fails on any server error, and pins the lists of reads that are open to viewers, member-only and admin-only. A second test uses real
+objects (an investigation, a saved question, a skill, a collection, a user) to confirm a viewer or member gets 403 and nothing changes.
+`test_every_mutating_operation_runs_a_policy_check` now discovers every module in `repolens/api` instead of a hand-written list. About 30
+operations validate the request or look up the object before they check the role, so a lower role gets 404 or 422 for an id that does
+not exist and 403 for one that does; ids are random, so this is not a way in.
+
 ## Evaluation
 `repolens/evals` generates seeded synthetic repositories with injected regressions and runs six ablation configurations
 plus the Oracle; see `evals/README.md` for results and limits.

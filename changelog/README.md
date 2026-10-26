@@ -12,5 +12,5 @@ when behaviour, design or protections move. Entries are added in the same commit
 ## Versions
 
 <!-- versions:start -->
-- [v0.1-beta](v0.1-beta.md) · 53 entries · 2026-10-20 to 2026-10-26
+- [v0.1-beta](v0.1-beta.md) · 54 entries · 2026-10-20 to 2026-10-27
 <!-- versions:end -->

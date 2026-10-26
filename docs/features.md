@@ -162,6 +162,19 @@ When an investigation finishes it publishes a short digest (problem, root cause,
 - Errors such as `KeyError: 'name'`, `'NoneType' object has no attribute`, `IndexError` and divide-by-zero are read against the retrieved code: the report names the line that raises it and the code that builds the value without it, with no model needed.
 - Publishing to Jira asks for the issue key (taken from the title when present) and says when publishing is switched off.
 
+## Roles: who can do what
+Three roles, checked on the server for every request (`services/policy.py`), on top of per-repository access. A viewer or member never gets more by changing the web page.
+
+| | Viewer | Member | Admin |
+|---|---|---|---|
+| Read the workspace: repositories, code, wiki, graph, investigations, dashboards, usage totals, saved questions, approved skills | yes | yes | yes |
+| Search and ask (these read, they change nothing shared), keep private chats, give feedback | yes | yes | yes |
+| Their own profile, sessions, authenticator app and access tokens (a read token acts as a viewer) | yes | yes | yes |
+| Add, index and measure repositories; start, rerun and review investigations; suggested fixes; edit the wiki and propose edits; upload documents; saved questions and quality runs; submit skills (they wait for an admin); read Jira and publish to it; assess change risk | no | yes | yes |
+| People and roles (the user list, invitations, reset links), the audit log, single sign-on and SCIM, model and integration settings, repository access and deletion, storage and system metrics, approving skills and publishing wiki edits, exporting feedback | no | no | yes |
+
+Chats are private to their owner, whatever the role. `tests/test_role_matrix.py` calls every operation as each role and fails if a lower role succeeds where the code requires more, if any operation returns a server error, or if the list of reads open to viewers, members only or admins only changes without someone updating the test on purpose.
+
 ## Accounts and security
 
 - Sign-in is a server-side session: list and end your devices, sign out everywhere else, idle sessions end after 8 hours, a password change signs out other devices.
