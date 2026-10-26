@@ -1,9 +1,14 @@
+import { Download, Expand, Maximize2, Minimize2, Minus, Plus, ScanSearch } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphEdge, GraphNode } from "@/lib/api";
 
 export const NODE_COLORS: Record<string, string> = {
   file: "#64748b", doc: "#0ea5e9", section: "#38bdf8", function: "#4f46e5", class: "#7c3aed", commit: "#f59e0b", pr: "#10b981",
 };
+export const COMMUNITY_COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#ef4444", "#84cc16", "#f97316"];
+export const communityColor = (c: number | null | undefined) => (c == null ? "#cbd5e1" : COMMUNITY_COLORS[c % COMMUNITY_COLORS.length]);
+/** Solid = found directly in code or links, dashed = inferred from words or meaning, dotted = a weak guess. */
+export const trustDash = (t?: string) => (t === "inferred" ? "5 3" : t === "uncertain" ? "1.5 3" : undefined);
 export const REL_COLORS: Record<string, string> = {
   CALLS: "#4f46e5", IMPORTS: "#64748b", MENTIONS: "#0ea5e9", LINKS_TO: "#06b6d4", TESTS: "#10b981",
   MODIFIES: "#f59e0b", RELATED_TO: "#ec4899", CONTAINS: "#cbd5e1", INCLUDES: "#10b981",
@@ -76,10 +81,18 @@ export function fitView(nodes: GraphNode[], pos: Record<string, P>): { x: number
 
 interface Props {
   nodes: GraphNode[]; edges: GraphEdge[]; selectedId: string | null; highlight?: Set<string>;
-  onSelect: (id: string) => void; heat?: Record<string, number>;
+  onSelect: (id: string) => void; heat?: Record<string, number>; byCommunity?: boolean;
+  /** dim everything outside this area (community number) */
+  focusArea?: number | null;
+  /** move the view to this node; a new `n` re-centres even on the same node */
+  centerOn?: { id: string; n: number } | null;
 }
 
-export default function ForceGraph({ nodes, edges, selectedId, highlight, onSelect, heat }: Props) {
+const MIN_K = 0.2, MAX_K = 6;
+const clampK = (k: number) => Math.max(MIN_K, Math.min(MAX_K, k));
+type LabelMode = "smart" | "all" | "none";
+
+export default function ForceGraph({ nodes, edges, selectedId, highlight, onSelect, heat, byCommunity, focusArea, centerOn }: Props) {
   const posRef = useRef<Record<string, P>>({});
   const pos = useMemo(() => {
     posRef.current = layout(nodes, edges, posRef.current);
@@ -87,12 +100,29 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   }, [nodes, edges]);
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
   const [hover, setHover] = useState<string | null>(null);
+  const [labelMode, setLabelMode] = useState<LabelMode>("smart");
+  const [tall, setTall] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const svg = useRef<SVGSVGElement>(null);
+
+  // Pointer position in the drawing's own units (the SVG is scaled to its box); falls back to the centre when unmeasured.
+  const toBox = (clientX: number, clientY: number) => {
+    const r = svg.current?.getBoundingClientRect();
+    if (!r || !r.width || !r.height) return { x: W / 2, y: H / 2, sx: 1, sy: 1 };
+    return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height), sx: W / r.width, sy: H / r.height };
+  };
+  /** Zoom keeping the point (px, py) still, so the thing under the pointer stays under it. */
+  const zoomAt = (factor: number, px = W / 2, py = H / 2) =>
+    setView((v) => { const k = clampK(v.k * factor), f = k / v.k; return { k, x: px - (px - v.x) * f, y: py - (py - v.y) * f }; });
 
   // Fit the layout to the canvas whenever the node set changes (pan/zoom afterwards is the user's).
   const fitKey = nodes.map((n) => n.id).join("|");
   useEffect(() => setView(fitView(nodes, pos)), [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const p = centerOn ? pos[centerOn.id] : undefined;
+    if (p) setView((v) => { const k = Math.max(v.k, 1.4); return { k, x: W / 2 - p.x * k, y: H / 2 - p.y * k }; });
+  }, [centerOn?.id, centerOn?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const focus = hover ?? selectedId;
   const adj = useMemo(() => {
     const m = new Map<string, Set<string>>();
@@ -106,50 +136,99 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   const radius = (n: GraphNode) => 5 + 9 * Math.sqrt(n.degree / maxDeg);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const near = (id: string) => !focus || id === focus || adj.get(focus)?.has(id);
+  const inArea = (id: string) => focusArea == null || nodeById.get(id)?.community === focusArea;
+
+  const exportSvg = () => {
+    const el = svg.current;
+    if (!el) return;
+    const copy = el.cloneNode(true) as SVGSVGElement;
+    copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    copy.setAttribute("width", String(W)); copy.setAttribute("height", String(H));
+    copy.setAttribute("style", "background:#fff;--color-ink:#0f172a;--color-surface:#ffffff");  // the page's colour variables do not exist in the file
+    try {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml" }));
+      a.download = "repolens-graph.svg"; a.click(); URL.revokeObjectURL(a.href);
+    } catch { /* the browser cannot save files here */ }
+  };
+  const btn = "grid h-8 w-8 place-items-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2";
 
   return (
-    <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Knowledge graph" className="h-[34rem] w-full cursor-grab rounded-lg border border-line bg-white select-none"
-      onWheel={(e) => { e.preventDefault(); setView((v) => ({ ...v, k: Math.max(0.4, Math.min(3, v.k * (e.deltaY < 0 ? 1.1 : 0.9))) })); }}
-      onMouseDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; }}
-      onMouseMove={(e) => { if (drag.current) { const dx = e.clientX - drag.current.x, dy = e.clientY - drag.current.y; drag.current = { x: e.clientX, y: e.clientY }; setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy })); } }}
-      onMouseUp={() => { drag.current = null; }} onMouseLeave={() => { drag.current = null; }}>
-      <defs>
-        {Object.entries(REL_COLORS).map(([rel, c]) => (
-          <marker key={rel} id={`arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>))}
-      </defs>
-      <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-        {edges.map((e) => {
-          const a = pos[e.source], b = pos[e.target];
-          if (!a || !b) return null;
-          const on = highlight?.has(e.id) || (focus && (e.source === focus || e.target === focus));
-          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-          const tn = nodeById.get(e.target);
-          const end = DIRECTED.has(e.rel) && tn ? radius(tn) + 2 : 0; // stop at the node edge so the arrowhead is visible
-          return (
-            <g key={e.id}>
-              <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={REL_COLORS[e.rel] ?? "#94a3b8"}
-                markerEnd={DIRECTED.has(e.rel) && (on || !focus) ? `url(#arrow-${e.rel})` : undefined}
-                strokeWidth={on ? 2.5 : 1} strokeDasharray={e.provenance === "semantic" ? "4 3" : undefined}
-                opacity={on ? 0.95 : focus ? 0.12 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${e.rel} (${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
-              {on && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
-            </g>);
-        })}
-        {nodes.map((n) => {
-          const p = pos[n.id];
-          if (!p) return null;
-          const sel = n.id === selectedId;
-          const showLabel = sel || n.id === hover || n.degree >= maxDeg * 0.35 || nodes.length < 25 || (focus && adj.get(focus)?.has(n.id));
-          return (
-            <g key={n.id} transform={`translate(${p.x} ${p.y})`} opacity={near(n.id) ? 1 : 0.25} className="cursor-pointer"
-              onClick={(ev) => { ev.stopPropagation(); onSelect(n.id); }} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
-              onMouseDown={(ev) => ev.stopPropagation()} role="button" aria-label={`${n.type} ${n.qualname || n.name}`}>
-              <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : (NODE_COLORS[n.type] ?? "#94a3b8")} style={{ stroke: sel ? "var(--color-ink)" : highlight?.has(n.id) ? "#ec4899" : "var(--color-surface)" }} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
-              <title>{`${n.type} ${n.qualname || n.name}\n${n.degree} connections${heat && n.id in heat ? `\nheat ${Math.round(heat[n.id] * 100)}%` : ""}`}</title>
-              {showLabel && <text y={-radius(n) - 4} textAnchor="middle" fontSize={10} style={{ fill: "var(--color-ink)", stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{n.name.length > 28 ? n.name.slice(0, 27) + "…" : n.name}</text>}
-            </g>
-          );
-        })}
-      </g>
-    </svg>
+    <div className="relative">
+      <div role="toolbar" aria-label="Graph controls" className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-white/95 p-1 shadow-sm">
+        <button className={btn} aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.3)}><Plus className="h-4 w-4" /></button>
+        <button className={btn} aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.3)}><Minus className="h-4 w-4" /></button>
+        <span className="w-10 text-center text-[11px] tabular-nums text-muted" aria-label="Zoom level">{Math.round(view.k * 100)}%</span>
+        <button className={btn} aria-label="Fit to screen" title="Fit everything (0)" onClick={() => setView(fitView(nodes, pos))}><ScanSearch className="h-4 w-4" /></button>
+        <button className={btn} aria-label="Actual size" title="Reset to 100%" onClick={() => setView({ x: 0, y: 0, k: 1 })}><Expand className="h-4 w-4" /></button>
+        <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-md border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
+          <option value="smart">Key labels</option><option value="all">All labels</option><option value="none">No labels</option></select>
+        <button className={btn} aria-label="Download SVG" title="Download as SVG" onClick={exportSvg}><Download className="h-4 w-4" /></button>
+        <button className={btn} aria-label={tall ? "Shrink graph" : "Enlarge graph"} aria-pressed={tall} title={tall ? "Shrink" : "Enlarge"} onClick={() => setTall((t) => !t)}>{tall ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+      </div>
+      <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Knowledge graph" tabIndex={0}
+        className={`${tall ? "h-[46rem]" : "h-[34rem]"} w-full cursor-grab rounded-lg border border-line bg-white select-none`}
+        onWheel={(e) => { e.preventDefault(); const b = toBox(e.clientX, e.clientY); zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, b.x, b.y); }}
+        onDoubleClick={(e) => { const b = toBox(e.clientX, e.clientY); zoomAt(1.6, b.x, b.y); }}
+        onKeyDown={(e) => {
+          const step = 40;
+          if (e.key === "+" || e.key === "=") zoomAt(1.3);
+          else if (e.key === "-" || e.key === "_") zoomAt(1 / 1.3);
+          else if (e.key === "0") setView(fitView(nodes, pos));
+          else if (e.key === "ArrowLeft") setView((v) => ({ ...v, x: v.x + step }));
+          else if (e.key === "ArrowRight") setView((v) => ({ ...v, x: v.x - step }));
+          else if (e.key === "ArrowUp") setView((v) => ({ ...v, y: v.y + step }));
+          else if (e.key === "ArrowDown") setView((v) => ({ ...v, y: v.y - step }));
+          else return;
+          e.preventDefault();
+        }}
+        onMouseDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; }}
+        onMouseMove={(e) => {
+          if (!drag.current) return;
+          const b = toBox(e.clientX, e.clientY), dx = (e.clientX - drag.current.x) * b.sx, dy = (e.clientY - drag.current.y) * b.sy;
+          drag.current = { x: e.clientX, y: e.clientY };
+          setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy }));
+        }}
+        onMouseUp={() => { drag.current = null; }} onMouseLeave={() => { drag.current = null; }}>
+        <defs>
+          {Object.entries(REL_COLORS).map(([rel, c]) => (
+            <marker key={rel} id={`arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>))}
+        </defs>
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+          {edges.map((e) => {
+            const a = pos[e.source], b = pos[e.target];
+            if (!a || !b) return null;
+            const on = highlight?.has(e.id) || (focus && (e.source === focus || e.target === focus));
+            const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+            const tn = nodeById.get(e.target);
+            const end = DIRECTED.has(e.rel) && tn ? radius(tn) + 2 : 0; // stop at the node edge so the arrowhead is visible
+            const away = !inArea(e.source) || !inArea(e.target);
+            return (
+              <g key={e.id}>
+                <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={REL_COLORS[e.rel] ?? "#94a3b8"}
+                  markerEnd={DIRECTED.has(e.rel) && (on || !focus) ? `url(#arrow-${e.rel})` : undefined}
+                  strokeWidth={on ? 2.5 : 1} strokeDasharray={trustDash(e.trust ?? (e.provenance === "semantic" ? "inferred" : "fact"))}
+                  opacity={away ? 0.06 : on ? 0.95 : focus ? 0.12 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${e.rel} (${e.trust ?? e.provenance}: ${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
+                {on && !away && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
+              </g>);
+          })}
+          {nodes.map((n) => {
+            const p = pos[n.id];
+            if (!p) return null;
+            const sel = n.id === selectedId;
+            const showLabel = labelMode === "none" ? sel || n.id === hover : labelMode === "all" || sel || n.id === hover || n.degree >= maxDeg * 0.35 || nodes.length < 25 || (focus && adj.get(focus)?.has(n.id));
+            return (
+              <g key={n.id} transform={`translate(${p.x} ${p.y})`} opacity={inArea(n.id) ? (near(n.id) ? 1 : 0.25) : 0.12} className="cursor-pointer"
+                onClick={(ev) => { ev.stopPropagation(); onSelect(n.id); }} onDoubleClick={(ev) => ev.stopPropagation()} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
+                onMouseDown={(ev) => ev.stopPropagation()} role="button" aria-label={`${n.type} ${n.qualname || n.name}`}>
+                <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : byCommunity ? communityColor(n.community) : (NODE_COLORS[n.type] ?? "#94a3b8")} style={{ stroke: sel ? "var(--color-ink)" : highlight?.has(n.id) ? "#ec4899" : "var(--color-surface)" }} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
+                <title>{`${n.type} ${n.qualname || n.name}\n${n.degree} connections${n.community != null ? `\narea ${n.community + 1}` : ""}${heat && n.id in heat ? `\nheat ${Math.round(heat[n.id] * 100)}%` : ""}`}</title>
+                {showLabel && <text y={-radius(n) - 4} textAnchor="middle" fontSize={10} style={{ fill: "var(--color-ink)", stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{n.name.length > 28 ? `${n.name.slice(0, 27)}…` : n.name}</text>}
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+    </div>
   );
 }

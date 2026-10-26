@@ -3,6 +3,7 @@ import { FilePlus2, Map as MapIcon, Pencil, Search } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/feedback";
+import StartHere from "@/components/StartHere";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Spinner, Textarea } from "@/components/ui";
 import { api, type Atlas, type PageHit, type PageSource, type WikiSource } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -87,6 +88,7 @@ export function AtlasTab({ sources }: { sources: WikiSource[] }) {
         <select aria-label="Repository" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>{repos.map((r) => <option key={r.repo_id} value={r.repo_id}>{r.name}</option>)}</select>
         {a && <p className="text-sm text-muted"><MapIcon className="mr-1 inline h-4 w-4" />{a.summary.modules} modules · {a.summary.files} files · {a.summary.public_symbols} public symbols · <b className="text-ink">{a.summary.coverage != null ? `${Math.round(a.summary.coverage * 100)}%` : "—"}</b> documented</p>}
       </div>
+      {repoId && <StartHere repoId={repoId} />}
       {atlas.isLoading ? <Spinner /> : atlas.error ? <ErrorNote error={atlas.error} /> : !a?.modules.length ? <Empty>Nothing indexed yet.</Empty> : (
         <div className="grid gap-3 md:grid-cols-2">
           {a.modules.map((m) => (

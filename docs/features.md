@@ -153,6 +153,16 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Graph trust, areas and Start here
+
+Every connection in the graph says how far it can be trusted: **fact** (found directly in the code, a document link, git or GitHub), **inferred** (guessed from shared words or meaning) or **uncertain** (a weak guess). The graph draws facts solid, inferred links dashed and uncertain ones dotted, and **Facts only** hides the rest. **Colour by → Area** groups nodes into communities, the parts of a repository that hang together (found from the connections themselves, without a model).
+
+**Start here** appears on the graph page and at the top of the wiki's Code atlas once a repository is chosen: the areas, the **hubs** (most connected, so a change there reaches the most other things), **surprising connections** between areas, and good first questions. Editors get the same through three MCP tools: `graph_overview`, `graph_neighbors` and `graph_path`.
+
+## Graph view controls
+
+The graph has a toolbar: **zoom in and out** (the point under the pointer stays put), **fit to screen**, **actual size**, a **zoom level** readout, a **labels** switch (key labels, all labels or none), **download as SVG** and **enlarge** for a taller canvas. The mouse wheel zooms toward the pointer, a double click zooms in, dragging pans, and with the graph focused `+`, `-`, `0` and the arrow keys zoom, fit and pan. Picking a node from the search box moves the view to it. When coloured by area, a legend lists the areas; click one to look at it on its own and dim the rest.
+
 ## Logo and About
 
 The mark is a lens over a small graph of connected repository nodes (one node in amber). It is the browser-tab icon (`frontend/public/favicon.svg`), the sidebar and sign-in logo (`components/Logo.tsx`, the same drawing), and appears in **Settings → About** with the version, the licence and links to report a bug or see the source.

@@ -15,6 +15,7 @@ from ..schemas import CollectionCreate, DocsUpload, HeatIn, KnowledgeQuery, Repo
 from ..security import redact_stored
 from ..services import answer_memory
 from ..services import graph as g
+from ..services import graph_insights as gi
 from ..services import knowledge as kb
 from ..services.access import scope_for
 from ..services.policy import authorize
@@ -201,6 +202,32 @@ def graph_stats(repo_id: str | None = None, p: Principal = Depends(current_princ
     }
 
 
+def _with_community(db: Session, dicts: list[dict]) -> list[dict]:
+    """Add the community number to node dicts (null for nodes outside any cluster)."""
+    cache: dict[str, dict] = {}
+    for d in dicts:
+        rid = d["repo_id"]
+        if rid not in cache:
+            repo = db.get(Repository, rid)
+            cache[rid] = gi.analyse(db, repo)["member"] if repo else {}
+        d["community"] = cache[rid].get(d["id"])
+    return dicts
+
+
+@router.get("/graph/communities")
+def graph_communities(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """The parts of a repository that hang together, largest first, with their most connected members."""
+    repo = _get_repo(db, p, repo_id)
+    info = gi.analyse(db, repo)
+    return {"repo": {"id": repo.id, "name": repo.name}, "communities": info["communities"]}
+
+
+@router.get("/graph/report")
+def graph_report(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """The start-here report: areas, hubs, surprising connections and good first questions."""
+    return gi.report(db, _get_repo(db, p, repo_id))
+
+
 @router.get("/graph/overview")
 def graph_overview(
     repo_id: str | None = None,
@@ -226,7 +253,10 @@ def graph_overview(
     if rels:
         eq = eq.where(KGEdge.rel.in_(rels.split(",")))
     names = _names(db, p)
-    return {"nodes": [g.node_dict(n, names) for n in nodes], "edges": [g.edge_dict(e) for e in db.scalars(eq)]}
+    return {
+        "nodes": _with_community(db, [g.node_dict(n, names) for n in nodes]),
+        "edges": [g.edge_dict(e) for e in db.scalars(eq)],
+    }
 
 
 @router.get("/graph/nodes")
@@ -271,7 +301,7 @@ def graph_node(
     return {
         "node": g.node_dict(n, names),
         "content": chunk.content[:4000] if chunk else "",
-        "nodes": [g.node_dict(x, names) for x in ns],
+        "nodes": _with_community(db, [g.node_dict(x, names) for x in ns]),
         "edges": [g.edge_dict(e) for e in es],
         "connections": kb._connections(db, p.org_id, n, names, limit=25, scope=scope),
     }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -146,6 +146,39 @@ describe("Knowledge page", () => {
     expect(brief).toHaveTextContent("Called by 2 place(s)");
     expect(brief).toHaveTextContent("Public and not described in any document.");
     expect(brief).toHaveTextContent("Used by: handle_profile_request");
+  });
+
+  it("marks inferred links, can hide everything but facts, and colours nodes by area", async () => {
+    const nodes = [{ ...node("n1", "function", "get_profile", 3), community: 0 }, { ...node("n2", "section", "Deleted users", 2), community: 1 }, { ...node("n3", "file", "api.py", 1), community: 0 }];
+    const edges = [{ ...edge("e1", "n2", "n1", "MENTIONS"), provenance: "doc_mention", trust: "inferred" as const, weight: 0.7 }, { ...edge("e2", "n1", "n3"), trust: "fact" as const }];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const u = String(input);
+      if (u.endsWith("/auth/me")) return json(me);
+      if (u.endsWith("/repositories")) return json([]);
+      if (u.includes("/graph/stats")) return json({ nodes: {}, edges: [], total_nodes: 3, total_edges: 2 });
+      if (u.includes("/graph/overview")) return json({ nodes, edges });
+      return json({}, 404);
+    });
+    renderPage("/knowledge?tab=graph");
+    await screen.findByRole("button", { name: "function get_profile" });
+    const svg = () => screen.getByRole("img", { name: "Knowledge graph" });
+    const dashes = () => [...svg().querySelectorAll("line")].map((l) => l.getAttribute("stroke-dasharray"));
+    expect(dashes()).toContain("5 3"); // the inferred link is dashed
+    expect(screen.getByText(/dashed/)).toBeInTheDocument(); // and the legend says what that means
+    await userEvent.click(screen.getByLabelText(/Facts only/));
+    expect(svg().querySelectorAll("line")).toHaveLength(1); // only the directly found link remains
+    expect(dashes()).not.toContain("5 3");
+    const fillOf = (name: string) => screen.getByRole("button", { name }).querySelector("circle")?.getAttribute("fill");
+    await userEvent.selectOptions(screen.getByLabelText("Colour by"), "community");
+    expect(fillOf("function get_profile")).toBe(fillOf("file api.py")); // same area, same colour
+    expect(fillOf("function get_profile")).not.toBe(fillOf("section Deleted users")); // a different area
+    const legend = screen.getByRole("group", { name: "Areas" }); // pick one area to look at on its own
+    await userEvent.click(within(legend).getByRole("button", { name: "Area 2" }));
+    const opacityOf = (name: string) => Number(screen.getByRole("button", { name }).getAttribute("opacity"));
+    expect(opacityOf("section Deleted users")).toBe(1);
+    expect(opacityOf("function get_profile")).toBeLessThan(0.2);
+    await userEvent.click(within(legend).getByRole("button", { name: "All areas" }));
+    expect(opacityOf("function get_profile")).toBe(1);
   });
 
   it("uploads selected files to the collection", async () => {

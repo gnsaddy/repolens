@@ -118,6 +118,46 @@ def t_brief(db: Session, p: Principal, a: dict) -> str:
     )
 
 
+def t_graph_overview(db: Session, p: Principal, a: dict) -> str:
+    from ..api import knowledge as api
+
+    return _clip(api.graph_report(repo_id=a["repo_id"], p=p, db=db)["markdown"])
+
+
+def t_graph_neighbors(db: Session, p: Principal, a: dict) -> str:
+    from ..api import knowledge as api
+
+    d = api.graph_node(a["node_id"], depth=1, rels=a.get("relation"), p=p, db=db)
+    me = d["node"]["id"]
+    by_id = {n["id"]: n for n in d["nodes"]}
+    lines = []
+    for e in d["edges"]:
+        other = by_id.get(e["target"] if e["source"] == me else e["source"])
+        if other:
+            arrow = "->" if e["source"] == me else "<-"
+            lines.append(
+                f"- {arrow} {e['rel']} {other['qualname'] or other['name']} [{other['type']}] "
+                f"{other['path']}:{other['start_line']} ({e['trust']}, node_id {other['id']})"
+            )
+    head = f"{d['node']['qualname'] or d['node']['name']} [{d['node']['type']}], {d['node']['degree']} connections"
+    return _clip(head + "\n" + ("\n".join(lines[:40]) if lines else "No connections."))
+
+
+def t_graph_path(db: Session, p: Principal, a: dict) -> str:
+    from ..api import knowledge as api
+
+    r = api.graph_path(src=a["from_id"], dst=a["to_id"], p=p, db=db)
+    if not r["found"]:
+        return "No connection found within 6 steps."
+    out = []
+    for s in r["steps"]:
+        n, e = s["node"], s["edge"]
+        out.append(
+            (f"  {e['rel']} ({e['trust']})\n" if e else "") + f"{n['qualname'] or n['name']} [{n['type']}] {n['path']}"
+        )
+    return _clip("\n".join(out))
+
+
 def t_wiki_page(db: Session, p: Principal, a: dict) -> str:
     from ..api import wiki as api
 
@@ -230,6 +270,27 @@ TOOLS: list[Tool] = [
         "What to know before changing a symbol: who uses it, what it depends on, where it is documented, recent history, and warnings.",
         _obj({"node_id": S}, ["node_id"]),
         t_brief,
+    ),
+    Tool(
+        "graph_overview",
+        "A start-here map of a repository: the areas that hang together, the most connected hubs (change with care), surprising links between areas, and good first questions.",
+        _obj({"repo_id": S}, ["repo_id"]),
+        t_graph_overview,
+    ),
+    Tool(
+        "graph_neighbors",
+        "What a file, function, class or document is directly connected to, with each link marked fact, inferred or uncertain. Use node ids from find_symbol.",
+        _obj(
+            {"node_id": S, "relation": {"type": "string", "description": "Optional, e.g. CALLS, IMPORTS, MENTIONS"}},
+            ["node_id"],
+        ),
+        t_graph_neighbors,
+    ),
+    Tool(
+        "graph_path",
+        "The shortest chain of connections between two nodes, each step marked fact, inferred or uncertain.",
+        _obj({"from_id": S, "to_id": S}, ["from_id", "to_id"]),
+        t_graph_path,
     ),
     Tool(
         "read_wiki_page",

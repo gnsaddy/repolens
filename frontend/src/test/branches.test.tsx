@@ -66,13 +66,14 @@ describe("graph heat and connections", () => {
   });
   it("colours nodes by heat, greys unknown ones, draws arrowheads and labels the focused links", async () => {
     const { container } = render(<ForceGraph nodes={[node("a"), node("b"), node("c")]} edges={[edge]} selectedId="a" heat={{ a: 1, b: 0 }} onSelect={() => {}} />);
-    const fills = [...container.querySelectorAll("circle")].map((c) => c.getAttribute("fill"));
+    const drawing = container.querySelector("svg[aria-label='Knowledge graph']")!;
+    const fills = [...drawing.querySelectorAll("circle")].map((c) => c.getAttribute("fill"));
     expect(fills).toEqual(["rgb(239,68,68)", "rgb(59,130,246)", "#e2e8f0"]);
     expect(container.querySelector("line")?.getAttribute("marker-end")).toBe("url(#arrow-CALLS)");
     expect(container.textContent).toContain("calls"); // edge label for the selected node's link
   });
   it("keeps type colours when there is no heat", () => {
     const { container } = render(<ForceGraph nodes={[node("a")]} edges={[]} selectedId={null} onSelect={() => {}} />);
-    expect(container.querySelector("circle")?.getAttribute("fill")).toBe("#4f46e5");
+    expect(container.querySelector("svg[aria-label='Knowledge graph'] circle")?.getAttribute("fill")).toBe("#4f46e5");
   });
 });

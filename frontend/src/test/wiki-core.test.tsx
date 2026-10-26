@@ -28,6 +28,11 @@ function setup(url = "/wiki") {
     if (u.includes("/wiki/page") && init?.method === "PUT") return json({ path: JSON.parse(String(init.body)).path, created: false, secrets_redacted: 0 });
     if (u.includes("/wiki/page")) return json(page);
     if (u.includes("/wiki/search")) return json([{ repo: "team-notes", repo_id: "n1", path: "deploy.md", title: "Deploy checklist", snippet: "Run the migrations first", start_line: 1, score: 0.8 }]);
+    if (u.includes("/graph/report")) return json({ repo: { id: "r1", name: "shop" }, stats: { nodes: 40, edges: 90, communities: 2 },
+      communities: [{ id: 0, size: 25, files: 6, label: "src/billing", top: [{ id: "n1", name: "compute_total", type: "function", degree: 9 }] }],
+      hubs: [{ id: "n1", name: "compute_total", type: "function", path: "src/billing/orders.py", degree: 9, community: 0 }],
+      surprising: [{ source: { id: "n1", name: "compute_total", type: "function", path: "a", degree: 9 }, target: { id: "n2", name: "send_mail", type: "function", path: "b", degree: 2 }, relation: "RELATED_TO", trust: "inferred", from_area: "src/billing", to_area: "src/notify" }],
+      questions: ["What does `compute_total` do, and what depends on it?"], markdown: "# Start here: shop" });
     if (u.includes("/wiki/atlas")) return json({ modules: [{ module: "src/billing", files: 3, functions: 4, classes: 1, languages: ["py"], documented: 1, coverage: 0.2, top_symbols: [{ node_id: "x1", name: "Invoice.charge", type: "function", path: "src/billing/invoice.py", start_line: 3, connections: 7, documented: false }] }], summary: { modules: 1, files: 3, public_symbols: 5, documented: 1, coverage: 0.2 } });
     return json({});
   });
@@ -77,9 +82,18 @@ describe("DeepMind Wiki core", () => {
 
   it("shows the code atlas with coverage and undocumented symbols", async () => {
     setup("/wiki?tab=atlas");
-    expect(await screen.findByText("src/billing")).toBeInTheDocument();
+    expect((await screen.findAllByText("src/billing")).length).toBeGreaterThan(0);
     expect(screen.getByText("20% documented", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("Invoice.charge")).toBeInTheDocument();
     expect(screen.getByText("undocumented")).toBeInTheDocument();
+  });
+
+  it("opens the atlas with a Start here panel: areas, hubs, surprising links and first questions", async () => {
+    setup("/wiki?tab=atlas");
+    const panel = await screen.findByLabelText("Start here");
+    expect(within(panel).getByLabelText("Areas")).toHaveTextContent("src/billing");
+    expect(within(panel).getByLabelText("Hubs")).toHaveTextContent("compute_total");
+    expect(within(panel).getByLabelText("Surprising connections")).toHaveTextContent("inferred");
+    expect(within(panel).getByLabelText("Good first questions")).toHaveTextContent("what depends on it");
   });
 });

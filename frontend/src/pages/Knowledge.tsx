@@ -3,12 +3,13 @@ import { Brain, FileText, Network, Search, Sparkles, Trash2, Upload } from "luci
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
-import ForceGraph, { HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
+import ForceGraph, { communityColor, HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
+import StartHere from "@/components/StartHere";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
 import AnswerFeedback from "@/components/AnswerFeedback";
 import MemoryBrowser from "@/components/MemoryBrowser";
 import SimilarAnswers from "@/components/SimilarAnswers";
-import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type MemoryStats, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
+import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, type GraphData, type GraphReport, type GraphNode, type GraphStats, type HeatResult, type KnowledgeHit, type MemoryStats, type NodeBrief, type NodeDetail, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -138,6 +139,10 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
   const [pathTarget, setPathTarget] = useState<GraphNode | null>(null);
   const [colorBy, setColorBy] = useState("type");
   const [hiddenRels, setHiddenRels] = useState<string[]>([]);
+  const [factsOnly, setFactsOnly] = useState(false);
+  const [focusArea, setFocusArea] = useState<number | null>(null);
+  const [centerOn, setCenterOn] = useState<{ id: string; n: number } | null>(null);
+  const pick = (id: string) => { setSelected(id); setCenterOn((c) => ({ id, n: (c?.n ?? 0) + 1 })); };
   const [pathSet, setPathSet] = useState<{ nodes: Set<string>; edges: Set<string> } | undefined>();
 
   const typesKey = types.join();
@@ -154,14 +159,21 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
     return { nodes: [...nodes.values()], edges: [...edges.values()] };
   }, [overview.data, extra]);
 
-  const shownEdges = useMemo(() => merged.edges.filter((e) => !hiddenRels.includes(e.rel)), [merged.edges, hiddenRels]);
+  const shownEdges = useMemo(() => merged.edges.filter((e) => !hiddenRels.includes(e.rel) && (!factsOnly || (e.trust ?? "fact") === "fact")), [merged.edges, hiddenRels, factsOnly]);
   const nodeIds = useMemo(() => merged.nodes.map((n) => n.id).slice(0, 500), [merged.nodes]);
-  const heat = useQuery({ queryKey: ["graph-heat", colorBy, nodeIds.join()], enabled: colorBy !== "type" && nodeIds.length > 0,
+  const heat = useQuery({ queryKey: ["graph-heat", colorBy, nodeIds.join()], enabled: !["type", "community"].includes(colorBy) && nodeIds.length > 0,
     queryFn: () => api<HeatResult>("/graph/heat", { method: "POST", json: { metric: colorBy, node_ids: nodeIds, days: 90 } }) });
+  const report = useQuery({ queryKey: ["graph-report", repoId], enabled: !!repoId && colorBy === "community", queryFn: () => api<GraphReport>(`/graph/report?repo_id=${repoId}`) });
+  const areas = useMemo(() => {
+    const names = new Map((Array.isArray(report.data?.communities) ? report.data!.communities : []).map((c) => [c.id, c.label]));
+    const count = new Map<number, number>();
+    merged.nodes.forEach((n) => { if (n.community != null) count.set(n.community, (count.get(n.community) ?? 0) + 1); });
+    return [...count.entries()].sort((a, b) => a[0] - b[0]).map(([id, n]) => ({ id, count: n, label: names.get(id) ?? `Area ${id + 1}` }));
+  }, [merged.nodes, report.data]);
   const toggleRel = (r: string) => setHiddenRels((h) => (h.includes(r) ? h.filter((x) => x !== r) : [...h, r]));
 
   const expand = useCallback(() => { if (detail.data) setExtra((x) => ({ nodes: [...x.nodes, ...detail.data.nodes], edges: [...x.edges, ...detail.data.edges] })); }, [detail.data]);
-  useEffect(() => { if (initialNode && detail.data && detail.data.node.id === initialNode) expand(); }, [initialNode, detail.data, expand]);
+  useEffect(() => { if (initialNode && detail.data && detail.data.node.id === initialNode) { expand(); setCenterOn((c) => c ?? { id: initialNode, n: 1 }); } }, [initialNode, detail.data, expand]);
 
   const tracePath = async (target: GraphNode) => {
     setPathTarget(target);
@@ -196,28 +208,39 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
           {query.length > 1 && found.data && (
             <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-line bg-white shadow-lg">
               {found.data.map((n) => (<li key={n.id}><button className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50"
-                onClick={() => { setSelected(n.id); setExtra((x) => ({ nodes: [...x.nodes, n], edges: x.edges })); setQuery(""); }}>
+                onClick={() => { pick(n.id); setExtra((x) => ({ nodes: [...x.nodes, n], edges: x.edges })); setQuery(""); }}>
                 <span className="h-2 w-2 rounded-full" style={{ background: NODE_COLORS[n.type] }} /><span className="truncate">{n.qualname || n.name}</span><span className="ml-auto text-muted">{n.type}</span></button></li>))}
               {!found.data.length && <li className="px-3 py-2 text-xs text-muted">No matches</li>}</ul>)}
         </div>
       </div>
+      {repoId && <StartHere repoId={repoId} />}
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <div>
           {overview.isLoading ? <Spinner /> : !merged.nodes.length ? <Empty>The graph is empty. Index a repository or upload documents first.</Empty> : (
-            <ForceGraph heat={colorBy !== "type" ? (heat.data?.values ?? {}) : undefined} nodes={merged.nodes} edges={shownEdges} selectedId={selected} highlight={pathSet ? new Set([...pathSet.nodes, ...pathSet.edges]) : undefined} onSelect={setSelected} />)}
+            <ForceGraph focusArea={colorBy === "community" ? focusArea : null} centerOn={centerOn} byCommunity={colorBy === "community"} heat={!["type", "community"].includes(colorBy) ? (heat.data?.values ?? {}) : undefined} nodes={merged.nodes} edges={shownEdges} selectedId={selected} highlight={pathSet ? new Set([...pathSet.nodes, ...pathSet.edges]) : undefined} onSelect={setSelected} />)}
+          {colorBy === "community" && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Areas">
+              <button className={`rounded-full border px-2 py-0.5 ${focusArea == null ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted hover:bg-slate-50"}`} aria-pressed={focusArea == null} onClick={() => setFocusArea(null)}>All areas</button>
+              {areas.map((a) => (
+                <button key={a.id} aria-pressed={focusArea === a.id} title={`${a.count} shown here`} onClick={() => setFocusArea(focusArea === a.id ? null : a.id)}
+                  className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 ${focusArea === a.id ? "border-brand bg-indigo-50" : "border-line hover:bg-slate-50"}`}>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: communityColor(a.id) }} />{a.label}</button>))}
+              {!areas.length && <span className="text-muted">No areas yet: the graph is small or loosely connected.</span>}
+            </div>)}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={factsOnly} onChange={(e) => setFactsOnly(e.target.checked)} />Facts only <span className="text-muted">(hide inferred and uncertain links)</span></label>
             <label className="flex items-center gap-1.5">Colour by
               <select aria-label="Colour by" className="h-8 rounded-md border border-line bg-white px-2" value={colorBy} onChange={(e) => setColorBy(e.target.value)}>
-                <option value="type">Node type</option><option value="churn">Heat: recent change (90 days)</option><option value="bugs">Heat: bug-fix activity</option>
+                <option value="type">Node type</option><option value="community">Area (what hangs together)</option><option value="churn">Heat: recent change (90 days)</option><option value="bugs">Heat: bug-fix activity</option>
                 <option value="connections">Heat: most connected</option><option value="undocumented">Heat: undocumented code</option></select></label>
-            {colorBy !== "type" && (<span className="flex items-center gap-2 text-muted" aria-label="Heat legend">
+            {!["type", "community"].includes(colorBy) && (<span className="flex items-center gap-2 text-muted" aria-label="Heat legend">
               {heat.isLoading ? "Loading…" : (<><span>cold</span><span className="h-2.5 w-28 rounded" style={{ background: HEAT_GRADIENT }} /><span>hot</span><span>· {heat.data?.label}</span>{heat.data && !Object.keys(heat.data.values).length && <span className="text-amber-700">· no data for these nodes</span>}</>)}</span>)}
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
             {Object.entries(REL_COLORS).filter(([r]) => r !== "INCLUDES").map(([r, c]) => (
               <label key={r} className="flex items-center gap-1"><input type="checkbox" aria-label={`Show ${r.toLowerCase().replace("_", " ")}`} checked={!hiddenRels.includes(r)} onChange={() => toggleRel(r)} />
                 <span className="h-0.5 w-4" style={{ background: c }} />{r.toLowerCase().replace("_", " ")}</label>))}
-            <span>· arrows point from caller/source to target · dashed = semantic guess · hover a node to label its links · scroll to zoom, drag to pan</span></div>
+            <span>· arrows point from caller/source to target · <b>solid</b> = found directly, <b>dashed</b> = inferred, <b>dotted</b> = weak guess · hover a node to label its links · scroll to zoom, drag to pan</span></div>
         </div>
         <Card className="max-h-[36rem] overflow-auto">
           {!selected ? <Empty>Select a node to see what it connects to.</Empty> : !detail.data ? <Spinner /> : (<>

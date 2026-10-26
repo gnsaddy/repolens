@@ -181,6 +181,15 @@ re-applies the edits and opens a draft pull request, or fails without writing an
 endpoint answers `409` for a public target unless the body has `confirm_public: true`. `pr_report.build(public=True)` is the strict
 variant of the pull request comment (score, signal names and the pull request's own files only), chosen by the Action's `public` flag.
 
+## Graph insights
+`services/graph_insights.py` derives three things from the stored graph, with no model call. **Trust** maps each edge's provenance to fact
+(static analysis, document link, git, GitHub), inferred (semantic, document mention) or uncertain (the same with weight under 0.5);
+`edge_dict` carries it. **Communities** come from deterministic label propagation over one repository's edges (nodes visited in sorted order,
+ties to the smaller label, groups under three left out, numbered by size), labelled by their most common directory. **Hubs** are the highest-degree
+code and document nodes; **surprising connections** are the rarest links between two communities (never CONTAINS or MODIFIES). The result is
+cached per repository until it is indexed again and rendered as the Start here report (`GET /api/graph/report`, `/api/graph/communities`, and a
+`community` field on node dicts). The MCP server exposes `graph_overview`, `graph_neighbors` and `graph_path`.
+
 ## Real-bug evaluation, calibration and injection tests
 `agents/workflow.py` ranks suspects with one entry per file, down-weights commits that share no words with the report and context files (docs, tests, changelogs) unless a stack trace names them. `evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose
 only reachable history ends there), indexes it with the offline stack and scores retrieval and the investigation shortlist against the

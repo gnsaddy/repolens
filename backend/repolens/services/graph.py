@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import Change, CodeChunk, Document, KGEdge, KGNode, Repository
 from .access import Scope
+from .graph_insights import trust
 
 SYMBOL_TYPES = {"function": "function", "method": "function", "class": "class", "interface": "class", "type": "class"}
 CODE_LANGS = {"python", "javascript", "typescript", "tsx", "go", "java"}
@@ -567,6 +568,7 @@ def edge_dict(e: KGEdge) -> dict:
         "target": e.dst_id,
         "rel": e.rel,
         "provenance": e.provenance,
+        "trust": trust(e.provenance, e.weight),
         "weight": e.weight,
         "evidence": e.evidence,
     }

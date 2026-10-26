@@ -89,9 +89,10 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 
 export interface GraphNode {
   id: string; type: "file" | "doc" | "section" | "function" | "class" | "commit" | "pr"; name: string; qualname: string;
-  path: string; start_line: number; end_line: number; repo_id: string; repo: string; degree: number; meta: Record<string, unknown>;
+  path: string; start_line: number; end_line: number; repo_id: string; repo: string; degree: number; meta: Record<string, unknown>; community?: number | null;
 }
-export interface GraphEdge { id: string; source: string; target: string; rel: string; provenance: string; weight: number; evidence: string }
+export type Trust = "fact" | "inferred" | "uncertain";
+export interface GraphEdge { id: string; source: string; target: string; rel: string; provenance: string; trust?: Trust; weight: number; evidence: string }
 export interface GraphData { nodes: GraphNode[]; edges: GraphEdge[] }
 export interface Connection { rel: string; direction: "in" | "out"; label: string; provenance: string; weight: number; evidence: string; node: GraphNode }
 export interface NodeDetail extends GraphData { node: GraphNode; content: string; connections: Connection[] }
@@ -274,3 +275,12 @@ export interface DashInsights {
 }
 
 export interface AccessToken { id: string; name: string; prefix: string; scope: "read" | "write"; created_at: string; expires_at: string | null; last_used_at: string | null; revoked: boolean }
+
+export interface NodeRef { id: string; name: string; type: string; path: string; degree: number }
+export interface CommunityInfo { id: number; size: number; files: number; label: string; top: { id: string; name: string; type: string; degree: number }[] }
+export interface GraphReport {
+  repo: { id: string; name: string }; stats: { nodes: number; edges: number; communities: number }; communities: CommunityInfo[];
+  hubs: (NodeRef & { community: number | null })[];
+  surprising: { source: NodeRef; target: NodeRef; relation: string; trust: Trust; from_area: string | null; to_area: string | null }[];
+  questions: string[]; markdown: string;
+}
