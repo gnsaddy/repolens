@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-rou
 import Logo from "@/components/Logo";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useTheme } from "@/lib/theme";
-import { BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Moon, Sun, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
+import { MessageSquare, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Moon, Sun, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -12,6 +12,7 @@ import { APP_VERSION } from "./lib/version";
 import { Spinner } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
 import ReportIssue from "./components/ReportIssue";
+import AskFab from "./components/AskFab";
 import Login, { SsoComplete } from "./pages/Login";
 import About from "./pages/About";
 import Security from "./pages/Security";
@@ -23,6 +24,7 @@ const Risk = lazy(() => import("./pages/Risk"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Investigations = lazy(() => import("./pages/Investigations"));
 const InvestigationView = lazy(() => import("./pages/InvestigationView"));
+const Ask = lazy(() => import("./pages/Ask"));
 const TokenUsage = lazy(() => import("./pages/TokenUsage"));
 const Wiki = lazy(() => import("./pages/Wiki"));
 const Ownership = lazy(() => import("./pages/Ownership"));
@@ -35,6 +37,7 @@ import ResetPassword from "./pages/ResetPassword";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/ask", label: "Ask", icon: MessageSquare },
   { to: "/investigations", label: "Investigations", icon: Search },
   { to: "/knowledge", label: "Knowledge", icon: Network },
   { to: "/wiki", label: "DeepMind Wiki", icon: Library },
@@ -105,6 +108,7 @@ function Shell() {
         <ErrorBoundary resetKey={loc.pathname + loc.search}><Suspense fallback={<div className="py-10"><Spinner /></div>}><Outlet /></Suspense></ErrorBoundary>
       </main>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+      <AskFab />
     </div>
   );
 }
@@ -120,6 +124,8 @@ export default function App() {
       <Route path="/faq" element={<Faq />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
+        <Route path="ask" element={<Ask />} />
+        <Route path="ask/:id" element={<Ask />} />
         <Route path="investigations" element={<Investigations />} />
         <Route path="investigations/:id" element={<InvestigationView />} />
         <Route path="knowledge" element={<Knowledge />} />

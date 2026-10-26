@@ -20,7 +20,7 @@ _AUTH = re.compile(r"^/api/auth/(login|register|reset|sso/(discover|start|exchan
 _HEAVY = re.compile(
     r"^/api/(mcp|knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"
     r"|investigations(/ci/start|/[^/]+/rerun)?|jira/(investigate|issues/[^/]+/analyze)|repositories(/[^/]+/(index|reindex))?"
-    r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*)$"
+    r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*|chats/[^/]+/messages(/[^/]+)?)$"
 )
 
 HEADERS = [
@@ -88,7 +88,7 @@ class EdgeGuard:
             if not wait and auth:
                 who = hashlib.sha256(auth).hexdigest()[:24]
                 wait = ratelimit.hit(f"user:{who}", s.rate_limit_user_per_minute)
-                if not wait and method == "POST" and _HEAVY.match(path):
+                if not wait and method in ("POST", "PUT") and _HEAVY.match(path):
                     wait = ratelimit.hit(f"heavy:{who}", s.rate_limit_heavy_per_minute)
             if wait:
                 return await reply(429, f"Too many requests. Try again in {wait} s.", wait)

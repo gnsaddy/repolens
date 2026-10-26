@@ -195,6 +195,29 @@ class DocsUpload(BaseModel):
     documents: list[DocIn] = Field(min_length=1, max_length=200)
 
 
+class ChatAttachmentIn(BaseModel):
+    name: str = Field(min_length=1, max_length=300)
+    text: str = Field(min_length=1, max_length=400_000)
+
+
+class ChatCreate(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    repo_ids: list[str] = Field(default_factory=list, max_length=50)
+    fallback: bool = False
+
+
+class ChatPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    archived: bool | None = None
+    repo_ids: list[str] | None = Field(default=None, max_length=50)
+    fallback: bool | None = None
+
+
+class ChatMessageIn(BaseModel):
+    content: str = Field(min_length=1, max_length=8000)
+    attachment: ChatAttachmentIn | None = None
+
+
 class WikiPageIn(BaseModel):
     repo_id: str
     path: str = Field(min_length=1, max_length=500)

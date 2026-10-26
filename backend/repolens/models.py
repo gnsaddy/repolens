@@ -83,6 +83,45 @@ class FixProposal(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ChatThread(Base):
+    """A person's conversation with the knowledge base. Private to its owner: not even admins can read it."""
+
+    __tablename__ = "chat_threads"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="New chat")
+    repo_ids: Mapped[list] = mapped_column(JSON, default=list)  # empty = everything this person may see
+    fallback: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # may answer from general knowledge when the sources do not
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    messages: Mapped[list[ChatMessage]] = relationship(
+        back_populates="thread", cascade="all, delete-orphan", order_by="ChatMessage.created_at, ChatMessage.id"
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    thread_id: Mapped[str] = mapped_column(ForeignKey("chat_threads.id", ondelete="CASCADE"), index=True)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    role: Mapped[str] = mapped_column(String(12))  # user | assistant
+    content: Mapped[str] = mapped_column(Text, default="")
+    sources: Mapped[list] = mapped_column(JSON, default=list)  # what an answer cited, as it was when it was written
+    connections: Mapped[list] = mapped_column(JSON, default=list)
+    mode: Mapped[str] = mapped_column(String(20), default="")  # llm | extractive | general | none
+    attachment: Mapped[dict] = mapped_column(
+        JSON, default=dict
+    )  # {"name", "chars"} of a .txt or .log file sent with a question
+    attachment_text: Mapped[str] = mapped_column(Text, default="")  # kept so an edited question can be answered again
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    thread: Mapped[ChatThread] = relationship(back_populates="messages")
+
+
 class ApiToken(Base):
     """A personal access token for scripts, CI and editor tools (MCP). Only a hash is stored; it acts as its owner with
     reduced power: `read` tokens are viewers, `write` tokens are at most members, never admins."""

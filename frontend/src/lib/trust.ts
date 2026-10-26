@@ -16,6 +16,7 @@ export const CONTROLS: { name: string; status: Status; note: string }[] = [
   { name: "Encryption of saved credentials", status: "built", note: "Git, Jira, Confluence and model credentials are encrypted at rest and never returned by the API." },
   { name: "Encryption in transit (HTTPS)", status: "partly", note: "RepoLens serves plain HTTP behind your proxy. The deployment guide covers certificates (your own, cert-manager or Caddy), but you set them up." },
   { name: "Encryption of the database and its disks", status: "not-yet", note: "Depends on your infrastructure, for example encrypted volumes. RepoLens does not add it." },
+  { name: "Private chats", status: "built", note: "Your conversations with the knowledge base are visible only to you: not to admins, other people or access tokens. Answers only use what you may see." },
   { name: "Runs in your own infrastructure", status: "built", note: "Self-hosted with Docker Compose or Kubernetes, and it works without any AI service." },
   { name: "No telemetry", status: "built", note: "No analytics, usage pings or crash reports go to the authors. Tracing only goes where an administrator points it." },
   { name: "Deleting your data", status: "built", note: "One command deletes a whole workspace, and old records are cleaned up on a schedule you set." },

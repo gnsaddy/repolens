@@ -153,6 +153,20 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Ask: chat with your knowledge base
+
+**Ask** (sidebar, and the floating **Ask** button on every other page) is a chat over everything you can see: repositories, documents, the wiki and the graph. Each answer cites its sources (`[S1]`, `[S2]`), and a source opens in the wiki or the graph.
+
+* **History:** every chat is saved, grouped by Today, Yesterday, Previous 7 days and Older, and searchable by title and content.
+* **Edit:** rename a chat, **edit** a question you asked (everything after it is removed and the question is answered again), **archive** a chat (it moves to the Archived tab and comes back if you write in it) or **delete** it (after confirmation).
+* **Scope:** limit a chat to one repository or document collection, or leave it on "All repositories & knowledge base".
+* **Follow-ups:** earlier turns inform a short follow-up ("and then?").
+* **Attach a `.txt` or `.log` file** to debug an error: only those two types are accepted, up to 200,000 characters are kept, secrets are masked, and the error lines, stack frames and code names in the file are used to search your code and docs.
+* **Allow fallback knowledge:** when the sources do not cover a question, a connected model may answer from general knowledge, clearly labelled "Not from your documents". It needs a model; without one the switch is off and says why. Off by default for every chat.
+* **Without a model:** the answer is the best passages (extracted, not generated) plus the key lines from an attached file.
+
+Chats are **private to you**: not even a workspace admin can open another person's chat, and access tokens cannot use them. See `SECURITY.md`.
+
 ## Long pages in the wiki
 
 A wiki page with more than 12 sections (an imported PDF has one per page) opens **one section at a time**, with Previous, Next, a picker and a "Show all N sections" link, instead of loading everything at once. The "On this page" list becomes the list of sections (the first 40, then "Show all"), highlights the one you are on and jumps between them. Showing all of a very large page (over 150 sections) asks first. Shorter pages look exactly as before.

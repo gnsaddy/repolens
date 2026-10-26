@@ -38,6 +38,7 @@ ACTION_MIN_ROLE = {
     "mcp.read": "viewer",
     "mcp.investigate": "member",
     "wiki.decide": "member",
+    "chat.write": "viewer",  # a person's own conversations: private to them, not shared workspace data
     "wiki.publish": "admin",
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}

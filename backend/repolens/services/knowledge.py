@@ -243,26 +243,9 @@ def _grounded(text: str) -> bool:
     return bool(re.search(r"\[S\d+\]", text)) or bool(_NO_ANSWER.search(text))
 
 
-def ask(
-    db: Session,
-    org: str,
-    query: str,
-    repo_ids: list[str] | None = None,
-    k: int = 8,
-    user_jira_key: str | None = None,
-    scope: Scope | None = None,
-    kinds: list[str] | None = None,
-    fresh: bool = False,
-) -> dict:
-    llm = LLMClient(db, org, "knowledge", "")
-    mem_key = answer_memory.scope_key(scope, repo_ids, kinds)
-    fp = answer_memory.fingerprint(db, org, scope, repo_ids)
-    if not llm.offline and not fresh:
-        hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
-        if hit:
-            return {**hit, "query": query, "mode": "llm", "cached": True}
-    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
-    sources = [
+def sources_from(results: list[dict]) -> list[dict]:
+    """The numbered sources of an answer, each with where it came from and a short snippet."""
+    return [
         {
             "id": f"S{i}",
             **{
@@ -284,11 +267,15 @@ def ask(
         }
         for i, r in enumerate(results, 1)
     ]
-    connections = []
+
+
+def connections_from(results: list[dict]) -> list[dict]:
+    """What the best sources are connected to in the graph."""
+    out = []
     for r in results[:5]:
         for c in r["connections"][:3]:
             if c["rel"] != "CONTAINS":
-                connections.append(
+                out.append(
                     {
                         "from": r["title"],
                         "label": c["label"],
@@ -297,6 +284,30 @@ def ask(
                         "provenance": c["provenance"],
                     }
                 )
+    return out
+
+
+def ask(
+    db: Session,
+    org: str,
+    query: str,
+    repo_ids: list[str] | None = None,
+    k: int = 8,
+    user_jira_key: str | None = None,
+    scope: Scope | None = None,
+    kinds: list[str] | None = None,
+    fresh: bool = False,
+) -> dict:
+    llm = LLMClient(db, org, "knowledge", "")
+    mem_key = answer_memory.scope_key(scope, repo_ids, kinds)
+    fp = answer_memory.fingerprint(db, org, scope, repo_ids)
+    if not llm.offline and not fresh:
+        hit = answer_memory.lookup(db, org, "ask", query, mem_key, fp, provider=llm.provider, model=llm.model)
+        if hit:
+            return {**hit, "query": query, "mode": "llm", "cached": True}
+    results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
+    sources = sources_from(results)
+    connections = connections_from(results)
     base = {"query": query, "sources": sources, "connections": connections[:12]}
     if not results:
         return {**base, "answer": "Nothing relevant was found in the indexed documents and code.", "mode": "none"}

@@ -6,6 +6,7 @@ import { api, type GraphNode, type Repo } from "@/lib/api";
 
 export const PAGES = [
   { label: "Dashboard", to: "/", hint: "overview" },
+  { label: "Ask: chat with your knowledge base", to: "/ask", hint: "questions, follow-ups, attach a log" },
   { label: "Investigations", to: "/investigations", hint: "find the root cause of a bug" },
   { label: "Knowledge: ask & search", to: "/knowledge", hint: "ask questions over code and docs" },
   { label: "Knowledge: graph", to: "/knowledge?tab=graph", hint: "explore connections and heat map" },
