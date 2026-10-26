@@ -211,3 +211,54 @@ def _extracted(sources: list[dict], results: list[dict], log_lines: list[str], f
             + "_"
         )
     return "\n\n".join(lines)
+
+
+_STOP = frozenset(
+    "a an the is are was were be been do does did how what why when where which who whom can could should would will "
+    "i we you it this that these those to of in on for with from by and or not my our your me us as at if so about "
+    "there their them they any some get got use using used please tell explain show".split()
+)
+
+
+def _terms(text: str) -> frozenset[str]:
+    return frozenset(w for w in re.findall(r"[a-z][a-z0-9_]{2,}", text.lower()) if w not in _STOP)
+
+
+def unanswered(threads: list[ChatThread], limit: int = 30) -> list[dict]:
+    """Questions the caller asked that their sources could not answer, similar ones grouped, most asked first.
+
+    Built only from the caller's own chats: conversations are private, so nothing here is shared with anyone else."""
+    found: list[dict] = []
+    for t in threads:
+        prev: ChatMessage | None = None
+        for m in t.messages:
+            if m.role == "user":
+                prev = m
+            elif m.role == "assistant" and prev is not None and (m.mode in ("none", "general") or not m.sources):
+                found.append({"text": prev.content.strip()[:300], "when": m.created_at, "chat_id": t.id})
+                prev = None
+    groups: list[dict] = []
+    for f in sorted(found, key=lambda x: x["when"], reverse=True):
+        words = _terms(f["text"])
+        if not words:
+            continue
+        for g in groups:
+            if len(words & g["words"]) / len(words | g["words"]) >= 0.5:
+                g["count"] += 1
+                g["chat_ids"].append(f["chat_id"])
+                break
+        else:
+            groups.append(
+                {"question": f["text"], "words": words, "count": 1, "last_asked": f["when"], "chat_ids": [f["chat_id"]]}
+            )
+    groups.sort(key=lambda g: (-g["count"], -g["last_asked"].timestamp()))
+    return [
+        {
+            "question": g["question"],
+            "count": g["count"],
+            "last_asked": g["last_asked"],
+            "topic": ", ".join(sorted(g["words"])[:4]),
+            "chat_id": g["chat_ids"][0],
+        }
+        for g in groups[:limit]
+    ]

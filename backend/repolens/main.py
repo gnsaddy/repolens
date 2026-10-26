@@ -22,6 +22,7 @@ from .api import (
     jira,
     knowledge,
     mcp,
+    measure,
     metrics,
     ownership,
     proposals,
@@ -206,6 +207,7 @@ def create_app() -> FastAPI:
         mcp.router,
         fixes.router,
         chat.router,
+        measure.router,
         webhooks.router,
         wiki.router,
     ):

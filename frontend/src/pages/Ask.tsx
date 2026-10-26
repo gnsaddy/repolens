@@ -6,6 +6,8 @@ import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, ErrorNote, Input, Spinner, Textarea } from "@/components/ui";
 import { api, type ChatList, type ChatMsg, type ChatSource, type ChatSummary, type ChatThread, type Repo } from "@/lib/api";
 import { cn, safeHref, timeAgo } from "@/lib/utils";
+import ChatGaps from "@/components/ChatGaps";
+import InfoTip from "@/components/InfoTip";
 import Markdown from "./wiki/Markdown";
 
 const MAX_ATTACH_CHARS = 400_000;
@@ -24,7 +26,7 @@ export default function Ask() {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const toast = useToast();
-  const [tab, setTab] = useState<"chats" | "archived">("chats");
+  const [tab, setTab] = useState<"chats" | "archived" | "gaps">("chats");
   const [search, setSearch] = useState("");
   const [draftScope, setDraftScope] = useState("");
   const [draftFallback, setDraftFallback] = useState(false);
@@ -32,7 +34,7 @@ export default function Ask() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [title, setTitle] = useState("");
 
-  const list = useQuery({ queryKey: ["chats", tab, search], queryFn: () => api<ChatList>(`/chats?archived=${tab === "archived"}&q=${encodeURIComponent(search)}`) });
+  const list = useQuery({ queryKey: ["chats", tab, search], queryFn: () => api<ChatList>(`/chats?archived=${tab === "archived"}&q=${encodeURIComponent(search)}`), enabled: tab !== "gaps" });
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
   const thread = useQuery({ queryKey: ["chat", id], enabled: !!id, queryFn: () => api<ChatThread>(`/chats/${id}`) });
   const refresh = () => { qc.invalidateQueries({ queryKey: ["chats"] }); if (id) qc.invalidateQueries({ queryKey: ["chat", id] }); };
@@ -68,11 +70,11 @@ export default function Ask() {
         <Button onClick={() => nav("/ask")} className="w-full"><MessageSquarePlus className="h-4 w-4" />New chat</Button>
         <Input aria-label="Search chats" placeholder="Search chats…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <div role="tablist" aria-label="Chat list" className="flex gap-1 text-sm">
-          {(["chats", "archived"] as const).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("rounded-md px-3 py-1", tab === t ? "bg-indigo-50 font-medium text-brand" : "text-muted hover:bg-slate-50")}>{t === "chats" ? "Chats" : "Archived"}</button>))}
+          {(["chats", "archived", "gaps"] as const).map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("rounded-md px-3 py-1", tab === t ? "bg-indigo-50 font-medium text-brand" : "text-muted hover:bg-slate-50")}>{t === "chats" ? "Chats" : t === "archived" ? "Archived" : "Gaps"}</button>))}
         </div>
-        <div className="min-h-0 flex-1 overflow-auto" aria-label={tab === "chats" ? "Chats" : "Archived chats"}>
-          {list.isLoading ? <Spinner /> : !groups.length ? <p className="p-2 text-sm text-muted">{search ? "No chats match that search." : tab === "archived" ? "No archived chats." : "No chats yet. Ask a question to start one."}</p> : groups.map(([name, items]) => (
+        <div className="min-h-0 flex-1 overflow-auto" aria-label={tab === "chats" ? "Chats" : tab === "archived" ? "Archived chats" : "Gaps"}>
+          {tab === "gaps" ? <ChatGaps /> : list.isLoading ? <Spinner /> : !groups.length ? <p className="p-2 text-sm text-muted">{search ? "No chats match that search." : tab === "archived" ? "No archived chats." : "No chats yet. Ask a question to start one."}</p> : groups.map(([name, items]) => (
             <section key={name} className="mb-3"><h3 className="mb-1 px-2 text-xs font-medium uppercase tracking-wide text-muted">{name}</h3>
               <ul className="space-y-0.5">{items.map((c) => (
                 <li key={c.id} className={cn("group relative rounded-md", c.id === id ? "bg-indigo-50" : "hover:bg-slate-50")}>
@@ -159,8 +161,16 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
         <label className="flex items-center gap-2 text-sm"><GitBranch className="h-4 w-4 text-muted" /><span className="text-muted">Scope:</span>
           <select aria-label="Scope" value={scope} onChange={(e) => (thread ? onChange({ repo_ids: e.target.value ? [e.target.value] : [] }) : draft.setScope(e.target.value))} className="h-9 max-w-[16rem] rounded-md border border-line bg-white px-2 text-sm font-medium">
             <option value="">All repositories &amp; knowledge base</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
-        <label className={cn("ml-auto flex items-center gap-2 text-sm", !modelAvailable && "opacity-60")} title={modelAvailable ? "When your sources do not cover a question, the model may answer from general knowledge, clearly labelled" : "Needs a connected language model (Settings → AI & search)"}>
-          <input type="checkbox" checked={fallback} disabled={!modelAvailable} onChange={(e) => (thread ? onChange({ fallback: e.target.checked }) : draft.setFallback(e.target.checked))} />Allow fallback knowledge</label>
+        <span className="ml-auto flex items-center gap-1">
+          <label className={cn("flex items-center gap-2 text-sm", !modelAvailable && "opacity-60")} title={modelAvailable ? undefined : "Needs a connected language model (Settings → AI & search)"}>
+            <input type="checkbox" checked={fallback} disabled={!modelAvailable} onChange={(e) => (thread ? onChange({ fallback: e.target.checked }) : draft.setFallback(e.target.checked))} />Allow fallback knowledge</label>
+          <InfoTip label="About fallback knowledge">
+            <strong className="block text-sm">Fallback knowledge</strong>
+            <span className="mt-1 block">Normally answers come only from your repositories and documents, with citations.</span>
+            <span className="mt-1 block">With this on, a connected model may answer from its general knowledge when your sources do not cover the question. Those parts start with “Not from your documents:”, have no citations, and can be wrong or out of date.</span>
+            <span className="mt-1 block">Your question and any attached file are sent to your model provider even when nothing matched. Off by default. Needs a connected model.</span>
+          </InfoTip>
+        </span>
         {thread && (<>
           <button aria-label="Rename chat" title="Rename chat" className="rounded p-1.5 text-muted hover:bg-slate-100" onClick={onRename}><Pencil className="h-4 w-4" /></button>
           <button aria-label={thread.archived ? "Restore chat" : "Archive chat"} title={thread.archived ? "Restore" : "Archive"} className="rounded p-1.5 text-muted hover:bg-slate-100" onClick={() => onChange({ archived: !thread.archived })}>{thread.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>

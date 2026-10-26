@@ -23,7 +23,7 @@ const SOURCES = [
 ];
 
 /** A small fake of the chat API, holding chats in memory. */
-function server(opts: { model?: boolean; initial?: ChatThread[] } = {}) {
+function server(opts: { model?: boolean; initial?: ChatThread[]; gaps?: unknown[] } = {}) {
   const chats = new Map<string, ChatThread>((opts.initial ?? []).map((t) => [t.id, t]));
   const calls: { method: string; url: string; body?: Record<string, unknown> }[] = [];
   const summary = (t: ChatThread) => ({ ...t, items: undefined, messages: t.items.length, preview: t.items.at(-1)?.content.slice(0, 80) ?? "" });
@@ -32,6 +32,8 @@ function server(opts: { model?: boolean; initial?: ChatThread[] } = {}) {
     calls.push({ method, url, body });
     if (url.endsWith("/auth/me")) return json({ id: "u", email: "a@b.io", name: "A", role: "member", org_id: "o" });
     if (url.endsWith("/repositories")) return json(repos);
+    if (url.endsWith("/chats/gaps")) return json({ items: opts.gaps ?? [] });
+    if (method === "POST" && url.endsWith("/knowledge/collections/c1/documents")) return json({ received: 1, changed: 1, secrets_redacted: 0 });
     let m: RegExpMatchArray | null;
     if (method === "GET" && url.includes("/chats?")) {
       const archived = url.includes("archived=true"), q = decodeURIComponent(url.split("q=")[1] ?? "").toLowerCase();
@@ -88,6 +90,20 @@ describe("Ask: a new chat", () => {
     expect(fb).toBeDisabled(); // no language model is connected
     expect(fb.closest("label")).toHaveAttribute("title", expect.stringContaining("Needs a connected language model"));
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled(); // nothing to send yet
+  });
+
+  it("explains fallback knowledge in an (i) tooltip that opens on click and closes on Escape", async () => {
+    server({ model: true });
+    page();
+    const tip = await screen.findByRole("button", { name: "About fallback knowledge" });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    await userEvent.click(tip);
+    const box = screen.getByRole("tooltip");
+    expect(box).toHaveTextContent("Not from your documents:");
+    expect(box).toHaveTextContent("sent to your model provider even when nothing matched");
+    expect(tip).toHaveAttribute("aria-expanded", "true");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
   it("enables the fallback switch when a model is connected", async () => {
@@ -319,5 +335,31 @@ describe("the floating Ask button and the sidebar", () => {
     expect(await screen.findByRole("button", { name: "New chat" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Ask a question" })).toBeNull(); // not on top of the chat itself
     expect(screen.getAllByRole("link", { name: /^Ask$/ })[0]).toHaveAttribute("aria-current", "page"); // the sidebar item is highlighted
+  });
+});
+
+
+describe("Ask: gaps", () => {
+  const gap = { question: "How do I rotate the zebra gateway credentials?", count: 3, last_asked: now(), topic: "gateway, rotate, zebra", chat_id: "t9" };
+  it("lists unanswered questions and drafts a page into a documentation collection", async () => {
+    const s = server({ gaps: [gap] });
+    page();
+    await userEvent.click(await screen.findByRole("tab", { name: "Gaps" }));
+    const list = await screen.findByLabelText("Unanswered questions");
+    expect(list).toHaveTextContent("asked 3 times");
+    expect(list).toHaveTextContent("Nobody else sees this list");
+    expect(within(list).getByRole("link", { name: gap.question })).toHaveAttribute("href", "/ask/t9");
+    await screen.findByRole("option", { name: "handbook" }).catch(() => undefined);
+    await userEvent.click(within(list).getByRole("button", { name: /Draft a page/ }));
+    await waitFor(() => expect(s.calls.find((c) => c.url.endsWith("/knowledge/collections/c1/documents"))).toBeTruthy());
+    const doc = (s.calls.find((c) => c.url.endsWith("/documents"))!.body as { documents: { path: string; content: string }[] }).documents[0];
+    expect(doc.path).toBe("drafts/how-do-i-rotate-the-zebra-gateway-credentials.md");
+    expect(doc.content).toContain("asked 3 times");
+  });
+  it("says so when there is nothing to write", async () => {
+    server();
+    page();
+    await userEvent.click(await screen.findByRole("tab", { name: "Gaps" }));
+    expect(await screen.findByText(/No gaps found/)).toBeInTheDocument();
   });
 });

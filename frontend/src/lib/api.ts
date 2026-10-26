@@ -274,6 +274,7 @@ export interface JiraInvestigateBatch { started: { issue_key: string; investigat
 export interface DashAttention { severity: "high" | "medium" | "low" | "info"; text: string; to: string }
 export interface DashInsights {
   attention: DashAttention[];
+  first_steps?: { asked: boolean; measured: boolean };
   investigations_per_day: { date: string; completed: number; failed: number }[];
   ai: { tokens: number; avoided: number; savings_rate: number; cost: number; requests: number; helpful_rate: number | null; ratings: number; daily: { date: string; tokens: number }[] };
   knowledge: { pages: number; chunks: number; graph_nodes: number; graph_edges: number; documented_ratio: number | null; wiki_issues: number; drift_open: number; proposals_pending: number };
@@ -300,3 +301,11 @@ export interface ChatMsg {
 export interface ChatSummary { id: string; title: string; repo_ids: string[]; fallback: boolean; archived: boolean; created_at: string; updated_at: string; messages: number; preview: string }
 export interface ChatThread extends ChatSummary { items: ChatMsg[] }
 export interface ChatList { items: ChatSummary[]; model_available: boolean }
+
+export interface ChatGap { question: string; count: number; last_asked: string; topic: string; chat_id: string }
+export interface MeasureRates { top1: number | null; top3: number | null; top5: number | null; mrr: number | null }
+export interface MeasureRun {
+  id: string; status: "running" | "completed" | "failed"; cases: number; error: string | null; started_at: string; finished_at: string | null;
+  result: { cases: number; random_top3: number; retrieval: MeasureRates; investigation: MeasureRates; top3_ci95: [number, number] | null; caveats: string[]; rows: { commit: string; report: string; files: string[]; retrieval_rank: number | null; investigation_rank: number | null }[] } | null;
+}
+export interface MeasureList { items: MeasureRun[]; can_run: boolean }

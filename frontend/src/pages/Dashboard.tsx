@@ -19,12 +19,16 @@ export default function Dashboard() {
   const wiki = useQuery({ queryKey: ["wiki-overview"], queryFn: () => api<WikiOverview>("/wiki/overview") });
   const llm = useQuery({ queryKey: ["llm-settings"], queryFn: () => api<LLMSettings>("/settings/llm") });
   const steps = [
-    { done: (data?.repositories ?? 0) > 0, label: "Add a repository", hint: "Pick a Git URL or local path, and choose which branches to index.", to: "/repositories" },
-    { done: (wiki.data?.totals?.pages ?? 0) > 0, label: "Add documentation", hint: "Upload a README, import a web page or connect Confluence.", to: "/wiki?tab=sources" },
-    { done: (data?.investigations ?? 0) > 0, label: "Investigate a bug", hint: "Describe it or paste a stack trace above.", to: "/investigations" },
-    { done: !!llm.data && llm.data.provider !== "heuristic", label: "Connect an AI model (optional)", hint: "Answers work offline; a model makes them read better.", to: "/settings" },
+    { done: (data?.repositories ?? 0) > 0, label: "Add a repository", hint: "Pick a Git URL or local path, and choose which branches to index.", to: "/repositories", cta: "Add repository", required: true },
+    { done: (wiki.data?.totals?.pages ?? 0) > 0, label: "Add documentation", hint: "Upload a README or PDF, import a web page or connect Confluence.", to: "/wiki?tab=sources", cta: "Add documents", required: true },
+    { done: !!more.data?.first_steps?.asked, label: "Ask your first question", hint: "Ask in plain words and get an answer with citations.", to: "/ask", cta: "Open Ask", required: true },
+    { done: !!more.data?.first_steps?.measured, label: "Measure it on your repo", hint: "See how often it finds the files behind your own past bug fixes.", to: "/repositories", cta: "Choose a repository", required: false },
+    { done: (data?.investigations ?? 0) > 0, label: "Investigate a bug", hint: "Describe it or paste a stack trace above.", to: "/investigations", cta: "Investigate", required: true },
+    { done: !!llm.data && llm.data.provider !== "heuristic", label: "Connect an AI model (optional)", hint: "Answers work offline; a model makes them read better.", to: "/settings", cta: "Open settings", required: false },
   ];
-  const finished = steps.every((s) => s.done);
+  const finished = steps.filter((s) => s.required).every((s) => s.done);
+  const next = steps.find((s) => !s.done);
+  const doneCount = steps.filter((s) => s.done).length;
   function go(e: FormEvent) {
     e.preventDefault();
     if (q.trim().length >= 5) nav("/investigations", { state: { query: q } });
@@ -39,11 +43,12 @@ export default function Dashboard() {
       </form>
       {!finished && data && (
         <Card className="mb-6" aria-label="Getting started">
-          <CardTitle right={<span className="text-xs text-muted">{steps.filter((s) => s.done).length} of {steps.length} done</span>}>Getting started</CardTitle>
-          <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{steps.map((s) => (
-            <li key={s.label}><Link to={s.to} className={`flex h-full gap-2 rounded-lg border p-3 text-sm hover:border-brand ${s.done ? "border-emerald-200 bg-emerald-50/50" : "border-line"}`}>
+          <CardTitle right={<span className="text-xs text-muted">{doneCount} of {steps.length} done</span>}>Getting started</CardTitle>
+          <div role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} className="mb-4 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
+          <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{steps.map((s) => (
+            <li key={s.label}><Link to={s.to} aria-current={s === next ? "step" : undefined} className={cn("flex h-full gap-2 rounded-lg border p-3 text-sm hover:border-brand", s.done ? "border-emerald-200 bg-emerald-50/50" : s === next ? "border-brand bg-indigo-50/40" : "border-line")}>
               {s.done ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
-              <span><span className="block font-medium">{s.label}</span><span className="text-xs text-muted">{s.hint}</span></span></Link></li>))}</ol>
+              <span><span className="block font-medium">{s.label}</span><span className="text-xs text-muted">{s.hint}</span>{s === next && <span className="mt-1 block text-xs font-medium text-brand">Next: {s.cta} →</span>}</span></Link></li>))}</ol>
         </Card>)}
       {more.data?.attention && <Attention items={more.data.attention} />}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

@@ -126,8 +126,11 @@ describe("dashboard getting started", () => {
     });
     shell(<Routes><Route path="/" element={<Dashboard />} /></Routes>);
     const card = await screen.findByLabelText("Getting started");
-    expect(card).toHaveTextContent("1 of 4 done");
+    expect(card).toHaveTextContent("1 of 6 done");
     expect(card).toHaveTextContent("Add documentation");
+    expect(card).toHaveTextContent("Next: Add documents");
+    expect(card).toHaveTextContent("Ask your first question");
+    expect(card).toHaveTextContent("Measure it on your repo");
   });
 });
 

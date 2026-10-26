@@ -56,7 +56,8 @@ Everything left of the model router runs on your own machine without calling any
 * **Models and routing**: connect several models and providers, test each, and give each a tier. Plain tasks go to cheaper models, hard ones to stronger models, with fallback and one-step escalation.
 * **Answer memory**: earlier answers to similar questions are shown first and reused when the sources have not changed.
 * **DeepMind Wiki**: search by meaning, edit pages in place, a per-repository code atlas, and an at-a-glance card (kind, owner, warnings, commands) for every page.
-* **Ask (chat)**: a private chat over your repositories and documents with history, scope, editing, archiving, and a `.txt`/`.log` attachment for debugging; answers cite their sources.
+* **Ask (chat)**: a private chat over your repositories and documents with history, scope, editing, archiving, and a `.txt`/`.log` attachment for debugging; answers cite their sources; a **Gaps** tab lists the questions it could not answer, with a one-click starter page.
+* **Measure it on your repo**: tests how often RepoLens finds the files behind your own past bug fixes, on your machine, with a confidence range.
 * **Suggested fixes**: a drafted patch for a confirmed cause that a person approves before a draft pull request is opened; never merged.
 * **Editor and CI**: an MCP server for Claude Code, Cursor and others, and a GitHub Action that comments change risk on every pull request.
 * **Accounts**: profile, device sessions you can end, idle timeout, sign-in rate limiting, and an Insights page for utilisation and AI savings.

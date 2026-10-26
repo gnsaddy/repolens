@@ -361,3 +361,27 @@ def test_the_list_says_whether_a_model_is_connected(client, auth, monkeypatch):
     assert client.get("/api/chats", headers=auth).json()["model_available"] is False
     monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
     assert client.get("/api/chats", headers=auth).json()["model_available"] is True
+
+
+# ---------------------------------------------------------------- unanswered questions
+def test_unanswered_questions_are_grouped_private_and_skip_answered_ones(client, auth):
+    h2 = make_user(client, auth, "gaps2@example.com")
+    c = new_chat(client, auth)
+    say(client, auth, c["id"], "How do I rotate the zebra gateway credentials?")  # empty workspace: no sources
+    c2 = new_chat(client, auth)
+    say(client, auth, c2["id"], "rotate zebra gateway credentials how")
+    c3 = new_chat(client, auth)
+    say(client, auth, c3["id"], "What is the deployment procedure for billing?")
+    items = client.get("/api/chats/gaps", headers=auth).json()["items"]
+    top = items[0]
+    assert top["count"] == 2 and "zebra" in top["topic"] and len(items) == 2
+    assert client.get("/api/chats/gaps", headers=h2).json()["items"] == []  # nobody else's questions
+    assert client.get("/api/chats/gaps").status_code in (401, 403)
+
+
+def test_a_question_with_sources_is_not_a_gap(client, auth, repo):
+    c = new_chat(client, auth)
+    assert say(client, auth, c["id"], "get_profile display_name").status_code == 201
+    got = [m for m in client.get(f"/api/chats/{c['id']}", headers=auth).json()["items"] if m["role"] == "assistant"]
+    assert got[-1]["sources"]
+    assert client.get("/api/chats/gaps", headers=auth).json()["items"] == []

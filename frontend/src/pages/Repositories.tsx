@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/feedback";
-import { File, GitPullRequest, Lock, RefreshCw, Trash2 } from "lucide-react";
+import { File, Gauge, GitPullRequest, Lock, RefreshCw, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, statusTone } from "@/components/ui";
 import StoragePanel from "@/components/StoragePanel";
+import MeasurePanel from "@/components/MeasurePanel";
 import { api, type BranchList, type GithubConn, type IndexRunRow, type PullRow, type FileView, type PathOwners, type Repo, type SearchHit } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import AccessPanel from "@/components/AccessPanel";
@@ -14,6 +15,7 @@ export default function Repositories() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [sel, setSel] = useState<string | null>(null);
+  const [measuring, setMeasuring] = useState(false);
   const [file, setFile] = useState<{ path: string; line?: [number, number] } | null>(null);
   const [form, setForm] = useState({ name: "", source: "local", url: "" });
   const [picked, setPicked] = useState<string[]>([]);
@@ -53,6 +55,7 @@ export default function Repositories() {
   return (
     <div>
       <PageHeader title="Repository Explorer" subtitle="Search and explore your indexed codebase with semantic understanding." />
+      {measuring && repo && <MeasurePanel repo={repo} onClose={() => setMeasuring(false)} />}
       <form onSubmit={search} className="mb-6 flex gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files, symbols, or ask a question…" aria-label="Search code" />
         <Button type="submit" variant="outline">Search{sel ? " in repo" : " all"}</Button>
@@ -105,6 +108,7 @@ export default function Repositories() {
           {!repo ? <Empty>Select a repository to explore its files and history.</Empty> : (<>
             <Card>
               <CardTitle right={canWrite(user) && (<div className="flex gap-1">
+                {repo.source !== "docs" && <Button size="sm" variant="outline" onClick={() => setMeasuring(true)} disabled={repo.status !== "ready"}><Gauge className="h-3.5 w-3.5" />Measure</Button>}
                 <Button size="sm" variant="outline" onClick={() => reindex.mutate(repo.id)} disabled={repo.status === "indexing"}><RefreshCw className="h-3.5 w-3.5" />Re-index</Button>
                 {user?.role === "admin" && <Button size="sm" variant="ghost" aria-label="Delete repository" onClick={async () => { if (await ask({ title: `Delete ${repo.name}?`, message: "Its index, graph, investigations and clone are removed. The source repository is not touched.", confirmLabel: "Delete repository", danger: true })) remove.mutate(repo.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>)}>{repo.name}</CardTitle>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">

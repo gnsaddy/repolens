@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     AuditEvent,
+    ChatThread,
     CodeChunk,
     DocProposal,
     Document,
     DriftAlert,
+    EvalRun,
     FeedbackEvent,
     Investigation,
     KGEdge,
@@ -202,8 +204,17 @@ def build(db: Session, org: str, user_id: str, role: str, scope: Scope) -> dict:
             if len(activity) >= 8:
                 break
 
+    first_steps = {  # drives the getting-started guide; counts only, never anyone's content
+        "asked": bool(db.scalar(select(func.count()).select_from(ChatThread).where(ChatThread.user_id == user_id))),
+        "measured": bool(
+            db.scalar(
+                select(func.count()).select_from(EvalRun).where(EvalRun.org_id == org, EvalRun.status == "completed")
+            )
+        ),
+    }
     return {
         "attention": attention,
+        "first_steps": first_steps,
         "investigations_per_day": list(trend.values()),
         "ai": ai,
         "knowledge": knowledge,

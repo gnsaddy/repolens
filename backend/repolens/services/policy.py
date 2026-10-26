@@ -8,6 +8,7 @@ from ..deps import Principal, audit
 ACTION_MIN_ROLE = {
     "repo.create": "member",
     "repo.index": "member",
+    "repo.measure": "member",
     "repo.delete": "admin",
     "investigation.create": "member",
     "investigation.delete": "member",

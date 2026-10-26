@@ -123,6 +123,19 @@ def create_chat(body: ChatCreate, p: Principal = Depends(current_principal), db:
     return _full(db, p, t)
 
 
+@router.get("/gaps")
+def gaps(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Your own questions that your sources could not answer: the pages worth writing next."""
+    _no_tokens(p)
+    rows = db.scalars(
+        select(ChatThread)
+        .where(ChatThread.org_id == p.org_id, ChatThread.user_id == p.user_id)
+        .order_by(ChatThread.updated_at.desc())
+        .limit(svc.MAX_THREADS)
+    )
+    return {"items": svc.unanswered(list(rows))}
+
+
 @router.get("/{thread_id}")
 def get_chat(thread_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     _no_tokens(p)

@@ -162,10 +162,24 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 * **Scope:** limit a chat to one repository or document collection, or leave it on "All repositories & knowledge base".
 * **Follow-ups:** earlier turns inform a short follow-up ("and then?").
 * **Attach a `.txt` or `.log` file** to debug an error: only those two types are accepted, up to 200,000 characters are kept, secrets are masked, and the error lines, stack frames and code names in the file are used to search your code and docs.
-* **Allow fallback knowledge:** when the sources do not cover a question, a connected model may answer from general knowledge, clearly labelled "Not from your documents". It needs a model; without one the switch is off and says why. Off by default for every chat.
+* **Allow fallback knowledge:** when the sources do not cover a question, a connected model may answer from general knowledge, clearly labelled "Not from your documents". It needs a model; without one the switch is off and says why. Off by default for every chat. An **(i)** button next to the switch explains it: what changes, that those parts have no citations and can be wrong, and that your question and any attached file go to your model provider even when nothing matched.
 * **Without a model:** the answer is the best passages (extracted, not generated) plus the key lines from an attached file.
 
 Chats are **private to you**: not even a workspace admin can open another person's chat, and access tokens cannot use them. See `SECURITY.md`.
+
+### Gaps: the pages worth writing next
+
+The **Gaps** tab lists questions *you* asked that your sources could not answer (no sources found, or only a general-knowledge reply). Similar questions are grouped ("asked 3 times"), most asked first, each linking to its chat. **Draft a page** saves a starter page (`drafts/<question>.md`) in a documentation collection (it offers to create one called Handbook if you have none) for someone to fill in. The list is built from your own chats only, so it is as private as they are.
+
+## Measure it on your repo
+
+On **Repositories**, a repository's **Measure** button tests RepoLens against that repository's own history. It takes recent bug-fix commits (message says fix/resolve, 1–4 source files changed), uses the commit message as the question with file names hidden, rebuilds the index as it was just before the fix, and checks whether the files the fix changed are among the top 1, 3 and 5 suggestions. The result shows the three rates, a 95% range for top 3, what random picking would score, a per-fix table of hits and misses, and the caveats (tidy commit messages, small sample, no language model involved).
+
+It runs in a separate process on your server: nothing is downloaded, no model is called and no code leaves the machine. One run at a time per workspace; 5, 10 or 15 fix commits; runs are kept so you can compare after re-indexing. `POST/GET /api/repositories/{id}/measure`, policy action `repo.measure` (members), migration 0022.
+
+## Getting started guide
+
+The dashboard checklist walks a new workspace through: add a repository, add documentation, ask a first question, measure it on your repo (optional), investigate a bug, connect a model (optional). It shows progress, highlights the next step with a link, and disappears once the required steps are done.
 
 ## Long pages in the wiki
 

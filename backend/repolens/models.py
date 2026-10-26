@@ -753,3 +753,19 @@ class BitbucketConnection(Base):
     account: Mapped[str] = mapped_column(String(200), default="")  # who the credential belongs to, for display
     token_encrypted: Mapped[str] = mapped_column(Text)  # never returned by the API
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class EvalRun(Base):
+    """A 'measure it on my repository' run: fix commits from the repo's own history become test questions."""
+
+    __tablename__ = "eval_runs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(ForeignKey("repositories.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(20), default="running")  # running | completed | failed
+    cases: Mapped[int] = mapped_column(Integer, default=10)
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
