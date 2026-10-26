@@ -115,7 +115,12 @@ export default function Repositories() {
                 <span>{repo.file_count} files</span><span>{repo.chunk_count} chunks</span><span>branch {repo.branch || repo.default_branch}</span>{lastRun?.finished_at && <span>last index {Math.max(1, Math.round((+new Date(lastRun.finished_at) - +new Date(lastRun.started_at)) / 1000))}s</span>}
                 <span>revision {repo.indexed_sha?.slice(0, 10) ?? "—"}</span><span>updated {timeAgo(repo.updated_at)}</span></div>
               {!!runs.data?.[0]?.secrets_redacted && <p className="mt-2 text-xs text-amber-700">The last index removed {runs.data[0].secrets_redacted} apparent secret(s) from stored code, diffs and docs.</p>}
-              {repo.status === "error" && <p className="mt-2 text-sm text-red-600">Indexing failed — check the path/URL and re-index.</p>}
+              {repo.status === "error" && (
+                <div className="mt-2 text-sm text-red-600">
+                  <p>Indexing failed{repo.last_error ? `: ${repo.last_error}` : " — check the path/URL and re-index."}</p>
+                  <p className="text-xs text-muted">A failure that can pass by itself, such as a timeout, is tried again automatically. Anything else needs the path, address or credentials fixed, then Re-index.</p>
+                </div>)}
+              {repo.status === "ready" && repo.source !== "docs" && <p className="mt-2 text-xs text-muted">Checked once a day: if the repository changed, it is indexed again automatically.</p>}
             </Card>
             {user?.role === "admin" && <AccessPanel key={repo.id} repoId={repo.id} repoName={repo.name} />}
             <div className="grid gap-4 xl:grid-cols-[260px_1fr]">

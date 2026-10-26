@@ -1,7 +1,7 @@
 export interface User { id: string; email: string; name: string; role: "admin" | "member" | "viewer"; org_id: string; auth_source?: string; totp_enabled?: boolean }
 export interface Repo {
   id: string; name: string; source: "local" | "git" | "docs"; url: string; default_branch: string; branch?: string; indexed_sha: string | null; web_url?: string; visibility?: "org" | "restricted";
-  status: "pending" | "indexing" | "ready" | "error"; file_count: number; chunk_count: number; updated_at: string;
+  status: "pending" | "indexing" | "ready" | "error"; file_count: number; chunk_count: number; updated_at: string; last_error?: string | null;
 }
 export interface EvidenceItem {
   type: "code" | "commit" | "caller" | "doc" | "test" | "pr";

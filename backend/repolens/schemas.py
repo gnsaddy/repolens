@@ -79,6 +79,7 @@ class RepoOut(ORM):
     file_count: int
     chunk_count: int
     updated_at: datetime
+    last_error: str | None = None  # why the last index failed, while the repository is in the error state
 
     @field_validator("url")
     @classmethod

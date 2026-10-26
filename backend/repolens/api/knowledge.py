@@ -291,17 +291,47 @@ def graph_overview(
     p: Principal = Depends(current_principal),
     db: Session = Depends(get_db),
 ):
-    """Most-connected nodes (commits hidden unless requested) and the edges among them."""
+    """Most-connected nodes (commits hidden unless requested) and the edges among them.
+
+    For one repository that is its `limit` most-connected nodes. For all of them, every repository gets its own share
+    and the total grows with their number (up to 400), so a big repository cannot crowd a small one out."""
     if repo_id:
         _get_repo(db, p, repo_id)
     wanted = set(types.split(",")) if types else {"file", "doc", "section", "function", "class"}
-    q = select(KGNode).where(KGNode.org_id == p.org_id, KGNode.type.in_(wanted), KGNode.degree > 0)
+    where = [KGNode.org_id == p.org_id, KGNode.type.in_(wanted), KGNode.degree > 0]
     visible_ids = scope_for(db, p).ids_or_none()
     if visible_ids is not None:
-        q = q.where(KGNode.repo_id.in_(visible_ids))
+        where.append(KGNode.repo_id.in_(visible_ids))
     if repo_id:
-        q = q.where(KGNode.repo_id == repo_id)
-    nodes = list(db.scalars(q.order_by(KGNode.degree.desc()).limit(limit)))
+        where.append(KGNode.repo_id == repo_id)
+    q = select(KGNode).where(*where)
+    repos_with_nodes = (
+        1 if repo_id else (db.scalar(select(func.count(func.distinct(KGNode.repo_id))).where(*where)) or 1)
+    )
+    if repos_with_nodes <= 1:
+        nodes = list(db.scalars(q.order_by(KGNode.degree.desc()).limit(limit)))
+    else:
+        budget = min(400, limit * repos_with_nodes)
+        share = max(10, budget // repos_with_nodes)
+        ranked = (
+            select(
+                KGNode.id,
+                func.row_number().over(partition_by=KGNode.repo_id, order_by=KGNode.degree.desc()).label("rank"),
+            )
+            .where(*where)
+            .subquery()
+        )
+        nodes = list(
+            db.scalars(
+                select(KGNode)
+                .join(ranked, KGNode.id == ranked.c.id)
+                .where(ranked.c.rank <= share)
+                .order_by(KGNode.degree.desc())
+            )
+        )[:budget]
+        if len(nodes) < budget:  # a small repository left room: the most-connected of the rest fill it
+            more = select(KGNode).where(*where, KGNode.id.notin_([n.id for n in nodes])).order_by(KGNode.degree.desc())
+            nodes += list(db.scalars(more.limit(budget - len(nodes))))
     ids = [n.id for n in nodes]
     eq = select(KGEdge).where(KGEdge.org_id == p.org_id, KGEdge.src_id.in_(ids), KGEdge.dst_id.in_(ids))
     if rels:

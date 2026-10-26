@@ -172,6 +172,27 @@ def list_remote_branches(url: str, auth_header: str | None = None) -> tuple[list
     return sorted(branches), default
 
 
+def remote_head(url: str, branch: str = "", auth_header: str | None = None) -> str:
+    """The commit a remote's branch (or its default branch) points at now, without cloning. Empty if unknown."""
+    if not url.startswith(_SCHEMES):
+        raise GitError("only https/ssh URLs are allowed")
+    ref = f"refs/heads/{branch}" if branch else "HEAD"
+    try:
+        r = subprocess.run(
+            ["git", "ls-remote", "--", url, ref],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            env={"GIT_TERMINAL_PROMPT": "0", "PATH": "/usr/bin:/bin:/usr/local/bin", **_auth_env(auth_header)},
+        )
+    except subprocess.TimeoutExpired as e:
+        raise GitError("checking the repository timed out") from e
+    if r.returncode != 0:
+        raise GitError(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "could not reach the repository")
+    first = r.stdout.splitlines()[0].split()[0] if r.stdout.strip() else ""
+    return first if re.fullmatch(r"[0-9a-f]{40,64}", first) else ""
+
+
 def list_local_branches(path: str) -> tuple[list[str], str]:
     out = _git(path, "for-each-ref", "--format=%(refname:short)", "refs/heads")
     return sorted(b for b in out.split() if b), current_branch(path)

@@ -10,10 +10,12 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ✅ Uploaded document collections (no git needed), edit/delete with incremental re-index
 * ⚠️ GitHub pull requests (title, body, discussion, files, commits, labels, Jira keys) via PAT or OAuth device flow; webhook re-sync
 * ✅ GitHub push webhook re-indexing (HMAC-verified)
+* ✅ **Failed indexes try again, and changed repositories are re-indexed daily:** a failure that can pass by itself (a timeout, a dropped connection) is tried again after 1 minute and again after 5 (`REPOLENS_INDEX_RETRY_DELAYS`, a list of seconds; empty turns it off). A wrong path, address, branch or password is not retried, because trying again cannot fix it. The Repositories page shows the real reason ("git log timed out"), not a fixed "check the path". Once a day (`REPOLENS_AUTO_REINDEX_HOURS`, 24; 0 turns it off) each repository is asked cheaply whether it changed (`git ls-remote` for a clone, the branch head for a local path), and only the ones that did, whose last index failed, or that were cut short by a restart are indexed again.
 * ✅ Private clones use the connected GitHub token via an environment-passed header, only for the host it was issued for; URLs with embedded credentials are rejected
 * ❌ GitLab / Bitbucket, GitHub App installation flow
 
 ## Retrieval and knowledge graph
+* ✅ **One world per repository in the graph:** with more than one repository the graph gives each its own labelled region, repositories that are linked are drawn nearer to each other and unrelated ones apart, and a link that crosses from one repository into another is drawn as an amber dashed bridge. A single repository looks as before. "All sources" gives each repository its own share of the nodes (120 each, at most 400 in all), so a bigger repository no longer crowds a smaller one out of the picture.
 * ✅ Hybrid search: pgvector similarity + Postgres full-text + symbol/path matching, reciprocal-rank fusion, deterministic ties, light stemming
 * ✅ Stack-trace understanding (Python/JS/Java), innermost-frame priority
 * ✅ Evidence links: GitHub/GitLab permalinks for commits, file ranges and PRs in evidence, reports, search and Ask (Jira comments get real link marks)

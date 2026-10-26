@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     max_branches: int = 8
     # Checkouts of git repositories unused for this many days are deleted (re-cloned on the next index). 0 disables.
     checkout_ttl_days: int = 30
+    # A failed index is tried again after each of these many seconds when the error can pass by itself (a timeout, a
+    # network drop); a wrong path or password is not retried. Empty turns retries off.
+    index_retry_delays: list[float] = Field(default_factory=lambda: [60.0, 300.0])
+    # Once this many hours, repositories that changed since their last index (and ones whose last index failed) are
+    # indexed again. 0 turns it off.
+    auto_reindex_hours: float = 24.0
     # Local (server-side path) repositories are only allowed under these roots outside dev
     local_repo_roots: list[str] = Field(default_factory=list)
     # Embeddings: "hash" (local, offline) or "openai" (OpenAI-compatible endpoint)

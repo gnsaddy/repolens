@@ -249,7 +249,26 @@ variant of the pull request comment (score, signal names and the pull request's 
 
 Limits that follow from this: the built-in vector captures word overlap, not meaning, so a question worded very differently from the page ranks lower (measured: 42% first-place on re-worded questions against 96% on exact ones; a real embedding model helps, see `evals/README.md`); text extraction loses layout, so tables and figures in a PDF may come out as plain lines or not at all; headings in a PDF are not recognised (only page boundaries are), so sections are pages; and a scanned PDF has no text to read.
 
+## Keeping indexes fresh
+`services/index_jobs.py`. `api/repos._run_index` hands each finished run to `after_run`. A `failed` run whose error can pass by itself
+(`retryable`: anything that does not match `PERMANENT`, such as a wrong path, branch or credentials) schedules a daemon `threading.Timer` for the
+next delay in `index_retry_delays` (default 60 s, then 300 s), with at most one pending retry per repository, reset on success. When it fires it
+indexes again only if the repository is still in the error state. `main._auto_reindexer` runs `daily_pass` every `auto_reindex_hours` (24, first
+pass 15 minutes after start-up). `changed()` is true for a repository whose last index failed, that never finished, that has said "indexing" for
+over three hours (the server stopped), or whose branch head differs from `indexed_sha` (`gitops.remote_head`, a `git ls-remote`, for clones; the
+local branch head for local paths). One that cannot be reached is left for the next pass. The reason for a failure is `IndexRun.error`, attached
+to the repository response as `last_error` (redacted, 300 characters) only while it is in the error state. The retention sweeper
+(`_retention_sweeper`) is started from the same lifespan; it had been written but never started, so the daily clean-up only ever ran from its
+manual endpoint.
+
 ## Graph insights
+**Worlds.** `ForceGraph.layout` groups nodes by repository (`repoGroups`). With two or more, `placeWorlds` puts the repositories on a wide ring and
+relaxes their centres: they never overlap, and repositories with links between them are pulled to just beyond touching, in proportion to the number
+of links. Each node is pulled to its own repository's centre, and a link across repositories is a longer, weaker spring. The drawing adds a faint
+region and name per repository and draws cross-repository links as amber dashed bridges. One repository uses the original single-cluster layout. Which nodes reach the browser is decided by `GET /api/graph/overview`: for one repository its `limit`
+most-connected nodes; for all of them a budget of `limit` per repository (at most 400) shared out with a window function (`row_number() over (partition by
+repo_id order by degree desc)`), every repository getting `budget / repositories` of it and the most-connected of the rest filling any room a small one leaves.
+
 `services/graph_insights.py` derives three things from the stored graph, with no model call. **Trust** maps each edge's provenance to fact
 (static analysis, document link, git, GitHub), inferred (semantic, document mention) or uncertain (the same with weight under 0.5);
 `edge_dict` carries it. **Communities** come from deterministic label propagation over one repository's edges (nodes visited in sorted order,

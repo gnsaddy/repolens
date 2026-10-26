@@ -125,6 +125,25 @@ async def _retention_sweeper(hours: float = 24.0) -> None:
         await asyncio.sleep(hours * 3600)
 
 
+async def _auto_reindexer(hours: float) -> None:
+    """Once every `hours`, index again each repository that changed since its last index or whose last index failed."""
+    from .api import repos
+    from .db import session_factory
+    from .services import index_jobs
+
+    def run() -> None:
+        with session_factory()() as db:
+            index_jobs.daily_pass(db, repos.schedule_index)
+
+    await asyncio.sleep(900)  # not while the server is still starting and people are signing in
+    while True:
+        try:
+            await asyncio.to_thread(run)
+        except Exception:
+            logging.getLogger("repolens.indexer").exception("daily re-index check failed")
+        await asyncio.sleep(hours * 3600)
+
+
 async def _investigation_reaper(seconds: float = 60.0) -> None:
     """Fail investigations left 'running' by a restart or a hung call, so they never spin forever."""
     from .db import session_factory
@@ -158,7 +177,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_source_scheduler()),
         asyncio.create_task(_investigation_reaper()),
         asyncio.create_task(_system_sampler()),
+        asyncio.create_task(_retention_sweeper()),  # was written but never started, so the daily clean-up never ran
     ]
+    if s.auto_reindex_hours > 0 and not s.run_jobs_inline:
+        tasks.append(asyncio.create_task(_auto_reindexer(s.auto_reindex_hours)))
     if s.checkout_ttl_days > 0:
         tasks.append(asyncio.create_task(_checkout_janitor()))
     yield

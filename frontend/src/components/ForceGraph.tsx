@@ -27,12 +27,65 @@ const DIRECTED = new Set(["CALLS", "IMPORTS", "TESTS", "MENTIONS", "LINKS_TO", "
 interface P { x: number; y: number; vx: number; vy: number }
 const W = 900, H = 600;
 
-/** Small dependency-free force layout (repulsion + springs + gravity), run to rest then rendered statically. */
+export interface Group { id: string; name: string; ids: string[] }
+/** The repositories (or document collections) the nodes belong to, biggest first. */
+export function repoGroups(nodes: GraphNode[]): Group[] {
+  const m = new Map<string, Group>();
+  for (const n of nodes) {
+    const g = m.get(n.repo_id) ?? { id: n.repo_id, name: n.repo, ids: [] };
+    g.ids.push(n.id);
+    m.set(n.repo_id, g);
+  }
+  return [...m.values()].sort((a, b) => b.ids.length - a.ids.length);
+}
+
+const worldRadius = (count: number) => 70 + 15 * Math.sqrt(count);
+
+/** Where each repository's "world" sits: spread on a ring, then repositories that are linked are drawn together and the rest pushed apart. */
+function placeWorlds(groups: Group[], edges: GraphEdge[], repoOf: Record<string, string>): Record<string, { x: number; y: number; r: number }> {
+  const n = groups.length;
+  const r = groups.map((g) => worldRadius(g.ids.length));
+  const ring = Math.max(300, r.reduce((a, b) => a + b, 0) * 0.95); // start well apart, so only a real link pulls two worlds together
+  const c = groups.map((_, i) => ({ x: W / 2 + Math.cos((i / n) * Math.PI * 2) * ring, y: H / 2 + Math.sin((i / n) * Math.PI * 2) * ring * 0.7 }));
+  const idx = new Map(groups.map((g, i) => [g.id, i]));
+  const links = new Map<string, number>();
+  for (const e of edges) {
+    const a = idx.get(repoOf[e.source]), b = idx.get(repoOf[e.target]);
+    if (a == null || b == null || a === b) continue;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    links.set(key, (links.get(key) ?? 0) + 1);
+  }
+  for (let it = 0; it < 180; it++) {
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        let dx = c[j].x - c[i].x, dy = c[j].y - c[i].y;
+        const d = Math.hypot(dx, dy) || 1;
+        dx /= d; dy /= d;
+        const apart = r[i] + r[j] + 90, k = links.get(`${i}|${j}`) ?? 0;
+        let move = 0;
+        if (d < apart) move = -(apart - d) * 0.08; // never overlap
+        else if (k) move = Math.min((d - (r[i] + r[j] + 40)) * 0.03 * Math.min(k, 6), 40); // linked worlds sit closer
+        c[i].x += dx * move / 2; c[i].y += dy * move / 2; c[j].x -= dx * move / 2; c[j].y -= dy * move / 2;
+      }
+    }
+    for (const p of c) { p.x += (W / 2 - p.x) * 0.002; p.y += (H / 2 - p.y) * 0.002; }
+  }
+  return Object.fromEntries(groups.map((g, i) => [g.id, { x: c[i].x, y: c[i].y, r: r[i] }]));
+}
+
+/** Small dependency-free force layout (repulsion + springs + gravity), run to rest then rendered statically.
+ *  With more than one repository, each gets its own region ("world") and only links between repositories reach across. */
 export function layout(nodes: GraphNode[], edges: GraphEdge[], seedPositions: Record<string, P> = {}): Record<string, P> {
   const pos: Record<string, P> = {};
+  const groups = repoGroups(nodes);
+  const repoOf: Record<string, string> = {};
+  nodes.forEach((n) => { repoOf[n.id] = n.repo_id; });
+  const worlds = groups.length > 1 ? placeWorlds(groups, edges, repoOf) : null;
   nodes.forEach((n, i) => {
     const a = (i / Math.max(nodes.length, 1)) * Math.PI * 2;
-    pos[n.id] = seedPositions[n.id] ?? { x: W / 2 + Math.cos(a) * 220 + (i % 7), y: H / 2 + Math.sin(a) * 160 + (i % 5), vx: 0, vy: 0 };
+    const w = worlds?.[n.repo_id];
+    const start = w ? { x: w.x + Math.cos(a * 7) * w.r * 0.6, y: w.y + Math.sin(a * 7) * w.r * 0.6 } : { x: W / 2 + Math.cos(a) * 220 + (i % 7), y: H / 2 + Math.sin(a) * 160 + (i % 5) };
+    pos[n.id] = seedPositions[n.id] ?? { ...start, vx: 0, vy: 0 };
   });
   const links = edges.filter((e) => pos[e.source] && pos[e.target]);
   const iters = nodes.length > 150 ? 160 : 260;
@@ -55,13 +108,15 @@ export function layout(nodes: GraphNode[], edges: GraphEdge[], seedPositions: Re
       const a = pos[e.source], b = pos[e.target];
       const dx = b.x - a.x, dy = b.y - a.y;
       const d = Math.sqrt(dx * dx + dy * dy) || 1;
-      const rest = e.rel === "CONTAINS" ? 50 : 90;
-      const f = (d - rest) * 0.02 * (0.5 + e.weight / 2);
+      const across = worlds != null && repoOf[e.source] !== repoOf[e.target]; // a link out of one world into another
+      const rest = across ? 200 : e.rel === "CONTAINS" ? 50 : 90;
+      const f = (d - rest) * 0.02 * (0.5 + e.weight / 2) * (across ? 0.4 : 1);
       a.vx += (dx / d) * f; a.vy += (dy / d) * f; b.vx -= (dx / d) * f; b.vy -= (dy / d) * f;
     }
     for (const n of nodes) {
       const p = pos[n.id];
-      p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004;
+      const home = worlds?.[n.repo_id]; // pulled towards its own world, not the middle of everything
+      p.vx += ((home?.x ?? W / 2) - p.x) * (home ? 0.014 : 0.004); p.vy += ((home?.y ?? H / 2) - p.y) * (home ? 0.014 : 0.004);
       p.x += Math.max(-20, Math.min(20, p.vx)) * cool; p.y += Math.max(-20, Math.min(20, p.vy)) * cool;
       p.vx *= 0.6; p.vy *= 0.6;
     }
@@ -69,11 +124,11 @@ export function layout(nodes: GraphNode[], edges: GraphEdge[], seedPositions: Re
   return pos;
 }
 
-export function fitView(nodes: GraphNode[], pos: Record<string, P>): { x: number; y: number; k: number } {
+export function fitView(nodes: GraphNode[], pos: Record<string, P>, pad = 0): { x: number; y: number; k: number } {
   const pts = nodes.map((n) => pos[n.id]).filter(Boolean);
   if (!pts.length) return { x: 0, y: 0, k: 1 };
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad, minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
   const w = Math.max(maxX - minX, 80), h = Math.max(maxY - minY, 80);
   const k = Math.max(0.4, Math.min((W * 0.88) / w, (H * 0.86) / h, 2.2));
   return { k, x: W / 2 - ((minX + maxX) / 2) * k, y: H / 2 - ((minY + maxY) / 2) * k };
@@ -120,7 +175,8 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
 
   // Fit the layout to the canvas whenever the node set changes (pan/zoom afterwards is the user's).
   const fitKey = nodes.map((n) => n.id).join("|");
-  useEffect(() => setView(fitView(nodes, pos)), [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pad = repoGroups(nodes).length > 1 ? 60 : 0; // room for the repository names above each world
+  useEffect(() => setView(fitView(nodes, pos, pad)), [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const p = centerOn ? pos[centerOn.id] : undefined;
     if (p) setView((v) => { const k = Math.max(v.k, 1.4); return { k, x: W / 2 - p.x * k, y: H / 2 - p.y * k }; });
@@ -140,6 +196,19 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
   const maxDeg = Math.max(1, ...nodes.map((n) => n.degree));
   const radius = (n: GraphNode) => 5 + 9 * Math.sqrt(n.degree / maxDeg);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  /** One region per repository when there is more than one: where its nodes ended up, so the name can sit above them. */
+  const worlds = useMemo(() => {
+    const groups = repoGroups(nodes);
+    if (groups.length < 2) return [];
+    return groups.flatMap((g, i) => {
+      const pts = g.ids.map((id) => pos[id]).filter(Boolean);
+      if (!pts.length) return [];
+      const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length, cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+      const r = Math.max(...pts.map((p) => Math.hypot(p.x - cx, p.y - cy))) + 34;
+      return [{ ...g, cx, cy, r, color: COMMUNITY_COLORS[i % COMMUNITY_COLORS.length] }];
+    });
+  }, [nodes, pos]);
+  const repoOfNode = useMemo(() => new Map(nodes.map((n) => [n.id, n.repo_id])), [nodes]);
   const near = (id: string) => !focus || id === focus || adj.get(focus)?.has(id);
   const inArea = (id: string) => focusArea == null || nodeById.get(id)?.community === focusArea;
 
@@ -184,7 +253,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
         <button className={btn} aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.3)}><Plus className="h-4 w-4" /></button>
         <button className={btn} aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.3)}><Minus className="h-4 w-4" /></button>
         <span className="w-10 text-center text-[11px] tabular-nums text-muted" aria-label="Zoom level">{Math.round(view.k * 100)}%</span>
-        <button className={btn} aria-label="Fit to screen" title="Fit everything (0)" onClick={() => setView(fitView(nodes, pos))}><ScanSearch className="h-4 w-4" /></button>
+        <button className={btn} aria-label="Fit to screen" title="Fit everything (0)" onClick={() => setView(fitView(nodes, pos, pad))}><ScanSearch className="h-4 w-4" /></button>
         <button className={btn} aria-label="Actual size" title="Reset to 100%" onClick={() => setView({ x: 0, y: 0, k: 1 })}><Expand className="h-4 w-4" /></button>
         <button className={btn} aria-label="Animate connections" aria-pressed={animate} title={calm ? "Your system asks for less motion, so the animation stays off" : "Show flow from the selected node to what it connects to"} onClick={() => setAnimate((a) => !a)}>{animate && !calm ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
         <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-md border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
@@ -200,7 +269,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
           const step = 40;
           if (e.key === "+" || e.key === "=") zoomAt(1.3);
           else if (e.key === "-" || e.key === "_") zoomAt(1 / 1.3);
-          else if (e.key === "0") setView(fitView(nodes, pos));
+          else if (e.key === "0") setView(fitView(nodes, pos, pad));
           else if (e.key === "ArrowLeft") setView((v) => ({ ...v, x: v.x + step }));
           else if (e.key === "ArrowRight") setView((v) => ({ ...v, x: v.x - step }));
           else if (e.key === "ArrowUp") setView((v) => ({ ...v, y: v.y + step }));
@@ -221,6 +290,11 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
             <marker key={rel} id={`arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={c} /></marker>))}
         </defs>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+          {worlds.map((w) => (
+            <g key={w.id} data-world={w.name} pointerEvents="none">
+              <circle cx={w.cx} cy={w.cy} r={w.r} fill={w.color} fillOpacity={0.05} stroke={w.color} strokeOpacity={0.4} strokeDasharray="6 5" />
+              <text x={w.cx} y={w.cy - w.r - 8} textAnchor="middle" fontSize={15} fontWeight={600} fill={w.color} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{w.name} · {w.ids.length} nodes</text>
+            </g>))}
           {edges.map((e) => {
             const a = pos[e.source], b = pos[e.target];
             if (!a || !b) return null;
@@ -229,12 +303,13 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
             const tn = nodeById.get(e.target);
             const end = DIRECTED.has(e.rel) && tn ? radius(tn) + 2 : 0; // stop at the node edge so the arrowhead is visible
             const away = !inArea(e.source) || !inArea(e.target);
+            const bridge = worlds.length > 0 && repoOfNode.get(e.source) !== repoOfNode.get(e.target); // from one repository's world into another's
             return (
-              <g key={e.id}>
-                <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={REL_COLORS[e.rel] ?? "#94a3b8"}
+              <g key={e.id} data-bridge={bridge ? "" : undefined}>
+                <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={bridge ? "#d97706" : (REL_COLORS[e.rel] ?? "#94a3b8")}
                   markerEnd={DIRECTED.has(e.rel) && (on || !focus) ? `url(#arrow-${e.rel})` : undefined}
-                  strokeWidth={on ? 2.5 : 1} strokeDasharray={trustDash(e.trust ?? (e.provenance === "semantic" ? "inferred" : "fact"))}
-                  opacity={away ? 0.06 : on ? 0.95 : focus ? 0.12 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${e.rel} (${e.trust ?? e.provenance}: ${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
+                  strokeWidth={on || bridge ? 2.5 : 1} strokeDasharray={bridge ? "7 4" : trustDash(e.trust ?? (e.provenance === "semantic" ? "inferred" : "fact"))}
+                  opacity={away ? 0.06 : on ? 0.95 : focus ? (bridge ? 0.5 : 0.12) : bridge ? 0.9 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${bridge ? "BRIDGE between repositories: " : ""}${e.rel} (${e.trust ?? e.provenance}: ${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
                 {on && !away && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
               </g>);
           })}

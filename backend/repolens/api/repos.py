@@ -11,7 +11,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, IndexRun, RepoAccess, Repository, User
 from ..schemas import AccessIn, RepoCreate, RepoOut, StorageCleanup
 from ..security import redact_stored
-from ..services import checkouts, gitops, retrieval
+from ..services import checkouts, gitops, index_jobs, retrieval
 from ..services.access import scope_for
 from ..services.indexer import clone_auth_for, index_repository
 from ..services.links import has_embedded_credentials
@@ -29,12 +29,33 @@ def _get_repo(db: Session, p: Principal, repo_id: str) -> Repository:
     return repo
 
 
+def _with_errors(db: Session, repos: list[Repository]) -> list[Repository]:
+    """Attach why the last index failed to each repository in the error state (it is not stored on the repository)."""
+    bad = [r.id for r in repos if r.status == "error"]
+    why: dict[str, str] = {}
+    if bad:
+        rows = db.execute(
+            select(IndexRun.repo_id, IndexRun.error)
+            .where(IndexRun.repo_id.in_(bad), IndexRun.status == "failed")
+            .order_by(IndexRun.started_at.desc())
+        )
+        for rid, err in rows:
+            why.setdefault(rid, redact_stored(err or "")[0][:300])
+    for r in repos:
+        r.last_error = why.get(r.id) or None  # type: ignore[attr-defined]
+    return repos
+
+
 def _run_index(repo_id: str) -> None:
     db = session_factory()()
     try:
-        index_repository(db, repo_id)
+        run = index_repository(db, repo_id)
+        status, error = run.status, run.error
     finally:
         db.close()
+    s = get_settings()
+    if not s.run_jobs_inline:  # a failure that can pass by itself (a timeout) is tried again after a wait
+        index_jobs.after_run(repo_id, status, error, schedule_index, s.index_retry_delays)
 
 
 def schedule_index(repo_id: str) -> None:
@@ -62,7 +83,7 @@ def list_repos(p: Principal = Depends(current_principal), db: Session = Depends(
     ids = scope_for(db, p).ids_or_none()
     if ids is not None:
         q = q.where(Repository.id.in_(ids))
-    return db.scalars(q.order_by(Repository.name)).all()
+    return _with_errors(db, list(db.scalars(q.order_by(Repository.name))))
 
 
 @router.get("/repositories/branches")
@@ -140,7 +161,7 @@ def create_repo(body: RepoCreate, p: Principal = Depends(current_principal), db:
 
 @router.get("/repositories/{repo_id}", response_model=RepoOut)
 def get_repo(repo_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    return _get_repo(db, p, repo_id)
+    return _with_errors(db, [_get_repo(db, p, repo_id)])[0]
 
 
 @router.post("/repositories/{repo_id}/index", status_code=202)
