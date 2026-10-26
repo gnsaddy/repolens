@@ -281,8 +281,8 @@ def test_chat_messages_use_the_tighter_limit_for_calls_that_spend_tokens():
 
 # ---------------------------------------------------------------- with a language model
 class Spy:
-    def __init__(self, reply="Deleted users get a default profile [S1]."):
-        self.reply, self.calls = reply, []
+    def __init__(self, reply="Deleted users get a default profile [S1].", truncated=False):
+        self.reply, self.calls, self.truncated = reply, [], truncated
 
     def install(self, monkeypatch, fail=False):
         monkeypatch.setattr(LLMClient, "offline", property(lambda self: False))
@@ -291,7 +291,7 @@ class Spy:
             self.calls.append({"system": system, "prompt": prompt, "validate": validate})
             if fail:
                 raise RuntimeError("provider down")
-            return LLMResult(self.reply, 10, 10, route={"model": "spy"})
+            return LLMResult(self.reply, 10, 10, route={"model": "spy"}, truncated=self.truncated)
 
         monkeypatch.setattr(LLMClient, "complete", complete)
         return self
@@ -385,3 +385,14 @@ def test_a_question_with_sources_is_not_a_gap(client, auth, repo):
     got = [m for m in client.get(f"/api/chats/{c['id']}", headers=auth).json()["items"] if m["role"] == "assistant"]
     assert got[-1]["sources"]
     assert client.get("/api/chats/gaps", headers=auth).json()["items"] == []
+
+
+def test_a_cut_off_reply_is_flagged_and_diagrams_are_requested_as_text(client, auth, repo, monkeypatch):
+    spy = Spy("Step one [S1]. ```text\n+-----+", truncated=True).install(monkeypatch)
+    c = new_chat(client, auth)
+    say(client, auth, c["id"], "design flowchart for the login and logout")
+    last = [m for m in client.get(f"/api/chats/{c['id']}", headers=auth).json()["items"] if m["role"] == "assistant"][
+        -1
+    ]
+    assert "stopped before finishing" in last["content"]
+    assert "cannot create images" in spy.calls[0]["system"] and "```text" in spy.calls[0]["system"]

@@ -363,3 +363,12 @@ describe("Ask: gaps", () => {
     expect(await screen.findByText(/No gaps found/)).toBeInTheDocument();
   });
 });
+
+describe("Ask: general knowledge label", () => {
+  it("shows a 'Not from your documents' badge beside the answer label when the model used general knowledge", async () => {
+    server({ initial: [thread({ items: [msg("user", "which model?"), msg("assistant", "Your documents do not say.\n\nNot from your documents: I am a language model.", { mode: "llm" })] })] });
+    page("/ask/t1");
+    const log = await screen.findByRole("log", { name: "Conversation" });
+    expect(await within(log).findByTitle(/not backed by your sources/)).toHaveTextContent("Not from your documents");
+  });
+});

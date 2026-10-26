@@ -21,6 +21,7 @@ class LLMResult:
     output_tokens: int
     cached_input_tokens: int = 0
     route: dict | None = None  # which model answered and why (set by LLMClient)
+    truncated: bool = False  # the model stopped because it ran out of output budget, not because it finished
 
 
 @dataclass
@@ -92,7 +93,13 @@ def _anthropic_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -
     )
     text = "".join(getattr(b, "text", "") for b in msg.content if getattr(b, "type", "") == "text")
     u = msg.usage
-    return LLMResult(text, u.input_tokens, u.output_tokens, getattr(u, "cache_read_input_tokens", 0) or 0)
+    return LLMResult(
+        text,
+        u.input_tokens,
+        u.output_tokens,
+        getattr(u, "cache_read_input_tokens", 0) or 0,
+        truncated=getattr(msg, "stop_reason", "") == "max_tokens",
+    )
 
 
 # Overridable in tests to inject a mock transport.
@@ -140,8 +147,13 @@ def _openai_call(system: str, prompt: str, max_tokens: int, cfg: LLMConfig) -> L
         raise RuntimeError(f"The model service returned an unexpected reply: {str(d)[:120]!r}")
     u = d.get("usage", {})
     cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
+    choice = d["choices"][0]
     return LLMResult(
-        d["choices"][0]["message"]["content"], u.get("prompt_tokens", 0), u.get("completion_tokens", 0), cached
+        choice["message"]["content"] or "",
+        u.get("prompt_tokens", 0),
+        u.get("completion_tokens", 0),
+        cached,
+        truncated=choice.get("finish_reason") == "length",
     )
 
 

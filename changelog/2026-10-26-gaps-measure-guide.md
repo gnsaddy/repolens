@@ -8,3 +8,8 @@
 
 ### Notes
 - The measurement uses the offline embedder and rule-based reasoning, so it never calls a model; its numbers describe file localisation, not answer quality.
+
+### Fixed (Ask)
+- Replies that hit the model's output limit were silently cut mid-sentence (the chat budget was 1,000 tokens, which models that "think" first can use up). The budget is now 4,000 and a cut-off reply says so ("Ask it to continue"). `LLMResult.truncated` is set from `finish_reason` / `stop_reason`.
+- Diagrams: the model cannot draw images, so it is told to draw flowcharts as plain text in a fenced `text` block, which renders intact.
+- A "Not from your documents" badge now appears beside "AI answer" when part of a reply is general knowledge.
