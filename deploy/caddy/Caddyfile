@@ -1,0 +1,10 @@
+# HTTPS for Docker Compose. With a public DNS name that points at this machine, Caddy gets and renews a free certificate by itself.
+# To use your own certificate instead, replace the line below with:  tls /certs/fullchain.pem /certs/privkey.pem
+{$REPOLENS_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8080
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

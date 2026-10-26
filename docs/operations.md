@@ -39,6 +39,55 @@ and separate: **encrypted connection secrets in a restored database cannot be re
 Rehearse a restore once now and after any big change; an untested backup is a hope, not a backup. This procedure was run end to end
 on a real cluster when the job was added (dump, read-back check, restore of the data into a new database).
 
+## HTTPS and certificates
+
+Run RepoLens over HTTPS anywhere other than your own laptop: sign-in tokens and everything you ask travel over the network. The app serves plain HTTP behind a proxy that holds the certificate. Set `REPOLENS_ENV=prod`, and point a DNS name at the proxy first, since every route below needs one.
+
+**Kubernetes.** The Ingress (`deploy/k8s/web.yaml`) already asks for a TLS secret named `repolens-tls`. Fill it in one of two ways.
+
+1. **Bring your own certificate** (from your company CA or any certificate authority). Use the full chain, with the server certificate first and then the intermediates, and an unencrypted key:
+   ```bash
+   kubectl -n repolens create secret tls repolens-tls --cert=fullchain.pem --key=privkey.pem
+   ```
+   To renew, run the same command with the new files (`kubectl ... --dry-run=client -o yaml | kubectl apply -f -`). Nothing else changes.
+2. **Automatic certificates with cert-manager** (for example from Let's Encrypt, renewed for you). Once per cluster, install [cert-manager](https://cert-manager.io/docs/installation/) and apply your edited `deploy/extras/cluster-issuer-letsencrypt.yaml` (it needs your e-mail; start with the staging server). Then enable the component in your overlay (`components: [../../components/cert-manager]`). Port 80 must reach the ingress controller for the challenge. Watch it with `kubectl -n repolens get certificate`, which should say `READY True` in a minute or two.
+
+If TLS ends at a cloud load balancer instead, remove the `tls` block with an overlay patch and keep the ingress as the plain HTTP backend.
+
+**Docker Compose.** Put Caddy in front, which gets and renews a free certificate for a public host name by itself:
+```bash
+REPOLENS_DOMAIN=repolens.example.com docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+```
+It needs Docker Compose 2.24 or newer, and ports 80 and 443 reaching the machine. The web port moves to `127.0.0.1`, so plain HTTP is no longer reachable from outside. To use your own certificate, put `fullchain.pem` and `privkey.pem` in `./certs` and replace the first line inside the `Caddyfile` block with `tls /certs/fullchain.pem /certs/privkey.pem` (see `deploy/caddy/Caddyfile`).
+
+**Check it.** `curl -vI https://repolens.example.com/healthz` should show a valid certificate and `200`, and the sign-in page should show the padlock. If the browser says the certificate is "Kubernetes Ingress Controller Fake Certificate", the `repolens-tls` secret is missing or was issued for a different host name than the one in the Ingress.
+
+**Proxy hops matter.** Behind a proxy the app only sees the proxy's address, so sign-in and API rate limits would be shared by every user. `REPOLENS_TRUSTED_PROXY_HOPS` tells it how many proxies to trust for the real client address. It is `2` in the Kubernetes config (ingress and the web container) and in `docker-compose.tls.yml` (Caddy and the web container). Leave it at `0` when nothing in front of RepoLens is under your control, because a larger number lets a caller forge their own address.
+
+## Deploy with Argo CD (GitOps)
+
+With Argo CD the cluster pulls its configuration from git, so CI needs no access to the cluster, every change is a reviewed commit, and a rollback is a revert. Argo CD itself is installed separately ([install guide](https://argo-cd.readthedocs.io/en/stable/getting_started/)).
+
+What is in the repository:
+
+| File | Purpose |
+|---|---|
+| `deploy/k8s/` | The base: everything the app needs |
+| `deploy/overlays/production/` | Your environment: release tag, host name, and the certificate option (images, host and CORS origin are patched here) |
+| `deploy/components/cert-manager/` | Optional add-on for automatic certificates |
+| `deploy/argocd/application.yaml` | The Argo CD application: watches an overlay, syncs automatically, prunes removed objects, and reverts manual changes |
+| `deploy/argocd/config-repo-example/` | The usual layout: a small private configuration repository that points at a released version of RepoLens |
+
+Steps:
+
+1. **Make your configuration repository** (or fork this one). Copy `deploy/argocd/config-repo-example/kustomization.yaml` into it, then set your host name and the release (`?ref=` and the image tags). Check that it builds: `kubectl kustomize .`.
+2. **Create the secret once**, outside git: copy `deploy/k8s/secret.example.yaml`, fill it in, and `kubectl apply` it, or manage it with Sealed Secrets, External Secrets or SOPS so an encrypted form can live in git. The certificate secret (`repolens-tls`) follows the same rule, unless you use cert-manager.
+3. **Point Argo CD at it.** Edit `deploy/argocd/application.yaml` (`repoURL`, `targetRevision`, `path`) and apply it: `kubectl apply -f deploy/argocd/application.yaml`. For a private repository, give Argo CD a read credential first.
+4. **Release by pull request.** Tag a version in this repository (the CD workflow then publishes the images), then change the tag in your configuration repository. Argo CD shows the diff and syncs it.
+5. **Turn off the push-style deploy.** Set the repository variable `DEPLOY_MODE` to `gitops`; the CD workflow then only publishes images and never needs a kubeconfig.
+
+Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.1-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
+
 ## Docker Compose and local runs
 
 ```bash

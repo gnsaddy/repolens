@@ -1,0 +1,25 @@
+# Your settings for one environment: which release, which host name, and how the certificate is obtained.
+# Copy this folder into your own configuration repository (see deploy/argocd/config-repo-example) or edit it in a fork.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../k8s
+
+# Option A (default): bring your own certificate. Create the secret once, it is not stored in git:
+#   kubectl -n repolens create secret tls repolens-tls --cert=fullchain.pem --key=privkey.pem
+# Option B: automatic certificates from cert-manager. Uncomment the next two lines.
+# components:
+#   - ../../components/cert-manager
+
+images:
+  - { name: ghcr.io/OWNER/repolens-api, newName: ghcr.io/gnsaddy/repolens-api, newTag: "0.1.0" }
+  - { name: ghcr.io/OWNER/repolens-web, newName: ghcr.io/gnsaddy/repolens-web, newTag: "0.1.0" }
+
+patches:
+  - target: { kind: Ingress, name: repolens }
+    patch: |-
+      - { op: replace, path: /spec/rules/0/host, value: repolens.example.com }     # your host name
+      - { op: replace, path: /spec/tls/0/hosts/0, value: repolens.example.com }    # the same name
+  - target: { kind: ConfigMap, name: repolens-config }
+    patch: |-
+      - { op: replace, path: /data/REPOLENS_CORS_ORIGINS, value: '["https://repolens.example.com"]' }   # the same host name, with https

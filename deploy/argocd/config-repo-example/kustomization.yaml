@@ -1,0 +1,19 @@
+# The usual GitOps layout: a small private "config" repository holds only your settings and points at a released version of RepoLens.
+# Argo CD watches this repository; upgrading is a pull request that changes `?ref=` and the image tags.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - github.com/gnsaddy/repolens//deploy/k8s?ref=v0.1.0
+# components:                                                   # automatic certificates
+#   - github.com/gnsaddy/repolens//deploy/components/cert-manager?ref=v0.1.0
+images:
+  - { name: ghcr.io/OWNER/repolens-api, newName: ghcr.io/gnsaddy/repolens-api, newTag: "0.1.0" }
+  - { name: ghcr.io/OWNER/repolens-web, newName: ghcr.io/gnsaddy/repolens-web, newTag: "0.1.0" }
+patches:
+  - target: { kind: Ingress, name: repolens }
+    patch: |-
+      - { op: replace, path: /spec/rules/0/host, value: repolens.your-company.com }
+      - { op: replace, path: /spec/tls/0/hosts/0, value: repolens.your-company.com }
+  - target: { kind: ConfigMap, name: repolens-config }
+    patch: |-
+      - { op: replace, path: /data/REPOLENS_CORS_ORIGINS, value: '["https://repolens.your-company.com"]' }   # the same host name, with https

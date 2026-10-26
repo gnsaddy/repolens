@@ -1,0 +1,26 @@
+# Argo CD application for RepoLens. Apply it once into the cluster that runs Argo CD:
+#   kubectl apply -f deploy/argocd/application.yaml
+# From then on Argo CD watches the path below and keeps the cluster equal to git. A deploy is a pull request.
+# The secret (database password, signing key, ...) is NOT in git; create it once or use Sealed Secrets, External Secrets or SOPS.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: repolens
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/gnsaddy/repolens.git      # use your own configuration repository or fork (see docs/operations.md)
+    targetRevision: main                                  # production: pin a release tag such as v0.1.0
+    path: deploy/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: repolens
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+    retry: { limit: 3, backoff: { duration: 10s, factor: 2, maxDuration: 3m } }
+  ignoreDifferences:
+    - { group: apps, kind: Deployment, name: web, jsonPointers: [/spec/replicas] }   # the autoscaler owns the replica count
+    - { group: apps, kind: Deployment, name: api, jsonPointers: [/spec/replicas] }

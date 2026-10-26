@@ -103,4 +103,5 @@ jobs:
       - name: Validate Kubernetes manifests
         run: |
           kubectl kustomize deploy/k8s > /tmp/all.yaml
-          python3 -c "import yaml,sys; [d for d in yaml.safe_load_all(open('/tmp/all.yaml'))]; print('manifests parse')"
+          kubectl kustomize deploy/overlays/production > /tmp/production.yaml   # the example environment (includes the base)
+          python3 -c "import yaml,sys; [d for f in ('/tmp/all.yaml','/tmp/production.yaml') for d in yaml.safe_load_all(open(f))]; [d for d in yaml.safe_load_all(open('deploy/argocd/application.yaml'))]; print('manifests parse')"

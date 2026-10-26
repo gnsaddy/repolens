@@ -1,0 +1,22 @@
+# HTTPS in front of the Compose stack:
+#   REPOLENS_DOMAIN=repolens.example.com docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# Needs Docker Compose 2.24 or newer. Ports 80 and 443 must reach this machine. Your own certificate: see deploy/caddy/Caddyfile.
+services:
+  web:
+    ports: !override ["127.0.0.1:${WEB_PORT:-8080}:8080"]   # no longer reachable over plain HTTP from outside
+  api:
+    environment:
+      REPOLENS_TRUSTED_PROXY_HOPS: "2"   # Caddy and the web container sit in front: sign-in limits then count the real client address
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      REPOLENS_DOMAIN: ${REPOLENS_DOMAIN:?set REPOLENS_DOMAIN to your host name}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro            # only needed for your own certificate
+      - caddy_data:/data             # the issued certificate and its account
+    depends_on: [web]
+volumes:
+  caddy_data:
