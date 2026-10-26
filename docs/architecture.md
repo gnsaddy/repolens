@@ -134,13 +134,18 @@ instead of the whole evidence. Memory and digests live in the application databa
 One function, `knowledge.retrieve_checked` (`retrieve` is the same without the report), decides what an answer is built from. Ask chat
 and `knowledge.ask`, which the Knowledge page, the DeepMind Wiki, MCP and the full quality runs call, all use it, so a retrieval check
 tests exactly what an answer sees. It runs the hybrid search, then
+**joined names**: code often writes two words as one (`ratelimit.py` for "rate limiting", `signin` for "sign-in"), which a search on the words
+never finds because prose that spells it out outranks it. `walkthrough.joined_pairs` joins neighbouring words of the question, and
+`joined_terms` keeps only the joined names that occur in a file path or symbol name in the index. They get their own search; the chunks
+whose file or symbol name contains the name (up to three) and their direct neighbours in the code graph, who calls them (up to two), are
+woven in after the best match (`knowledge._joined_hits`, `_with_joined`). With no joined name in the index nothing extra runs. Then
 `services/walkthrough.py` classifies the question (`task_kind`: *lookup*, *explain* or *build*). For explain and build questions
 `route_sources` adds the routes the question is about (the `routes` chunks written at index time by `services/routes.py`), each
 followed by its handler and the functions the handler calls, permission checks first. Routes are scored by their path (twice) plus
 the question's words in the handler body. Equal scores are ordered by how often the handler uses those words (`_mentions`), and the
 top `MAX_ROUTES` are taken from different files first (`_spread`, one per file, then the best of the rest), so one module of
 near-identical routes, such as a SCIM copy of the user routes, cannot fill every slot. The route sources go ahead of the ordinary
-results (`merge`). Then it measures **coverage**: the share of the question's key words (`walkthrough.key_words`, stemmed the same way as
+results (`merge`). Then it measures **coverage** (a joined name found in a source covers both of its words): the share of the question's key words (`walkthrough.key_words`, stemmed the same way as
 the text) that the six best sources mention. Below 60% it searches **once more**, wider and with the missing words in other forms
 (assign: assigns, assigned, assigning), and keeps whichever pass covers more. No model is called, so the same question always gets the
 same sources, and the response says whether it searched again (`retrieval`: coverage, missing words, refined). If the sources still

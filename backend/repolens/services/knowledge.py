@@ -307,6 +307,9 @@ def coverage(question: str, results: list[dict]) -> tuple[float, list[str]]:
     for r in results[:_TOP]:
         seen |= walkthrough._tokens(f"{r['title']} {r['file']} {r['content']}")
     # the stemmer cuts 'revoked' to 'revok' but leaves 'revoke', so a long word also matches one that starts with it
+    for joined, a, b in walkthrough.joined_pairs(question):  # 'ratelimit' in a source covers both 'rate' and 'limit'
+        if _mentioned(joined, seen):
+            seen |= {a, b}
     missing = sorted(w for w in want if not _mentioned(w, seen))
     return 1 - len(missing) / len(want), missing
 
@@ -317,6 +320,31 @@ def _variants(words: list[str]) -> str:
     for w in words:
         out += [w, w + "s", w + "ed", w + "ing"]
     return " ".join(out)
+
+
+def _joined_hits(leg: list[dict], joined: list[str]) -> list[dict]:
+    """From a search for joined names: the chunks whose file or symbol name contains one (up to three), and up to two of
+    their direct neighbours in the code graph (who calls them), which is how the code that uses a helper is found."""
+    direct = [
+        r for r in leg if not r["via_graph"] and any(j in f"{r['file']} {r['symbol'] or ''}".lower() for j in joined)
+    ][:3]
+    ids = {r["node_id"] for r in direct if r["node_id"]}
+    near = [r for r in leg if r["via_graph"] and r["via_graph"].get("from_node_id") in ids][:2]
+    return direct + near
+
+
+def _with_joined(results: list[dict], extra: list[dict], limit: int) -> list[dict]:
+    """The main results with the joined-name hits (at most five) woven in after the best match, without repeats."""
+    have = {r["chunk_id"] for r in results}
+    fresh = [r for r in extra if r["chunk_id"] not in have][:5]
+    merged: list[dict] = []
+    main = list(results)
+    while main or fresh:
+        if main:
+            merged.append(main.pop(0))
+        if fresh:
+            merged.append(fresh.pop(0))
+    return merged[:limit]
 
 
 def _retrieve_once(
@@ -331,6 +359,12 @@ def _retrieve_once(
     route_query: str,
 ) -> list[dict]:
     results = search(db, org, query, repo_ids, k=k, scope=scope, kinds=kinds)[: k + 3]
+    # code often writes two words as one ('rate limiting' -> ratelimit.py), which a search on the words never finds:
+    # search the joined names that exist in the index on their own, so prose that spells it out cannot drown them
+    joined = walkthrough.joined_terms(db, org, route_query)
+    if joined:
+        leg = search(db, org, " ".join(joined), repo_ids, k=30, kinds=kinds, scope=scope)
+        results = _with_joined(results, _joined_hits(leg, joined), k + 4)
     if walkthrough.needs_path(kind) and (not kinds or "code" in kinds):
         results = walkthrough.merge(results, walkthrough.route_sources(db, org, route_query, repo_ids, scope), k)
     return results

@@ -7,7 +7,7 @@ handler calls (a permission check, a validator, a writer)."""
 
 import re
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CodeChunk, Repository
@@ -119,6 +119,45 @@ def key_words(question: str) -> frozenset[str]:
     can be compared: what the sources must mention for an answer to be built from them."""
     kept = " ".join(t for t in terms(question) if t not in GENERIC)
     return _tokens(kept.replace("_", " ")) - frozenset(stem(g) for g in GENERIC)
+
+
+MAX_JOINED = 4  # joined names searched for per question
+
+
+def joined_pairs(question: str) -> list[tuple[str, str, str]]:
+    """(joined name, first word, second word) for neighbouring words the question may mean as one name, with the words stemmed
+    like `key_words`: 'rate limiting' -> ratelimit, 'sign-in' -> signin. Code often writes two words as one."""
+    text = question.lower()
+    found = list(re.finditer(r"[a-z]+", text))
+    out: list[tuple[str, str, str]] = []
+    for a, b in zip(found, found[1:], strict=False):
+        gap = text[a.end() : b.start()]
+        if gap.strip(" -"):  # punctuation between them: not neighbours
+            continue
+        first, second = a.group(), b.group()
+        if "-" not in gap and (first in STOP or second in STOP):  # 'does the' is not a name; 'sign-in' is
+            continue
+        for tail in dict.fromkeys((second, stem(second))):
+            joined = first + tail
+            if len(joined) >= 6 and all(joined != j for j, _x, _y in out):
+                out.append((joined, stem(first), stem(second)))
+    return out
+
+
+def joined_terms(db: Session, org: str, question: str) -> list[str]:
+    """The joined names from the question that exist in the index as part of a file path or a symbol name."""
+    found: list[str] = []
+    for joined, _a, _b in joined_pairs(question):
+        if len(found) >= MAX_JOINED:
+            break
+        like = f"%{joined}%"
+        if db.scalar(
+            select(CodeChunk.id)
+            .where(CodeChunk.org_id == org, or_(CodeChunk.file_path.ilike(like), CodeChunk.symbol_name.ilike(like)))
+            .limit(1)
+        ):
+            found.append(joined)
+    return found
 
 
 def _result(c: CodeChunk, repo: str, title: str, via: str, content: str | None = None, line: int | None = None) -> dict:
