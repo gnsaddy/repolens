@@ -88,6 +88,10 @@ Steps:
 
 Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.1-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
 
+## Upload size limits
+
+Document imports accept **25 MB a file**, up to 20 files and **100 MB** in one upload. Three layers must agree, and all are set in this repository: the API (`REPOLENS_MAX_UPLOAD_MB`, default 100, applies only to the import route; every other request stays at `REPOLENS_MAX_BODY_MB`, 32), the web container (`client_max_body_size 101m` in `frontend/nginx.conf`), and on Kubernetes the ingress (`nginx.ingress.kubernetes.io/proxy-body-size: "101m"` in `deploy/k8s/web.yaml`; the controller's own default is only 1 MB). If you put another proxy or load balancer in front, raise its body limit and read timeout to match (Caddy needs nothing). Reading a large PDF takes time (the first 400 pages are read); the proxies allow 300 seconds. Files are uploaded as ordinary multipart files, not encoded, so a 25 MB file is 25 MB on the wire.
+
 ## How long indexing takes
 
 Indexing reads every file at the indexed commit, splits it into chunks, turns each chunk into a vector, saves them, and builds the knowledge graph. On one machine with the built-in embedder and SQLite, measured here:

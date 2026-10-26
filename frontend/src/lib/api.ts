@@ -77,7 +77,14 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const token = tokenStore.get();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.json !== undefined) { headers.set("Content-Type", "application/json"); init.body = JSON.stringify(init.json); }
-  const res = await fetch(`/api${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { ...init, headers });
+  } catch {  // the browser's own message is "Failed to fetch", which says nothing
+    throw new ApiError(0, init.body instanceof FormData
+      ? "Could not reach the server while uploading. It may be restarting, out of date, or the file is over a size limit. Try again, and for a large file check the limit shown above."
+      : "Could not reach the server. Check that it is running and try again.");
+  }
   if (res.status === 401 && !path.startsWith("/auth/login")) onUnauthorized();
   if (!res.ok) {
     let msg = res.statusText;

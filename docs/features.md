@@ -153,6 +153,17 @@ On a confirmed investigation, **Propose a fix** drafts a small code change for t
 
 **Insights → Can the confidence score be trusted?** shows, for investigations people confirmed or rejected, how often each score band was actually right, the average calibration error and a plain verdict (overconfident, underconfident, about right). With 20 or more reviews it fits a correction; with fewer it tells you how many are missing. Confirming or rejecting root causes is what feeds it.
 
+## Importing documents from your laptop
+
+Knowledge → Documents → **Upload files** accepts, besides Markdown and text (`.md .mdx .rst .txt .adoc`):
+
+* **Word** (`.docx`): headings, lists and tables become Markdown.
+* **Notion**: in Notion choose Export → Markdown & CSV, then upload the `.zip`. The ids Notion adds to every name are removed, links between pages are kept working, databases (CSV) become pages with a table, and images and attachments are left out. A zip may hold a zip (Notion splits big exports); any other zip of Markdown, text or CSV files imports the same way.
+* **CSV**: becomes a page with a table (first 300 rows).
+* **PDF**: the text of a PDF that has selectable text, one section per page (read with the `pypdf` library, which is part of the install). **No OCR**: a scanned PDF (pictures of pages) has no text to read, and is skipped with a clear explanation.
+
+Nothing needs a model, and nothing leaves the server. After an upload a short result says how many documents were imported, how many files were skipped, and why. A file that cannot be read never stops the others. Limits: text files 1 MB; Word, PDF, CSV and zip files **25 MB each**; up to 20 files and 100 MB in one upload; a zip up to 1,500 files and 60 MB unpacked; a PDF's first 400 pages.
+
 ## Security, FAQ and About pages
 
 The public pages now also include **FAQ** (`/faq`, "Questions about trust": is it safe, does it send my code anywhere, do I need a model, does it train on my data, who builds it, what are the official channels, is it production-ready, what if the AI is wrong, can I delete my data, how big a repository, what does it cost, how to report a problem), and the Security page opens with **Where each control stands**: every control marked Built, Partly or Not yet, including the gaps (no SAML, no database encryption of our own, no export of everything, no penetration test, no SOC 2 or ISO 27001). The footer groups Product, Trust, Developers and Community links and states the audit position. A day/night switch is on the sign-in page, the reset page and every public page, and the choice is remembered and shared with the app. The statements live in `frontend/src/lib/trust.ts`; change them only with the code that backs them.

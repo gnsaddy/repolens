@@ -41,6 +41,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "101m"   # the controller default is 1 MB, which would refuse document imports
 spec:
   ingressClassName: nginx
   tls: [{ hosts: [repolens.example.com], secretName: repolens-tls }]

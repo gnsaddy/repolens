@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { communityColor, HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import StartHere from "@/components/StartHere";
+import { IMPORT_ACCEPT, MAX_IMPORT_BYTES, MAX_IMPORT_TOTAL, MAX_TEXT_BYTES, needsImport, summarize, type ImportResult } from "@/lib/importFiles";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
 import AnswerFeedback from "@/components/AnswerFeedback";
 import MemoryBrowser from "@/components/MemoryBrowser";
@@ -289,7 +290,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
 }
 
 // ------------------------------------------------------------------------------------------------ Documents
-const ACCEPT = ".md,.mdx,.rst,.txt,.adoc";
+const ACCEPT = IMPORT_ACCEPT;
 
 function DocsTab({ repos }: { repos: Repo[] }) {
   const ask = useConfirm();
@@ -306,6 +307,14 @@ function DocsTab({ repos }: { repos: Repo[] }) {
     onSuccess: (r) => { setName(""); setSel(r.id); qc.invalidateQueries({ queryKey: ["repos"] }); } });
   const upload = useMutation({ mutationFn: (documents: { path: string; content: string }[]) => api(`/knowledge/collections/${active!.id}/documents`, { method: "POST", json: { documents } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["repos"] }); qc.invalidateQueries({ queryKey: ["docs"] }); } });
+  const [report, setReport] = useState<ImportResult | null>(null);
+  const importer = useMutation({
+    mutationFn: (files: File[]) => {
+      const form = new FormData();
+      files.forEach((f) => form.append("files", f, f.name));
+      return api<ImportResult>(`/knowledge/collections/${active!.id}/import`, { method: "POST", body: form });
+    },
+    onSuccess: (r) => { setReport(r); qc.invalidateQueries({ queryKey: ["repos"] }); qc.invalidateQueries({ queryKey: ["docs"] }); } });
   const remove = useMutation({ mutationFn: (id: string) => api(`/knowledge/collections/${active!.id}/documents/${id}`, { method: "DELETE" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["repos"] }); qc.invalidateQueries({ queryKey: ["docs"] }); } });
 
@@ -313,11 +322,18 @@ function DocsTab({ repos }: { repos: Repo[] }) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (!files.length || !active) return;
-    const big = files.filter((f) => f.size > 1_000_000);
-    const ok = files.filter((f) => f.size <= 1_000_000);
-    setNote(big.length ? `Skipped ${big.length} file(s) over 1 MB.` : "");
-    const documents = await Promise.all(ok.map(async (f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, content: await f.text() })));
+    setReport(null);
+    const limit = (f: File) => (needsImport(f.name) ? MAX_IMPORT_BYTES : MAX_TEXT_BYTES);
+    const big = files.filter((f) => f.size > limit(f));
+    const ok = files.filter((f) => f.size <= limit(f));
+    const text = ok.filter((f) => !needsImport(f.name));
+    let binary = ok.filter((f) => needsImport(f.name)), total = 0;
+    const tooMuch = binary.filter((f) => (total += f.size) > MAX_IMPORT_TOTAL); // a single upload carries at most 100 MB
+    binary = binary.filter((f) => !tooMuch.includes(f));
+    setNote([big.length ? `Skipped ${big.length} file(s) over the size limit (1 MB for text, 25 MB for Word, PDF, CSV and zip).` : "", tooMuch.length ? `${tooMuch.length} file(s) did not fit in one upload (100 MB at a time); upload them again separately.` : ""].filter(Boolean).join(" "));
+    const documents = await Promise.all(text.map(async (f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, content: await f.text() })));
     if (documents.length) upload.mutate(documents);
+    if (binary.length) importer.mutate(binary);
   }
   const dropCollection = useMutation({ mutationFn: (id: string) => api(`/knowledge/collections/${id}`, { method: "DELETE" }),
     onSuccess: () => { setSel(null); qc.invalidateQueries({ queryKey: ["repos"] }); toast("Collection deleted"); } });
@@ -342,10 +358,13 @@ function DocsTab({ repos }: { repos: Repo[] }) {
             <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}
             {user?.role === "admin" && <button aria-label="Delete collection" title="Delete this collection and all its documents" className="ml-2 align-middle text-muted hover:text-red-600"
               onClick={async () => { if (await ask({ title: `Delete the collection "${active.name}"?`, message: `All ${active.file_count} documents, their search entries and graph nodes are removed.`, confirmLabel: "Delete collection", danger: true })) dropCollection.mutate(active.id); }}><Trash2 className="inline h-4 w-4" /></button>}</CardTitle>
-          <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (max 1 MB each)</div>
-          <ErrorNote error={upload.error ?? remove.error} />
+          <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (text up to 1 MB; Word, PDF, CSV and zip up to 25 MB each). Notion: Export as Markdown &amp; CSV, then upload the .zip. Scanned PDFs are not read (no OCR).</div>
+          <ErrorNote error={upload.error ?? importer.error ?? remove.error} />
+          {report && (<div role="status" aria-label="Import result" className="mb-2 rounded-lg bg-slate-50 p-3 text-xs">
+            <p className="font-medium">{summarize(report)}</p>
+            {!!report.skipped.length && <ul className="mt-1 list-disc space-y-0.5 pl-5 text-amber-700">{report.skipped.slice(0, 12).map((x, i) => <li key={i}><b>{x.name}</b>: {x.reason}</li>)}{report.skipped.length > 12 && <li>…and {report.skipped.length - 12} more</li>}</ul>}</div>)}
           {note && <p className="mb-2 text-xs text-amber-700">{note}</p>}
-          {(upload.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 text-xs text-muted"><Spinner />Indexing and linking…</div>}
+          {(upload.isPending || importer.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 text-xs text-muted"><Spinner />Indexing and linking…</div>}
           {!docs.data?.length ? <Empty>No documents yet.</Empty> : (
             <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Path</th><th className="font-medium">Size</th><th /></tr></thead>
               <tbody>{docs.data.map((d) => (<tr key={d.id} className="border-t border-line"><td className="py-2">{d.path}</td><td className="text-muted">{(d.size / 1024).toFixed(1)} KB</td>

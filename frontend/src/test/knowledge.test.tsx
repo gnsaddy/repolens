@@ -228,4 +228,69 @@ describe("Knowledge page", () => {
     const post = calls.find((c) => c.body)!;
     expect(JSON.parse(post.body!)).toEqual({ documents: [{ path: "hello.md", content: "# Hello\n\nworld" }] });
   });
+
+  describe("importing Word, PDF, CSV and zip files", () => {
+    const repo = { id: "col1", name: "handbook", source: "docs", url: "", default_branch: "main", indexed_sha: null, status: "ready", file_count: 0, chunk_count: 0, updated_at: new Date().toISOString() };
+    function setup(answer: unknown) {
+      const calls: { url: string; body?: BodyInit | null }[] = [];
+      vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+        const u = String(input);
+        calls.push({ url: u, body: init?.body });
+        if (u.endsWith("/auth/me")) return json(me);
+        if (u.endsWith("/repositories")) return json([repo]);
+        if (u.endsWith("/import") && init?.method === "POST") return json(answer);
+        if (u.endsWith("/documents") && init?.method === "POST") return json({ received: 1, changed: 1 });
+        if (u.endsWith("/documents")) return json([]);
+        return json({}, 404);
+      });
+      return calls;
+    }
+    const sentFiles = (calls: { url: string; body?: BodyInit | null }[]) => (calls.find((c) => c.url.endsWith("/import"))!.body as FormData).getAll("files") as File[];
+
+    it("sends a Word file as a real file upload for the server to read, and says what was imported and what was skipped", async () => {
+      const calls = setup({ received: 2, changed: 1, secrets_redacted: 1, imported: [{ path: "Runbook.md", source: "Runbook.docx", kind: "docx" }], skipped: [{ name: "scan.pdf", reason: "it has no selectable text; it looks like a scanned document, and reading text out of pictures (OCR) is not supported" }] });
+      renderPage("/knowledge?tab=docs");
+      const input = await screen.findByLabelText("Upload documents");
+      for (const ext of [".docx", ".pdf", ".zip", ".csv"]) expect(input).toHaveAttribute("accept", expect.stringContaining(ext));
+      await userEvent.upload(input, [new File([new Uint8Array([80, 75, 3, 4])], "Runbook.docx"), new File([new Uint8Array([37, 80, 68, 70])], "scan.pdf")]);
+      const result = await screen.findByLabelText("Import result");
+      expect(result).toHaveTextContent("Imported 1 document, skipped 1, 1 secret masked.");
+      expect(result).toHaveTextContent("scan.pdf");
+      expect(result).toHaveTextContent("OCR");
+      const files = sentFiles(calls);
+      expect(files.map((f) => f.name)).toEqual(["Runbook.docx", "scan.pdf"]);
+      expect(new Uint8Array(await files[0].arrayBuffer())).toEqual(new Uint8Array([80, 75, 3, 4])); // the real bytes, not an encoded copy
+      expect(calls.some((c) => c.url.endsWith("/documents") && c.body)).toBe(false); // nothing went up as text
+    });
+
+    it("sends text files as text and Notion zips as files in the same pick", async () => {
+      const calls = setup({ received: 1, changed: 3, secrets_redacted: 0, imported: [{ path: "a.md", source: "x.zip", kind: "notion" }, { path: "b.md", source: "x.zip", kind: "notion" }, { path: "c.md", source: "x.zip", kind: "notion" }], skipped: [] });
+      renderPage("/knowledge?tab=docs");
+      await userEvent.upload(await screen.findByLabelText("Upload documents"), [new File(["# Hi"], "hi.md"), new File([new Uint8Array([80, 75])], "Export.zip")]);
+      expect(await screen.findByLabelText("Import result")).toHaveTextContent("Imported 3 documents.");
+      expect(JSON.parse(calls.find((c) => c.url.endsWith("/documents") && c.body)!.body as string)).toEqual({ documents: [{ path: "hi.md", content: "# Hi" }] });
+      expect(sentFiles(calls).map((f) => f.name)).toEqual(["Export.zip"]);
+    });
+
+    it("allows 25 MB a file, says so, and keeps a file over the limit, or over 100 MB in total, out of the upload", async () => {
+      const calls = setup({ received: 1, changed: 1, secrets_redacted: 0, imported: [{ path: "ok.md", source: "ok.pdf", kind: "pdf" }], skipped: [] });
+      renderPage("/knowledge?tab=docs");
+      const hint = await screen.findByText(/Word, PDF, CSV and zip up to 25 MB each/);
+      expect(hint).toHaveTextContent("Notion: Export as Markdown & CSV");
+      expect(hint).toHaveTextContent("no OCR");
+      const sized = (name: string, mb: number) => { const f = new File(["x"], name); Object.defineProperty(f, "size", { value: mb * 1024 * 1024 }); return f; };
+      await userEvent.upload(screen.getByLabelText("Upload documents"), [sized("ok.pdf", 25), sized("toobig.pdf", 26)]);
+      expect(await screen.findByText(/Skipped 1 file\(s\) over the size limit \(1 MB for text, 25 MB for Word/)).toBeInTheDocument();
+      expect(sentFiles(calls).map((f) => f.name)).toEqual(["ok.pdf"]); // exactly 25 MB goes up; 26 MB does not
+    });
+
+    it("does not send more than 100 MB in one upload", async () => {
+      const calls = setup({ received: 1, changed: 1, secrets_redacted: 0, imported: [], skipped: [] });
+      renderPage("/knowledge?tab=docs");
+      const sized = (name: string, mb: number) => { const f = new File(["x"], name); Object.defineProperty(f, "size", { value: mb * 1024 * 1024 }); return f; };
+      await userEvent.upload(await screen.findByLabelText("Upload documents"), [sized("a.pdf", 25), sized("b.pdf", 25), sized("c.pdf", 25), sized("d.pdf", 25), sized("e.pdf", 25)]);
+      expect(await screen.findByText(/1 file\(s\) did not fit in one upload \(100 MB at a time\)/)).toBeInTheDocument();
+      expect(sentFiles(calls).map((f) => f.name)).toEqual(["a.pdf", "b.pdf", "c.pdf", "d.pdf"]);
+    });
+  });
 });

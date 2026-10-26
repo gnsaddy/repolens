@@ -64,6 +64,12 @@ def test_the_ingress_uses_the_tls_secret_that_both_certificate_routes_fill():
     assert (
         ingress["spec"]["tls"][0]["secretName"] == "repolens-tls"
     )  # `kubectl create secret tls repolens-tls`, or cert-manager
+    assert (
+        ingress["metadata"]["annotations"]["nginx.ingress.kubernetes.io/proxy-body-size"] == "101m"
+    )  # the default (1 MB) would refuse imports
+    assert (
+        "client_max_body_size 101m" in (ROOT / "frontend" / "nginx.conf").read_text()
+    )  # the web container allows what the API allows
     comp = load(DEPLOY / "components" / "cert-manager" / "kustomization.yaml")[0]
     assert comp["kind"] == "Component" and "cert-manager.io~1cluster-issuer" in comp["patches"][0]["patch"]
     issuer = load(DEPLOY / "extras" / "cluster-issuer-letsencrypt.yaml")[0]

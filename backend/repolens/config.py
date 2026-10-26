@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     rate_limit_heavy_per_minute: int = 30  # model-backed and indexing calls, per session
     rate_limit_auth_per_minute: int = 20  # sign-in, registration and single-sign-on discovery, per address
     max_body_mb: int = 32  # larger request bodies are refused
+    max_upload_mb: int = 100  # document imports (several files, each up to 25 MB) may be larger; nothing else is
     metrics_token: str = ""  # when set, /metrics needs this bearer token
     # How long old records are kept before the daily sweep removes them (0 = keep forever).
     retention_feedback_days: int = 365

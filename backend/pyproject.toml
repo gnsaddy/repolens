@@ -10,6 +10,7 @@ dependencies = [
   "tree-sitter-go", "tree-sitter-java",
   "opentelemetry-api", "opentelemetry-sdk", "opentelemetry-instrumentation-fastapi",
   "opentelemetry-exporter-otlp-proto-http", "prometheus-client", "python-multipart",
+  "pypdf>=6.21,<7",  # text of PDF files that have selectable text; pure Python, no OCR
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ ignore = ["B008"]
 "repolens/services/mcp_server.py" = ["E501"]
 "repolens/services/pr_report.py" = ["E501"]
 "repolens/services/fixes.py" = ["E501"]
+"repolens/services/importers.py" = ["E501"]
 "repolens/services/graph_insights.py" = ["E501"]
 "repolens/services/calibration.py" = ["E501"]
 "repolens/evals/suites/bugs.py" = ["E501"]

@@ -67,10 +67,14 @@ class EdgeGuard:
             await send(start)
             await send(body)
 
-        limit = s.max_body_mb * 1024 * 1024
+        is_upload = (
+            scope["method"] == "POST" and path.startswith("/api/knowledge/collections/") and path.endswith("/import")
+        )
+        cap_mb = s.max_upload_mb if is_upload else s.max_body_mb
+        limit = cap_mb * 1024 * 1024
         declared = next((int(v) for k, v in scope["headers"] if k == b"content-length" and v.isdigit()), 0)
         if declared > limit:
-            return await reply(413, f"Request body is larger than {s.max_body_mb} MB")
+            return await reply(413, f"Request body is larger than {cap_mb} MB")
 
         if s.rate_limit_enabled and path.startswith(("/api/", "/scim/")) and path not in _EXEMPT:
             ip = _client(scope)
@@ -122,7 +126,7 @@ class EdgeGuard:
         try:
             await self.app(scope, counted, with_headers)
         except _TooLarge:
-            await reply(413, f"Request body is larger than {s.max_body_mb} MB")
+            await reply(413, f"Request body is larger than {cap_mb} MB")
 
 
 class _TooLarge(Exception):

@@ -4,7 +4,7 @@ import posixpath
 import re
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, KGEdge, KGNode, Repository
 from ..schemas import CollectionCreate, DocsUpload, HeatIn, KnowledgeQuery, RepoOut
 from ..security import redact_stored
-from ..services import answer_memory
+from ..services import answer_memory, importers
 from ..services import graph as g
 from ..services import graph_insights as gi
 from ..services import knowledge as kb
@@ -60,21 +60,14 @@ def _clean_path(path: str) -> str:
     return norm
 
 
-@router.post("/knowledge/collections/{repo_id}/documents")
-def upload_documents(
-    repo_id: str, body: DocsUpload, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
-):
-    repo = _get_repo(db, p, repo_id)
-    if repo.source != "docs":
-        raise HTTPException(400, "Documents can only be uploaded to a docs collection")
-    authorize(db, p, "document.write", repo.name, count=len(body.documents))
+def _store(db: Session, p: Principal, repo: Repository, items: list[tuple[str, str]]) -> tuple[int, int]:
+    """Save documents (path, text) into a collection and queue indexing. Returns (changed, secrets masked)."""
     changed = 0
     redacted = 0
-    for d in body.documents:
-        path = _clean_path(d.path)
-        if "\x00" in d.content:
+    for path, text in items:
+        if "\x00" in text:
             raise HTTPException(400, f"Binary content rejected: {path}")
-        content, n_red = redact_stored(d.content)  # secrets never enter the knowledge base
+        content, n_red = redact_stored(text)  # secrets never enter the knowledge base
         redacted += n_red
         h = hashlib.sha256(content.encode()).hexdigest()
         row = db.scalar(select(Document).where(Document.repo_id == repo.id, Document.path == path))
@@ -97,7 +90,64 @@ def upload_documents(
     repo.status = "indexing"
     db.commit()
     schedule_index(repo.id)
+    return changed, redacted
+
+
+@router.post("/knowledge/collections/{repo_id}/documents")
+def upload_documents(
+    repo_id: str, body: DocsUpload, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    repo = _get_repo(db, p, repo_id)
+    if repo.source != "docs":
+        raise HTTPException(400, "Documents can only be uploaded to a docs collection")
+    authorize(db, p, "document.write", repo.name, count=len(body.documents))
+    changed, redacted = _store(db, p, repo, [(_clean_path(d.path), d.content) for d in body.documents])
     return {"received": len(body.documents), "changed": changed, "secrets_redacted": redacted}
+
+
+@router.post("/knowledge/collections/{repo_id}/import")
+def import_files(
+    repo_id: str,
+    files: list[UploadFile] = File(...),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Import Word files, Notion exports and zips of documents (and PDFs when the optional library is installed).
+    Sent as an ordinary file upload, so a file is not enlarged by an encoding. A file that cannot be read is
+    reported and skipped; the rest are imported."""
+    repo = _get_repo(db, p, repo_id)
+    if repo.source != "docs":
+        raise HTTPException(400, "Documents can only be imported into a docs collection")
+    if not 1 <= len(files) <= 20:
+        raise HTTPException(422, "Send between 1 and 20 files at a time")
+    docs: list[importers.Doc] = []
+    skipped: list[dict] = []
+    for f in files:
+        name = f.filename or "file"
+        raw = f.file.read(importers.MAX_FILE + 1)  # one byte more than allowed is enough to know it is too large
+        got, skips = importers.convert(name, raw)
+        docs += got
+        skipped += [{"name": s.name, "reason": s.reason} for s in skips]
+    authorize(db, p, "document.write", repo.name, count=len(docs) or len(files))
+    clean: list[tuple[str, str]] = []
+    kind_of: dict[str, tuple[str, str]] = {}
+    for d in docs[:2000]:
+        try:
+            path = _clean_path(d.path)
+        except HTTPException:
+            skipped.append({"name": d.source, "reason": "its name is not allowed"})
+            continue
+        if path.lower() not in {c.lower() for c, _ in clean}:
+            clean.append((path, d.content))
+            kind_of[path] = (d.source, d.kind)
+    changed, redacted = _store(db, p, repo, clean) if clean else (0, 0)
+    return {
+        "received": len(files),
+        "imported": [{"path": path, "source": kind_of[path][0], "kind": kind_of[path][1]} for path, _ in clean],
+        "skipped": skipped,
+        "changed": changed,
+        "secrets_redacted": redacted,
+    }
 
 
 @router.get("/knowledge/collections/{repo_id}/documents")
