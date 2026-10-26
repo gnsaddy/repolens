@@ -15,7 +15,7 @@ Backend: `ruff check . && ruff format .` (run on the whole folder), `mypy repole
 ## What a good change includes
 * Tests that fail without the change (`backend/tests`, `frontend/src/test`).
 * Docs: behaviour goes in `docs/features.md`, design in `docs/architecture.md`, anything affecting trust in `SECURITY.md`.
-* A changelog entry: `make changelog title="short title"` makes a draft in `changelog/unreleased/`; fill it in, then `make changelog-index` folds it into the version file (`changelog/v0.1-beta.md`).
+* A changelog entry: `make changelog title="short title"` makes a draft in `changelog/unreleased/`; fill it in, then `make changelog-index` folds it into the current version's file (`changelog/v0.2-beta.md`).
 * A database change gets an Alembic migration.
 
 ## Where things live

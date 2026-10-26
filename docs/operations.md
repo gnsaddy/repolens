@@ -86,7 +86,7 @@ Steps:
 4. **Release by pull request.** Tag a version in this repository (the CD workflow then publishes the images), then change the tag in your configuration repository. Argo CD shows the diff and syncs it.
 5. **Turn off the push-style deploy.** Set the repository variable `DEPLOY_MODE` to `gitops`; the CD workflow then only publishes images and never needs a kubeconfig.
 
-Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.1-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
+Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.2-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
 
 ## Upload size limits
 
@@ -150,4 +150,4 @@ Images run `alembic upgrade head` on start, so deploying a new image migrates th
 Changing the embedding model needs `python -m repolens.devtools.reembed` (see `evals/README.md`).
 
 ## Versions and releases
-The app is at **v0.1-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.1.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.1-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.1-beta` publishes a GitHub release without deploying anything.
+The app is at **v0.2-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.2.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.2-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.2-beta` publishes a GitHub release without deploying anything.

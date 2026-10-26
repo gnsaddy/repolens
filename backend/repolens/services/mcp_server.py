@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from .. import __version__
 from ..deps import Principal
 from ..services.policy import authorize
 
@@ -383,7 +384,7 @@ def handle(db: Session, p: Principal, msg: dict) -> dict | None:
             {
                 "protocolVersion": asked if asked in PROTOCOLS else PROTOCOLS[0],
                 "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "repolens", "version": "0.1.0"},
+                "serverInfo": {"name": "repolens", "version": __version__},
                 "instructions": "RepoLens answers questions about this team's code, documentation, pull requests and tickets with cited sources. "
                 "Prefer ask or search before guessing; use symbol_brief before suggesting a change to a function.",
             },

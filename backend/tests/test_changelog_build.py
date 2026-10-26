@@ -65,7 +65,7 @@ def test_a_new_version_label_starts_a_new_file_and_the_index_lists_both(cl, tmp_
     assert cl.write_index() == 2
     readme = (tmp_path / "changelog" / "README.md").read_text()
     assert readme.index("v2-beta") < readme.index("v1-beta")  # newest version first
-    assert "1 entries" in readme
+    assert "1 entry" in readme
 
 
 def test_parse_round_trips_a_rendered_file(cl):

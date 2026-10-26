@@ -55,7 +55,7 @@ describe("About page", () => {
     expect(screen.getByRole("region", { name: "What you can do with it" })).toHaveTextContent("DeepMind Wiki");
     expect(screen.getByRole("region", { name: "What you can do with it" })).toHaveTextContent("Suggested fixes");
     const status = screen.getByRole("region", { name: "Where it stands" });
-    expect(status).toHaveTextContent("v0.1-beta");
+    expect(status).toHaveTextContent("v0.2-beta");
     expect(status).toHaveTextContent(/not had an independent security audit/);
     expect(screen.getByRole("region", { name: "Who built it and how it is licensed" })).toHaveTextContent("Apache License 2.0");
   });

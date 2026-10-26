@@ -1,6 +1,6 @@
 [project]
 name = "repolens"
-version = "0.1.0b0"
+version = "0.2.0b0"
 description = "RepoLens AI - repository intelligence and RCA platform"
 requires-python = ">=3.11"
 dependencies = [

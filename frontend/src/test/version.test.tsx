@@ -10,11 +10,11 @@ import SettingsPage from "@/pages/SettingsPage";
 afterEach(() => vi.restoreAllMocks());
 
 describe("version", () => {
-  it("is v0.1-beta and shown on the sign-in page", async () => {
+  it("is v0.2-beta and shown on the sign-in page", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 401, headers: { "Content-Type": "application/json" } })));
-    expect(APP_VERSION).toBe("v0.1-beta");
+    expect(APP_VERSION).toBe("v0.2-beta");
     render(<QueryClientProvider client={new QueryClient()}><AuthProvider><MemoryRouter><Login /></MemoryRouter></AuthProvider></QueryClientProvider>);
-    expect((await screen.findAllByText("v0.1-beta")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("v0.2-beta")).length).toBeGreaterThan(0);
   });
 
   it("the new logo is on the sign-in page and an About strip with the version is on Settings", async () => {
@@ -26,7 +26,7 @@ describe("version", () => {
     localStorage.setItem("repolens.token", "tok");
     render(<QueryClientProvider client={new QueryClient()}><AuthProvider><MemoryRouter><SettingsPage /></MemoryRouter></AuthProvider></QueryClientProvider>);
     const about = await screen.findByRole("region", { name: "About RepoLens AI" });
-    expect(about).toHaveTextContent("v0.1-beta");
+    expect(about).toHaveTextContent("v0.2-beta");
     expect(about.querySelector("svg[aria-label='RepoLens AI logo']")).not.toBeNull();
     expect(screen.getByRole("link", { name: /Report a bug or request a feature/ })).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });

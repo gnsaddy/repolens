@@ -2,7 +2,7 @@
 
 # RepoLens AI
 
-**Version v0.1-beta.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
+**Version v0.2-beta.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
 
 **DeepMind Wiki: a living wiki for your code and docs.** Point RepoLens at your repositories, READMEs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint, and it builds a wiki you can browse and ask questions of, with a code atlas for every repository and an at-a-glance card (kind, owner, warnings, commands) for every page. Answers cite their sources. It also keeps the wiki honest: it flags pages that may be out of date when the code they describe changes, finds orphaned, duplicated and broken pages, and drafts edits that a person reviews before anything changes.
 

@@ -31,7 +31,7 @@ describe("sign-in page", () => {
   it("is honest about what it is not", async () => {
     show();
     const trust = await screen.findByLabelText("Why you can trust it");
-    expect(trust).toHaveTextContent(/v0\.1-beta release/);
+    expect(trust).toHaveTextContent(/v0\.2-beta release/);
     expect(trust).toHaveTextContent(/not had an independent security audit or a compliance certification/);
     expect(trust).not.toHaveTextContent(/SOC ?2|ISO ?27001|HIPAA|GDPR/i); // no certification is claimed
   });

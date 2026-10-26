@@ -17,7 +17,7 @@ ENTRY = re.compile(r"^### (.+?)\s*$")
 
 INTRO = """# Changelog
 
-One file per release, named after the version (for example `v0.1-beta.md`). Inside, entries are grouped by date, newest first,
+One file per release, named after the version (for example `v0.2-beta.md`). Inside, entries are grouped by date, newest first,
 and each entry lists what changed under **Added**, **Changed**, **Fixed**, **Security** and **Upgrade notes**. Write for the person
 who runs or uses RepoLens, not for the person who wrote the code: what changed, why it matters, and anything they must do.
 
@@ -106,7 +106,7 @@ def write_index() -> int:
         days = parse(p.read_text(encoding="utf8"))
         count = sum(len(v) for v in days.values())
         span = f"{min(days)} to {max(days)}" if days else "no entries yet"
-        rows.append(f"- [{p.stem}]({p.name}) · {count} entries · {span}")
+        rows.append(f"- [{p.stem}]({p.name}) · {count} {'entry' if count == 1 else 'entries'} · {span}")
     pending = len(list(UNRELEASED.glob("20??-??-??-*.md"))) if UNRELEASED.exists() else 0
     note = f"\n\n{pending} draft(s) in `unreleased/` not folded yet: run `make changelog-index`." if pending else ""
     block = f"{START}\n" + "\n".join(rows) + f"\n{END}{note}\n"
