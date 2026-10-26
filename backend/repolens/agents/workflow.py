@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import CacheEntry, Change, CodeChunk, PullRequest, Repository
-from ..services import cause_hints, llm_router, retrieval, usage, walkthrough
+from ..services import cause_hints, llm_router, retrieval, skills, usage, walkthrough
 from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
@@ -469,6 +469,7 @@ def build_graph(ctx: Ctx):
         deterministic = _deterministic_narrative(top, state["query"], hyps)
         if ctx.llm.offline:
             return {"narrative": deterministic, "llm_used": False}, "offline mode: deterministic narrative"
+        chosen = skills.choose(ctx.db, ctx.org_id, state["query"], "investigate", state["repo_ids"] or None)
         evidence_txt = _evidence_prompt(hyps[:3])
         prompt = f"INCIDENT:\n{state['query'][:4000]}\n\nEVIDENCE:\n{evidence_txt}"
         if deterministic["root_cause"] != _deterministic_narrative(top)["root_cause"]:  # a code-level reading exists
@@ -484,6 +485,7 @@ def build_graph(ctx: Ctx):
                     PROMPT_VERSION,
                     SCHEMA_VERSION,
                     ctx.llm.cache_id,
+                    skills.fingerprint(chosen),
                     shas,
                     hashlib.sha256(prompt.encode()).hexdigest(),
                 ]
@@ -517,7 +519,11 @@ def build_graph(ctx: Ctx):
                 low_confidence=top["confidence"] < 0.5,
             )
             res = ctx.llm.complete(
-                "investigator", SYSTEM_PROMPT, prompt, task=task, validate=lambda t: bool(_parse_json(t))
+                "investigator",
+                SYSTEM_PROMPT + skills.guidance(chosen),
+                prompt,
+                task=task,
+                validate=lambda t: bool(_parse_json(t)),
             )
             data = _parse_json(res.text)
             if not data:
@@ -526,7 +532,9 @@ def build_graph(ctx: Ctx):
                 "root_cause": str(data.get("root_cause", ""))[:1500],
                 "explanation": str(data.get("explanation", ""))[:3000],
                 "suggested_fix": str(data.get("suggested_fix", ""))[:3000],
+                **({"skills": [x.title for x in chosen]} if chosen else {}),
             }
+            skills.record_use(ctx.db, chosen)
             ctx.db.add(
                 CacheEntry(
                     key=key,
@@ -1053,6 +1061,8 @@ def render_report(ctx: Ctx, state: State) -> str:
     ]
     if n.get("explanation"):
         lines += ["### Reasoning", n["explanation"], ""]
+    if n.get("skills"):
+        lines += [f"_Guidance applied: {', '.join(n['skills'])}_", ""]
     if hyps:
         lines.append("### Leading hypotheses")
         for h in hyps[:3]:

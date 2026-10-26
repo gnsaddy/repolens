@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Brain, KeyRound, Plug, SearchCheck, ShieldCheck, UserCog } from "lucide-react";
+import { Brain, KeyRound, Plug, SearchCheck, ShieldCheck, Sparkles, UserCog } from "lucide-react";
 import Logo from "@/components/Logo";
 import { ISSUES_URL } from "@/components/ReportIssue";
 import { APP_VERSION } from "@/lib/version";
@@ -9,6 +9,7 @@ import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import AccessTokens from "@/components/AccessTokens";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
 import LanguageModelCard from "@/components/LanguageModelCard";
+import SkillsPanel from "@/components/SkillsPanel";
 import OutboundCard from "@/components/OutboundCard";
 import ModelRoutingCard, { MemoryCard } from "@/components/ModelRoutingCard";
 import { Badge, PageHeader } from "@/components/ui";
@@ -16,14 +17,14 @@ import { api, type ModelRegistry, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain], ["mcp", "MCP & tokens", KeyRound], ["people", "People", UserCog]] as const;
+const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain], ["skills", "Skills", Sparkles], ["mcp", "MCP & tokens", KeyRound], ["people", "People", UserCog]] as const;
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const admin = user?.role === "admin";
   const [sp, setSp] = useSearchParams();
   const asked = sp.get("tab");
-  const tab = asked === "ai" ? "ai" : asked === "mcp" ? "mcp" : asked === "people" && admin ? "people" : "integrations";
+  const tab = asked === "ai" ? "ai" : asked === "skills" ? "skills" : asked === "mcp" ? "mcp" : asked === "people" && admin ? "people" : "integrations";
   const tabs = TABS.filter(([k]) => k !== "people" || admin);
   const registry = useQuery({ queryKey: ["model-registry"], queryFn: () => api<ModelRegistry>("/settings/models") });
   const managed = !!registry.data?.connections?.some((c) => !c.legacy); // once models are managed below, one card is enough
@@ -37,7 +38,7 @@ export default function SettingsPage() {
             className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       <div className={tab === "people" ? "" : "max-w-4xl"}>
-        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
+        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : tab === "skills" ? <SkillsPanel admin={admin} canSubmit={!!user && user.role !== "viewer"} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
           <div className="space-y-4">
             <OutboundCard />
             {!managed && <LanguageModelCard admin={admin} />}

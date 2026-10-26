@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..models import ChatMessage, ChatThread, CodeChunk, Repository
 from ..security import redact_secrets
-from . import context, routes, walkthrough
+from . import context, routes, skills, walkthrough
 from . import knowledge as kb
 from .access import Scope
 from .llm import LLMClient, describe_failure
@@ -205,6 +205,7 @@ def _answer(
 
     llm = LLMClient(db, org, "chat", thread.id)
     failure = ""
+    chosen = skills.choose(db, org, question, kind, ids)
     if not llm.offline and (sources or thread.fallback or attachment):
         parts = []
         if sources:
@@ -238,18 +239,25 @@ def _answer(
         try:
             res = llm.complete(
                 "librarian",
-                CHAT_SYSTEM + (FALLBACK_RULE if thread.fallback else "") + walkthrough.addon(kind),
+                CHAT_SYSTEM
+                + (FALLBACK_RULE if thread.fallback else "")
+                + walkthrough.addon(kind)
+                + skills.guidance(chosen),
                 prompt,
                 max_tokens=4000,
                 task=task,
                 validate=None if thread.fallback else kb._grounded,
             )
+            skills.record_use(db, chosen)
             general = thread.fallback and not sources
             cut = "\n\n_(The model stopped before finishing. Ask it to continue.)_" if res.truncated else ""
             unknown = sorted({f"S{n}" for n in re.findall(r"\[S(\d+)\]", res.text) if not 1 <= int(n) <= len(sources)})
             return {
                 **base,
-                "content": res.text + cut + (f"\n\n_(Unknown citations: {', '.join(unknown)})_" if unknown else ""),
+                "content": res.text
+                + cut
+                + (f"\n\n_(Unknown citations: {', '.join(unknown)})_" if unknown else "")
+                + skills.footer(chosen),
                 "mode": "general" if general else "llm",
             }
         except Exception as e:  # budget reached, outage, no usable model: fall through to the extracted answer

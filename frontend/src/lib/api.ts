@@ -309,3 +309,9 @@ export interface MeasureRun {
   result: { cases: number; random_top3: number; retrieval: MeasureRates; investigation: MeasureRates; top3_ci95: [number, number] | null; caveats: string[]; rows: { commit: string; report: string; files: string[]; retrieval_rank: number | null; investigation_rank: number | null }[] } | null;
 }
 export interface MeasureList { items: MeasureRun[]; can_run: boolean }
+
+export interface SkillRow {
+  id: string; name: string; title: string; description: string; body: string; tasks: string[]; repo_ids: string[]; repos: string[];
+  always: boolean; status: "pending" | "approved" | "rejected" | "disabled"; note: string; uses: number; mine: boolean; created_at: string; updated_at: string;
+}
+export interface SkillList { items: SkillRow[]; builtin: { name: string; title: string; description: string; applies: string }[]; pending: number }

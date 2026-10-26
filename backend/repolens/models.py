@@ -770,3 +770,30 @@ class EvalRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Skill(Base):
+    """Guidance an organisation adds for the model: how its APIs are written, how its runbooks look, how it debugs.
+
+    Private to one organisation. A member can submit one; it applies only once an admin has approved it."""
+
+    __tablename__ = "skills"
+    __table_args__ = (UniqueConstraint("org_id", "name"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    name: Mapped[str] = mapped_column(String(80))  # short slug, unique per organisation
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")  # when it applies: matched against the question
+    body: Mapped[str] = mapped_column(Text, default="")  # the instructions
+    tasks: Mapped[list] = mapped_column(JSON, default=list)  # lookup | explain | build | investigate; empty = any
+    repo_ids: Mapped[list] = mapped_column(JSON, default=list)  # empty = every repository
+    always: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # apply to every matching task, not only on keyword match
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | approved | rejected | disabled
+    note: Mapped[str] = mapped_column(Text, default="")  # why it was rejected
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    reviewed_by: Mapped[str] = mapped_column(String(32), default="")
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

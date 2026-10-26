@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
-from . import answer_memory, context, usage, walkthrough
+from . import answer_memory, context, skills, usage, walkthrough
 from .access import Scope
 from .graph import neighbors, node_dict
 from .links import file_url
@@ -300,7 +300,8 @@ def ask(
     llm = LLMClient(db, org, "knowledge", "")
     failure = ""
     kind = walkthrough.task_kind(query)
-    mem_key = answer_memory.scope_key(scope, repo_ids, kinds)
+    chosen = skills.choose(db, org, query, kind, repo_ids)
+    mem_key = answer_memory.scope_key(scope, repo_ids, kinds) + skills.fingerprint(chosen)  # new guidance, new answers
     fp = answer_memory.fingerprint(db, org, scope, repo_ids)
     reuse = kind != "build"  # something written to order is made for this request, never replayed from memory
     if not llm.offline and not fresh and reuse:
@@ -324,7 +325,9 @@ def ask(
             )
             + f"\n\nQUESTION: {query[:2000]}"
         )
-        system = (ASK_SYSTEM.replace(" Be concise.", "") + walkthrough.addon(kind)) if kind != "lookup" else ASK_SYSTEM
+        system = (
+            (ASK_SYSTEM.replace(" Be concise.", "") + walkthrough.addon(kind)) if kind != "lookup" else ASK_SYSTEM
+        ) + skills.guidance(chosen)
         key = hashlib.sha256(
             json.dumps(
                 [ASK_PROMPT_VERSION, llm.cache_id, hashlib.sha256((system + prompt).encode()).hexdigest()]
@@ -367,17 +370,21 @@ def ask(
             )
             cited = set(re.findall(r"\[S(\d+)\]", res.text))
             unknown = sorted(f"S{n}" for n in cited if not 1 <= int(n) <= len(sources))
+            answer = res.text + skills.footer(chosen)
+            skills.record_use(db, chosen)
             db.add(
                 CacheEntry(
                     key=key,
                     org_id=org,
                     task="kb_ask",
-                    value={"answer": res.text, "unknown": unknown},
+                    value={"answer": answer, "unknown": unknown},
                     tokens_baseline=res.input_tokens + res.output_tokens,
                 )
             )
             db.commit()
-            out = {**base, "answer": res.text, "mode": "llm", "cached": False, "unknown_citations": unknown}
+            out = {**base, "answer": answer, "mode": "llm", "cached": False, "unknown_citations": unknown}
+            if chosen:
+                out["skills"] = [x.title for x in chosen]
             if res.route:
                 out["route"] = res.route
             if reuse:

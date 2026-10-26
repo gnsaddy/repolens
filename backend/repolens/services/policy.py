@@ -41,6 +41,8 @@ ACTION_MIN_ROLE = {
     "wiki.decide": "member",
     "chat.write": "viewer",  # a person's own conversations: private to them, not shared workspace data
     "wiki.publish": "admin",
+    "skill.submit": "member",  # an admin's submission is approved at once; a member's waits for review
+    "skill.review": "admin",
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}
 
