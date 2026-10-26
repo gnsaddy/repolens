@@ -32,6 +32,15 @@ Legend: ✅ built and tested · ⚠️ built, tested only with mocks/offline def
 * ⚠️ Narrative synthesis with Anthropic / OpenAI-compatible (tested with mocks); the GitHub Models provider is retired by GitHub (30 July 2026)
 * ❌ Separate Blue/Red/Judge/Oracle-as-agent roles, fix generation, adversarial review, sandboxed test execution
 
+### Debugging discipline in every report
+
+Reports follow the debugging practice described in Addy Osmani's [agent-skills](https://github.com/addyosmani/agent-skills) (`debugging-and-error-recovery`, `doubt-driven-development`):
+
+* **How to confirm it:** a six-step checklist filled in with what was found: reproduce (the trace's input, or "write down the exact steps"), localise (the file and function, plus a `git bisect` range when a suspect commit exists), reduce, fix the cause not the symptom, guard (a regression test, next to the existing test file when one was found) and verify (that test, the whole suite, the build, the original scenario).
+* **Red flags:** reasons not to trust the lead yet: no stack trace (inferred from symptoms), no commit tying the code to the failure (maybe not a regression), no test covering it, a runner-up hypothesis within 10 points, or confidence under 50%.
+* **Independent review:** with a connected model, a second pass is shown only the incident and the evidence, never the hypothesis titles, confidence or conclusion, and asked what it thinks the cause is, what else fits, what must be true, and the quickest experiment to tell them apart. The report says whether it **agrees** (it points at the same file or function) or **differs**. In savings mode it is skipped when confidence is already 70% or more, and when it is skipped or fails the report says why. It costs one extra light model call.
+* Errors, logs and stack traces stay untrusted data: they are analysed, never obeyed.
+
 ## Change-risk scoring (Oracle)
 * ✅ Interpretable 0–100 score from seven weighted signals (size, dependency centrality, public interfaces, historical defects, test gap, sensitive paths, similar past changes) with evidence, model version and limitations
 * ✅ Assess a commit, a branch range before merge, a synced PR, or a raw file list; ranks recent commits; auto-assesses PRs on webhook sync
