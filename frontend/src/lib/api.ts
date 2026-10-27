@@ -337,5 +337,12 @@ export interface SystemRisk { commits: number; lines: number; fixes: number; dri
 export interface CodeGraph { nodes: GraphNode[]; edges: GraphEdge[]; available: { strong: number; weak: number }; shown_weak: boolean; truncated: boolean }
 export interface SystemLink { src: string; dst: string; count: number; strong: number; http: number; imports: number; weak: number; strength: number; rels: Record<string, number>; trust: "fact" | "inferred" | "uncertain"; examples: { rel: string; from: string; to: string; evidence: string }[] }
 export interface SystemCoupling { a: string; b: string; tickets: number; ticket_examples: string[]; days: number; score: number }
-export interface SystemAnalysis { window_days: number; repos: SystemRepo[]; links: SystemLink[]; coupling: SystemCoupling[]; estimate_tokens: number }
+export interface SystemAnalysis { window_days: number; repos: SystemRepo[]; links: SystemLink[]; coupling: SystemCoupling[]; coverage: Record<string, LinkCoverage>; estimate_tokens: number }
 export interface SystemOverview { id: string; content: string; mode: "llm" | "extractive"; model: string; unsupported_names: string[]; created_by: string; created_by_name: string; created_at: string; repositories: number; partial: boolean }
+
+export interface LinkCoverage { languages: Record<string, number>; unread: { detector: string; language: string; files: number }[]; provides: string[]; route_files: number; detectors: string[] }
+export interface ImpactLink { link: string; repo_id: string; repo: string; label: string; target: string; kind: string; rel: string; trust: string; evidence: string; more: number; since: string; owners: { name: string; commits: number }[] }
+export interface Impact { node: { id: string; name: string; type: string; path: string; repo: string }; direct: ImpactLink[]; indirect: { repo: string; label: string; through: string }[]; repos: { repo: string; uses: number }[]; hidden: number; note: string }
+export interface Surface { repo: { id: string; name: string }; symbols: { id: string; name: string; type: string; path: string; uses: number; repos: string[]; kinds: string[]; trust: string }[]; dependants: string[]; hidden: number; exports: number; unused_exports: { name: string; package: string; path: string }[]; note: string }
+export interface ChangePair { src: string; dst: string; from: string; to: string; count: number; examples: { from: string; to: string; evidence: string; at: string }[] }
+export interface LinkChanges { days: number; tracking_since: string; new: ChangePair[]; removed: ChangePair[]; computed_at: string }

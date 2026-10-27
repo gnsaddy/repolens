@@ -30,6 +30,10 @@ JOB_OK = Gauge("repolens_job_last_success_timestamp_seconds", "When a background
 JOB_FAILURES = Counter("repolens_job_failures_total", "Background loop passes that raised", ["job"])
 REPOS = Gauge("repolens_repositories", "Repositories by status", ["status"])
 REPO_STATUSES = ("pending", "indexing", "ready", "error")
+LINKS = Gauge("repolens_repo_links", "Active dependencies between repositories", ["kind"])
+LINKS_NEW = Counter(
+    "repolens_repo_links_new_total", "Dependencies between repositories that appeared after tracking began"
+)
 
 
 @dataclass

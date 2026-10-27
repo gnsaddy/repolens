@@ -866,3 +866,44 @@ class GroupOverview(Base):
     unsupported_names: Mapped[list] = mapped_column(JSON, default=list)
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class RepoLink(Base):
+    """One proved dependency between two repositories: a function, class or file in one that uses one in the other."""
+
+    __tablename__ = "repo_links"
+    __table_args__ = (UniqueConstraint("org_id", "kind", "src_node_id", "dst_node_id"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    kind: Mapped[str] = mapped_column(String(12))  # import | http
+    rel: Mapped[str] = mapped_column(String(12))  # USES | IMPORTS | HTTP
+    tier: Mapped[str] = mapped_column(String(12))  # imported (the file names it) | used (a function calls it)
+    trust: Mapped[str] = mapped_column(String(12))  # fact | inferred | uncertain
+    weight: Mapped[float] = mapped_column(Float, default=1.0)
+    src_repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    dst_repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    src_node_id: Mapped[str] = mapped_column(String(32), index=True)
+    dst_node_id: Mapped[str] = mapped_column(String(32), index=True)
+    src_label: Mapped[str] = mapped_column(
+        String(600), default=""
+    )  # path:name, kept so a removed link can still be shown
+    dst_label: Mapped[str] = mapped_column(String(600), default="")
+    evidence: Mapped[str] = mapped_column(Text, default="")  # the proof: the import line, or the URL and the route
+    more: Mapped[int] = mapped_column(Integer, default=0)  # further callers of the same target that were not stored
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    gone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LinkState(Base):
+    """When a workspace's links were last worked out, from which index versions, and what could be read."""
+
+    __tablename__ = "link_states"
+    org_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), default="")
+    baseline_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now
+    )  # links before this are not "new"
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    coverage: Mapped[dict] = mapped_column(JSON, default=dict)

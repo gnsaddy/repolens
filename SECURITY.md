@@ -10,6 +10,7 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
   same `Scope` object filters repository lists, search, Ask, the knowledge graph (nodes, edges, paths), investigations,
   incident memory, risk assessments and dashboard counts; hidden items answer 404, never 403. Background jobs run with
   their creator's scope, re-evaluated at run time.
+- Dependencies (Graph page): links between repositories are stored per workspace but read through the same `Scope`: blast radius, public surface and what-changed count a repository you cannot open and never name it, and an unknown or invisible node answers 404.
 - Systems (Graph page): a saved set of repositories is shared with the workspace, but a repository you cannot see is only counted in
   it, never named, and is left out of its analysis. A written overview is stored with the ids of the repositories it was built from and
   is returned only to someone whose scope covers all of them, checked on every read. Changing or deleting a system needs its author or

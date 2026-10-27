@@ -13,7 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, IndexRun, RepoAccess, Repository, User
 from ..schemas import AccessIn, RepoCreate, RepoOut, StorageCleanup
 from ..security import redact_stored
-from ..services import checkouts, gitops, golden, groups, index_jobs, retrieval
+from ..services import checkouts, gitops, golden, groups, index_jobs, repo_links, retrieval
 from ..services.access import scope_for
 from ..services.indexer import clone_auth_for, index_repository
 from ..services.links import has_embedded_credentials
@@ -63,6 +63,11 @@ def _run_index(repo_id: str) -> None:
     s = get_settings()
     if not s.run_jobs_inline:  # a failure that can pass by itself (a timeout) is tried again after a wait
         index_jobs.after_run(repo_id, status, error, schedule_index, s.index_retry_delays)
+    if status == "completed" and org_id:  # a new dependency between repositories is noticed when the index finishes
+        try:
+            repo_links.after_index(org_id)
+        except Exception:
+            logging.getLogger("repolens.links").exception("could not refresh the dependencies between repositories")
     if status == "completed" and org_id and s.auto_quality_checks:  # did the new index change any saved answer?
         try:
             golden.after_index(org_id)

@@ -294,7 +294,7 @@ picture is stored: `analyse(db, org, ids, days)` computes it when asked, from da
   (`graph_insights.trust`: fact, inferred or uncertain) and up to three example edges per pair, strongest first, each with its evidence string.
   Cross-repository edges are created by `graph.build_repo_graph` (a call to a name that exists in exactly one other repository, document mentions,
   semantic similarity), so a repository must be indexed after the others it uses for the arrow to appear; the daily re-index repairs that.
-* **Strong, URL and name-only.** A cross-repository edge below weight 0.8 is a call matched by name alone (`graph.build_repo_graph` adds one when
+* **Strong, URL and name-only.** (The URL and import finders below now run as stored detectors, see "Stored dependencies between repositories".) A cross-repository edge below weight 0.8 is a call matched by name alone (`graph.build_repo_graph` adds one when
   a name exists in exactly one other repository); it is counted as `weak`, the pair's trust stays `uncertain`, and it is left out of the code graph
   unless `weak=true`. `_http_links` adds a third kind that is not stored in the graph: for every function, method or class chunk, quoted strings are
   searched for URL paths and compared with the route inventory (`routes.parse` of each repository's `routes` chunks) by full path and by tail, so a
@@ -329,6 +329,29 @@ picture is stored: `analyse(db, org, ids, days)` computes it when asked, from da
   repository ids are the same 404. Writes go through `authorize` (`group.write`, `group.overview`, both member); changing or deleting a group needs
   its author or an admin. `purge_repository` calls `forget_repo`, which removes the repository from its groups (deleting a group left empty) and
   deletes overviews written from it. `POST /api/groups/{id}/overview` is in the heavy-call rate limit.
+
+## Stored dependencies between repositories
+`services/repo_links.py`, tables `repo_links` and `link_states` (migration 0028). The finders that used to run each time the Graph page was opened now live here
+as **detectors** (`Detector`: `name`, `kind`, `languages`, `detect(db, ids) -> (links, coverage info)`), registered in `DETECTORS`. Today there are two,
+`ImportDetector` (imports, resolved to definitions through a package's re-exports) and `HttpDetector` (URLs matched to routes); a new kind of link is a new
+detector, with nothing else to change. `refresh(db, org)` runs them over every repository of the workspace when the fingerprint (each repository's
+`indexed_sha`) differs from `link_states.fingerprint`, under one lock per workspace, and then stores the result: a link seen before keeps its `first_seen_at`,
+one that is no longer found gets `gone_at` (kept 180 days as "removed"), a link that comes back counts as new again. A detector that raises is logged and its
+kind is left alone, so one broken finder never makes the others' links look removed. `link_states.baseline_at` is set when a workspace is first looked at;
+links that existed then are never reported as new. `after_index` (called from `_run_index`, debounced per workspace by `auto_link_delay_s`) refreshes after an
+index, so a new dependency is noticed with nobody watching; the page also refreshes lazily when the fingerprint is stale. Settings: `auto_link_refresh`,
+`auto_link_delay_s`. `DETECTION_VERSION` is part of the fingerprint: change it whenever a detector finds links differently, and every workspace works its links out again. Metrics: `repolens_repo_links{kind}` and `repolens_repo_links_new_total`.
+
+* **Coverage.** Each detector says which languages it reads (`languages`); `link_states.coverage` records, per repository, the languages found (function, method
+  and class chunks), the ones a detector cannot read (`unread`), the packages it provides and its route files. The Graph page prints "Not read: go in
+  orders-svc" so an empty graph is not mistaken for "no dependencies".
+* **Blast radius** (`impact`): the stored links whose destination is the node (or, for a file, anything defined in it), limited to repositories in the
+  caller's `Scope` (the rest are only counted), the top two recent authors of each calling file (`Change.files`, bots skipped), and in-repository callers one step
+  further in (`CALLS` edges with weight 0.5 or more, three per function).
+* **Public surface** (`surface`): links grouped by destination, with the number of uses (links plus `more`), and, for Python packages, the names the package
+  `__init__.py` re-exports or lists in `__all__` that no stored link points at. A name unused here may be used outside the workspace, and the page says so.
+* **What changed** (`changes`): new links (`first_seen_at` in the window and after `baseline_at`) and removed ones (`gone_at` in the window), grouped by
+  repository pair with up to three examples and their proof lines.
 
 ## Graph insights
 **Worlds.** `ForceGraph.layout` groups nodes by repository (`repoGroups`). With two or more, `placeWorlds` puts the repositories on a wide ring and

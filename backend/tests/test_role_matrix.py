@@ -325,6 +325,9 @@ VIEWER_READS = """
     /api/graph/communities
     /api/groups
     /api/groups/analysis
+    /api/groups/changes
+    /api/groups/impact
+    /api/groups/surface
     /api/groups/code-graph
     /api/groups/{gid}/analysis
     /api/groups/{gid}/overviews

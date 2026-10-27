@@ -8,6 +8,7 @@ from ..deps import Principal, current_principal
 from ..models import GroupOverview, RepoGroup, User
 from ..security import redact_stored
 from ..services import groups as svc
+from ..services import repo_links as lk
 from ..services.access import Scope, scope_for
 from ..services.policy import authorize
 
@@ -127,6 +128,45 @@ def analyse_selection(
     """The same picture for repositories picked on the page and not saved (comma-separated ids)."""
     ids = svc.clean_ids(db, p.org_id, scope_for(db, p), [x for x in repo_ids.split(",") if x])
     return svc.analyse(db, p.org_id, ids, days)
+
+
+@router.get("/impact")
+def impact(
+    node_id: str = Query(min_length=1, max_length=64),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """What in other repositories depends on this class, function or file, and who to ask about it."""
+    out = lk.impact(db, p.org_id, scope_for(db, p), node_id)
+    if out is None:
+        raise HTTPException(404, "Not found")
+    return out
+
+
+@router.get("/surface")
+def surface(
+    repo_id: str = Query(min_length=1, max_length=64),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """What other repositories use from this one, most used first, and what its package offers that nobody uses."""
+    out = lk.surface(db, p.org_id, scope_for(db, p), repo_id)
+    if out is None:
+        raise HTTPException(404, "Repository not found")
+    return out
+
+
+@router.get("/changes")
+def changes(
+    repo_ids: str = Query(min_length=1, max_length=1200),
+    days: int = Query(7, ge=1, le=365),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """Dependencies between the chosen repositories that appeared or disappeared in the last days."""
+    scope = scope_for(db, p)
+    ids = svc.clean_ids(db, p.org_id, scope, [x for x in repo_ids.split(",") if x])
+    return lk.changes(db, p.org_id, scope, ids, days)
 
 
 @router.get("/code-graph")

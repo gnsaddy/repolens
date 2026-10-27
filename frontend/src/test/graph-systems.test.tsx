@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
-import type { CodeGraph, GraphNode, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
+import type { ChangePair, CodeGraph, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
 import GraphPage from "@/pages/Graph";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(b === null ? null : JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
@@ -20,6 +20,7 @@ const analysis: SystemAnalysis = {
   repos: [{ id: "a", name: "orders-svc", source: "git", status: "ready", files: 3, chunks: 9, risk: risk(1, 0), heat: risk(0.5, 0) }, { id: "b", name: "pricing-svc", source: "git", status: "ready", files: 2, chunks: 6, risk: risk(2, 1), heat: risk(1, 1) }],
   links: [{ src: "a", dst: "b", count: 3, strong: 2, http: 1, imports: 0, weak: 0, strength: 1.2, rels: { CALLS: 2, HTTP: 1 }, trust: "fact", examples: [{ rel: "CALLS", from: "orders-svc: orders/handlers.py", to: "pricing-svc: pricing/engine.py", evidence: "handle_order calls compute_total()" }] }],
   coupling: [{ a: "a", b: "b", tickets: 1, ticket_examples: ["ORD-7"], days: 2, score: 5 }],
+  coverage: { a: { languages: { python: 4, go: 2 }, unread: [{ detector: "imports", language: "go", files: 2 }], provides: [], route_files: 0, detectors: ["imports", "urls"] }, b: { languages: { python: 3 }, unread: [], provides: ["pricing"], route_files: 1, detectors: ["imports", "urls"] } },
 };
 const group: SystemGroup = { id: "g1", name: "Checkout", description: "", repo_ids: ["a", "b"], hidden: 0, created_by: "2", created_by_name: "ann", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
 const overview: SystemOverview = { id: "o1", content: "## What this system is made of\norders-svc and pricing-svc.", mode: "llm", model: "m", unsupported_names: ["ghost/vanished.py"], created_by: "2", created_by_name: "ann", created_at: new Date().toISOString(), repositories: 2, partial: false };
@@ -35,7 +36,21 @@ const codeGraph: CodeGraph = {
   available: { strong: 2, weak: 4 }, shown_weak: false, truncated: false,
 };
 
-function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph } = {}) {
+const impact: Impact = {
+  node: { id: "n4", name: "UserClient", type: "class", path: "userlib/core.py", repo: "pricing-svc" },
+  direct: [{ link: "l1", repo_id: "a", repo: "orders-svc", label: "orders/checkout.py:checkout", target: "userlib/core.py:UserClient", kind: "import", rel: "USES", trust: "fact", evidence: "checkout calls UserClient, imported with `from userlib import UserClient`", more: 2, since: new Date().toISOString(), owners: [{ name: "ann", commits: 7 }] }],
+  indirect: [{ repo: "orders-svc", label: "orders/jobs.py:nightly", through: "orders/checkout.py:checkout" }],
+  repos: [{ repo: "orders-svc", uses: 3 }], hidden: 1, note: "Only repositories RepoLens has indexed are searched.",
+};
+const surface: Surface = {
+  repo: { id: "a", name: "orders-svc" },
+  symbols: [{ id: "n4", name: "UserClient", type: "class", path: "userlib/core.py", uses: 5, repos: ["shop-app"], kinds: ["import"], trust: "fact" }],
+  dependants: ["shop-app"], hidden: 0, exports: 3, unused_exports: [{ name: "unused_helper", package: "userlib", path: "userlib/core.py" }], note: "Counts the repositories RepoLens has indexed.",
+};
+const pairOf = (n: number): ChangePair => ({ src: "a", dst: "b", from: "orders-svc", to: "pricing-svc", count: n, examples: [{ from: "orders/reports.py:report", to: "userlib/core.py:unused_helper", evidence: "report calls unused_helper, imported with `from userlib import unused_helper`", at: new Date().toISOString() }] });
+const changes: LinkChanges = { days: 7, tracking_since: new Date(Date.now() - 86400000).toISOString(), new: [pairOf(2)], removed: [pairOf(1)], computed_at: new Date().toISOString() };
+
+function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -43,6 +58,9 @@ function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemO
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
     if (url.includes("/groups/analysis")) return json(analysis);
+    if (url.includes("/groups/impact")) return json(impact);
+    if (url.includes("/groups/surface")) return json(surface);
+    if (url.includes("/groups/changes")) return json(opts.changes ?? changes);
     if (url.includes("/groups/code-graph")) return json(opts.code ?? codeGraph, 200);
     if (url.endsWith("/overviews")) return json({ overviews: opts.overviews ?? [], hidden: 0 });
     if (url.endsWith("/overview") && method === "POST") return json(overview, 201);
@@ -101,6 +119,59 @@ describe("Graph: systems", () => {
     expect(sel).toHaveTextContent("from userlib import UserClient");
   });
 
+  it("shows what depends on a selected class: where, who to ask, and what is further in", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Code dependencies");
+    await userEvent.click(await within(card).findByRole("button", { name: "class UserClient" }));
+    const blast = await within(card).findByLabelText("Blast radius");
+    expect(blast).toHaveTextContent("3 places in 1 other repository depend on this");
+    expect(blast).toHaveTextContent("orders-svc: orders/checkout.py:checkout");
+    expect(blast).toHaveTextContent("ask ann (7)");
+    expect(blast).toHaveTextContent("+2 more");
+    expect(blast).toHaveTextContent("orders/jobs.py:nightly");
+    expect(blast).toHaveTextContent("1 more in repositories you cannot access");
+  });
+
+  it("lists new and removed dependencies with the proof, and says tracking has a start", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("What changed");
+    expect(card).toHaveTextContent("+ orders-svc → pricing-svc");
+    expect(card).toHaveTextContent("2 links");
+    expect(card).toHaveTextContent("− orders-svc → pricing-svc");
+    expect(card).toHaveTextContent("from userlib import unused_helper");
+    expect(card).toHaveTextContent("tracking since");
+  });
+
+  it("says plainly that nothing changed rather than showing an empty box", async () => {
+    open({ changes: { ...changes, new: [], removed: [] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    expect(await screen.findByLabelText("What changed")).toHaveTextContent("appeared or went away in the last 7 days");
+  });
+
+  it("shows what other repositories use from one repository, and its unused exports", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Public surface");
+    expect(await within(card).findByText("UserClient")).toBeInTheDocument();
+    expect(card).toHaveTextContent("5×");
+    expect(card).toHaveTextContent("shop-app");
+    expect(card).toHaveTextContent("not used by any repository here: unused_helper");
+  });
+
+  it("says which languages could not be read, so an empty graph is not mistaken for no dependencies", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Code dependencies");
+    expect(await within(card).findByRole("note")).toHaveTextContent("Not read: go in orders-svc (2 files)");
+  });
+
   it("keeps calls matched by name alone out of the picture until asked, and says why", async () => {
     open();
     await userEvent.click(await screen.findByLabelText("orders-svc"));
@@ -130,6 +201,8 @@ describe("Graph: systems", () => {
       if (url.endsWith("/repositories")) return json(repos);
       if (url.includes("/groups/analysis")) return json({ ...analysis, links: [], coupling: [] });
       if (url.includes("/groups/code-graph")) return json({ nodes: [], edges: [], available: { strong: 0, weak: 0 }, shown_weak: false, truncated: false });
+      if (url.includes("/groups/changes")) return json({ ...changes, new: [], removed: [] });
+      if (url.includes("/groups/surface")) return json(surface);
       return json({ groups: [], max_repos: 15, overviews: [], hidden: 0 });
     }) as typeof fetch);
     await userEvent.click(await screen.findByLabelText("orders-svc"));

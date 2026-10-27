@@ -312,10 +312,14 @@ def make_userlib(tmp_path):
     commit(
         p,
         {
-            "userlib/__init__.py": "from .core import get_user as get_user\nfrom .core import UserClient\n",
+            "userlib/__init__.py": (
+                "from .core import get_user as get_user\nfrom .core import UserClient\n"
+                "from .core import unused_helper as unused_helper\n"
+            ),
             "userlib/core.py": (
                 "def get_user(user_id):\n    return {'id': user_id}\n\n\n"
-                "class UserClient:\n    def name(self, user):\n        return user['id']\n"
+                "class UserClient:\n    def name(self, user):\n        return user['id']\n\n\n"
+                "def unused_helper():\n    return None\n"
             ),
         },
         "feat: user library",
@@ -334,7 +338,8 @@ def make_shop(tmp_path):
             "shop/checkout.py": (
                 "from userlib import get_user, UserClient\nimport requests\n\n\n"
                 "def checkout(uid):\n    user = get_user(uid)\n    return UserClient().name(user)\n\n\n"
-                "def audit(uid):\n    return get_user(uid)\n"
+                "def audit(uid):\n    return get_user(uid)\n\n\n"
+                "def run_checkout(uid):\n    return checkout(uid)\n"
             ),
             "shop/models.py": "from userlib import UserClient\n\n\nclass Order(UserClient):\n    pass\n",
             "shop/admin.py": "import userlib\n\n\ndef lookup(uid):\n    return userlib.get_user(uid)\n",

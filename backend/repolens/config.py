@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # seconds have passed with nothing else indexing (several repositories finish together: one run, not one each).
     auto_quality_checks: bool = True
     auto_quality_delay_s: float = 120.0
+    # Dependencies between repositories are worked out again this many seconds after the last index finishes, so a new
+    # one is noticed even when nobody has the Graph page open.
+    auto_link_refresh: bool = True
+    auto_link_delay_s: float = 60.0
     # Local (server-side path) repositories are only allowed under these roots outside dev
     local_repo_roots: list[str] = Field(default_factory=list)
     # Embeddings: "hash" (local, offline) or "openai" (OpenAI-compatible endpoint)

@@ -7,7 +7,7 @@ import Modal from "@/components/Modal";
 import ForceGraph, { NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import SystemGraph, { heatColor, TRUST_COLOR, type HeatMetric } from "@/components/SystemGraph";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
-import { api, type CodeGraph, type Repo, type SystemAnalysis, type SystemGroup, type SystemLink, type SystemOverview } from "@/lib/api";
+import { api, type ChangePair, type CodeGraph, type Impact, type LinkChanges, type LinkCoverage, type Repo, type Surface, type SystemAnalysis, type SystemGroup, type SystemLink, type SystemOverview } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import Markdown from "./wiki/Markdown";
@@ -98,8 +98,9 @@ export default function GraphPage() {
 
         <div className="space-y-4 lg:col-span-3">
           {!picked.length ? <Empty>Choose two or more repositories to see how they connect.</Empty> : analysis.isLoading ? <Spinner /> : !a ? <ErrorNote error={analysis.error} /> : (<>
-            {picked.length > 1 && <CodeDependencies cg={code.data} loading={code.isLoading} error={code.error} weak={weak} onWeak={setWeak} node={node} onNode={setNode}
+            {picked.length > 1 && <CodeDependencies coverage={a.coverage} names={pairs} cg={code.data} loading={code.isLoading} error={code.error} weak={weak} onWeak={setWeak} node={node} onNode={setNode}
               focus={link ? `${pairs.get(link.src)} → ${pairs.get(link.dst)}` : null} onClear={() => { setLink(null); setSelected(null); }} />}
+            {picked.length > 1 && <WhatChanged ids={key} names={pairs} />}
             <Card aria-label="Repository map">
               <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Colour repositories by
                 <select aria-label="Colour repositories by" value={metric} onChange={(e) => setMetric(e.target.value as HeatMetric)} className="h-8 rounded-md border border-line bg-white px-2 text-sm text-ink">{METRICS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}>
@@ -138,6 +139,7 @@ export default function GraphPage() {
               </Card>
             </div>
 
+            {picked.length > 1 && <PublicSurface repos={a.repos.map((r) => ({ id: r.id, name: r.name }))} />}
             <Card aria-label="Overview">
               <CardTitle right={write && active && (
                 <Button size="sm" disabled={makeOverview.isPending || dirty} onClick={() => makeOverview.mutate()}><Sparkles className="h-4 w-4" />{makeOverview.isPending ? "Writing…" : "Create knowledge for these repositories"}</Button>)}>Overview</CardTitle>
@@ -185,13 +187,17 @@ function SaveSystem({ mode, active, ids, onClose, onSaved }: { mode: "new" | "up
 }
 
 /** The classes, functions and files on both ends of each link, grouped by repository: the real dependency graph. */
-function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focus, onClear }: {
+function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focus, onClear, coverage, names }: {
+  coverage?: Record<string, LinkCoverage>; names: Map<string, string>;
   cg?: CodeGraph; loading: boolean; error: unknown; weak: boolean; onWeak: (v: boolean) => void;
   node: string | null; onNode: (id: string | null) => void; focus: string | null; onClear: () => void;
 }) {
   const byId = new Map((cg?.nodes ?? []).map((n) => [n.id, n]));
   const touching = (cg?.edges ?? []).filter((e) => node && (e.source === node || e.target === node) && e.rel !== "CONTAINS");
   const picked = node ? byId.get(node) : undefined;
+  const unread = Object.entries(coverage ?? {}).flatMap(([repo, c]) =>
+    Object.entries((c.unread ?? []).reduce<Record<string, number>>((acc, u) => ({ ...acc, [u.language]: (acc[u.language] ?? 0) + u.files }), {}))
+      .map(([lang, n]) => `${lang} in ${names.get(repo) ?? repo} (${n} file${n === 1 ? "" : "s"})`));
   const label = (id: string) => { const n = byId.get(id); return n ? `${n.repo}: ${n.qualname || n.name}` : id; };
   const crossing = cg ? cg.edges.filter((e) => e.rel !== "CONTAINS" && byId.get(e.source)?.repo_id !== byId.get(e.target)?.repo_id).length : 0;
   return (
@@ -224,7 +230,75 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
               <li key={e.id}>{e.source === node ? "→" : "←"} <strong>{REL[e.rel] ?? e.rel.toLowerCase()}</strong> <code>{label(e.source === node ? e.target : e.source)}</code>
                 {" "}<Badge tone={e.trust === "fact" ? "green" : "amber"}>{proof(e.rel, e.trust ?? "")}</Badge>
                 {e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>))}</ul>}
+            <BlastRadius id={picked.id} />
           </div>)}
+        {unread.length > 0 && (
+          <p className="mt-3 text-xs text-muted" role="note">Not read: {unread.join("; ")}. A repository using these may depend on others in ways this graph cannot show yet.</p>)}
+      </>)}
+    </Card>
+  );
+}
+
+/** What breaks if this changes: everything in other repositories that depends on it, who changes those places, and the
+ *  callers one step further in. */
+function BlastRadius({ id }: { id: string }) {
+  const q = useQuery({ queryKey: ["impact", id], queryFn: () => api<Impact>(`/groups/impact?node_id=${id}`), retry: false });
+  if (q.isLoading) return <p className="mt-3 text-xs text-muted">Looking for what depends on this…</p>;
+  const d = q.data;
+  if (!d) return <ErrorNote error={q.error} />;
+  const places = d.direct.reduce((n, x) => n + 1 + x.more, 0);
+  return (
+    <div className="mt-3 border-t border-line pt-3 text-xs" aria-label="Blast radius">
+      <div className="text-sm font-medium">{places ? `${places} place${places === 1 ? "" : "s"} in ${d.repos.length} other repositor${d.repos.length === 1 ? "y" : "ies"} depend on this` : "Nothing in other repositories depends on this"}</div>
+      {d.repos.length > 0 && <div className="mt-1 text-muted">{d.repos.map((r) => `${r.repo}: ${r.uses}`).join(" · ")}</div>}
+      {d.direct.length > 0 && <ul className="mt-2 space-y-1.5">{d.direct.map((x) => (
+        <li key={x.link}><code>{x.repo}: {x.label}</code>{x.owners.length > 0 && <span className="text-muted"> — ask {x.owners.map((o) => `${o.name} (${o.commits})`).join(", ")}</span>}
+          <div className="text-muted">{x.evidence}{x.more > 0 && ` · +${x.more} more`}</div></li>))}</ul>}
+      {d.indirect.length > 0 && <div className="mt-2"><div className="font-medium">Also affected, one step further in</div>
+        <ul className="mt-1 space-y-0.5">{d.indirect.map((x, i) => <li key={i}><code>{x.repo}: {x.label}</code> <span className="text-muted">calls {x.through.split(":").pop()}</span></li>)}</ul></div>}
+      {d.hidden > 0 && <p className="mt-2 text-muted">{d.hidden} more in repositories you cannot access.</p>}
+      <p className="mt-2 text-muted">{d.note}</p>
+    </div>
+  );
+}
+
+/** Dependencies that appeared or disappeared lately, with the line that proves each. */
+function WhatChanged({ ids, names }: { ids: string; names: Map<string, string> }) {
+  const q = useQuery({ queryKey: ["link-changes", ids], queryFn: () => api<LinkChanges>(`/groups/changes?repo_ids=${ids}&days=7`), retry: false });
+  if (q.isLoading || !q.data) return q.error ? <ErrorNote error={q.error} /> : null;
+  const c = q.data;
+  const Pair = ({ p, sign }: { p: ChangePair; sign: string }) => (
+    <li className="py-1.5"><div className="font-medium">{sign} {p.from} → {p.to} <Badge tone={sign === "+" ? "amber" : "gray"}>{p.count} link{p.count === 1 ? "" : "s"}</Badge></div>
+      <ul className="mt-0.5 space-y-0.5 text-xs text-muted">{p.examples.map((e, i) => <li key={i}><code>{e.from}</code> → <code>{e.to}</code> — {e.evidence}</li>)}</ul></li>
+  );
+  return (
+    <Card aria-label="What changed">
+      <CardTitle right={<span className="text-xs text-muted">last {c.days} days · tracking since {timeAgo(c.tracking_since)}</span>}>What changed between these repositories</CardTitle>
+      {!c.new.length && !c.removed.length ? <p className="text-sm text-muted">No dependency between {[...names.values()].slice(0, 4).join(", ")}{names.size > 4 ? " and others" : ""} appeared or went away in the last {c.days} days. Each index is compared with the one before, so a new dependency is listed here as soon as it is indexed.</p> : (
+        <ul className="divide-y divide-line text-sm">{c.new.map((p) => <Pair key={`n${p.src}${p.dst}`} p={p} sign="+" />)}{c.removed.map((p) => <Pair key={`r${p.src}${p.dst}`} p={p} sign="−" />)}</ul>)}
+    </Card>
+  );
+}
+
+/** What other repositories use from one repository, most used first, and what its package offers that nobody uses. */
+function PublicSurface({ repos }: { repos: { id: string; name: string }[] }) {
+  const [repo, setRepo] = useState(repos[0]?.id ?? "");
+  const id = repos.some((r) => r.id === repo) ? repo : repos[0]?.id ?? "";
+  const q = useQuery({ queryKey: ["surface", id], enabled: !!id, queryFn: () => api<Surface>(`/groups/surface?repo_id=${id}`), retry: false });
+  const s = q.data;
+  return (
+    <Card aria-label="Public surface">
+      <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Repository
+        <select aria-label="Repository" value={id} onChange={(e) => setRepo(e.target.value)} className="h-8 rounded-md border border-line bg-white px-2 text-sm text-ink">{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}>What other repositories use from it</CardTitle>
+      {q.isLoading ? <Spinner /> : !s ? <ErrorNote error={q.error} /> : (<>
+        {!s.symbols.length ? <p className="text-sm text-muted">No other repository uses anything from {s.repo.name} that RepoLens can see.</p> : (
+          <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Class or function</th><th className="font-normal">Used</th><th className="font-normal">By</th></tr></thead>
+            <tbody>{s.symbols.slice(0, 15).map((x) => (
+              <tr key={x.id} className="border-t border-line"><td className="py-1.5 pr-2"><div className="font-medium">{x.name}</div><div className="text-xs text-muted"><code>{x.path}</code></div></td>
+                <td className="pr-2">{x.uses}×</td><td className="text-xs text-muted">{x.repos.join(", ")}</td></tr>))}</tbody></table>)}
+        {s.exports > 0 && <p className="mt-3 text-xs text-muted">{s.exports} names exported by its package{s.unused_exports.length ? `; not used by any repository here: ${s.unused_exports.map((e) => e.name).join(", ")}` : "; all of them are used"}.</p>}
+        {s.hidden > 0 && <p className="mt-1 text-xs text-muted">{s.hidden} more use it in repositories you cannot access.</p>}
+        <p className="mt-2 text-xs text-muted">{s.note}</p>
       </>)}
     </Card>
   );
