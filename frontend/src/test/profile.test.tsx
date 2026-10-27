@@ -31,6 +31,9 @@ function renderPage(el: React.ReactNode) {
     if (u.includes("/metrics/system")) return json({ available: true, cores: 8, load_average: [0.5, 0.6, 0.7], uptime_s: 7300, threads: 24, interval_s: 5,
       current: { t: 1, host_cpu: 37.2, process_cpu: 12.5, mem_used: 5_000_000_000, mem_total: 16_000_000_000, process_rss: 120_000_000, rx_bps: 2048, tx_bps: 4096, rps: 1.4, error_rate: 0, p50_ms: 8, p95_ms: 41, container_limit: null },
       history: [{ t: 1, host_cpu: 30, process_cpu: 10, mem_used: 5e9, mem_total: 16e9, process_rss: 1e8, rx_bps: 1000, tx_bps: 2000, rps: 1, error_rate: 0, p50_ms: 8, p95_ms: 40, container_limit: null }] });
+    if (u.includes("/metrics/health")) return json({ version: "v0.2-beta", ok: false, problems: ["The retention loop is late", "1 repository failed to index"],
+      jobs: [{ name: "daily-reindex", state: "ok", every_s: 86400, last_ok: Date.now() / 1000 - 3600, failures: 0, last_error: null }, { name: "retention", state: "late", every_s: 86400, last_ok: null, failures: 0, last_error: null }],
+      repositories: { pending: 0, indexing: 1, ready: 3, error: 1 }, quality: { passed: 4, total: 5, trigger: "reindex", mode: "retrieval", at: new Date().toISOString() } });
     if (u.includes("/metrics/overview")) return json({ days: 30, content: { repositories: 2, doc_collections: 1, pages: 12, chunks: 340, graph_nodes: 900, graph_edges: 2100, indexing_errors: 0 },
       work: { investigations: 5, completed: 4, failed: 1, confirmed: 2, avg_minutes: 1.5, proposals_pending: 1, proposals_applied: 3, drift_open: 2 },
       ai: { requests: 40, tokens: 120000, cost: 0.42, errors: 1, cache_hits: 6, tokens_avoided: 60000, savings_rate: 0.333, by_model: [{ name: "gemini/flash-lite", input_tokens: 80000, output_tokens: 10000, cached_input_tokens: 0, requests: 30, errors: 0, cost: 0.1, avg_latency_ms: 300 }, { name: "memory/memory", input_tokens: 0, output_tokens: 0, cached_input_tokens: 0, requests: 4, errors: 0, cost: 0, avg_latency_ms: 0 }], by_agent: [], daily: [] },
@@ -103,5 +106,15 @@ describe("Insights", () => {
     expect(within(load).getByText("31%")).toBeInTheDocument(); // 5.0 of 16 GB
     expect(within(load).getByText(/↓ 2\.0 KB\/s/)).toBeInTheDocument();
     expect(within(load).getByText(/p95 41 ms/)).toBeInTheDocument();
+  });
+  it("tells an admin when a background job is late, and what the last saved-question check found", async () => {
+    renderPage(<Insights />);
+    const h = await screen.findByRole("region", { name: "RepoLens health" });
+    expect(within(h).getByText("needs attention")).toBeInTheDocument();
+    expect(within(h).getByRole("alert")).toHaveTextContent("The retention loop is late");
+    expect(within(h).getByText("Daily re-index")).toBeInTheDocument();
+    expect(within(h).getByText("late")).toBeInTheDocument();
+    expect(h).toHaveTextContent("Saved questions: 4 of 5 passed");
+    expect(h).toHaveTextContent("checked by itself after indexing");
   });
 });

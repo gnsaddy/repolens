@@ -18,7 +18,7 @@ const overview = (o: Partial<GoldenOverview> = {}): GoldenOverview => ({
     { id: "q1", question: good.question, expect_files: ["user_profile.py"], expect_phrases: [], repo_ids: [], mine: true, last: good },
     { id: "q2", question: bad.question, expect_files: ["api/auth.py"], expect_phrases: ["authorize"], repo_ids: [], mine: true, last: bad }],
   runs: [], active: null, max_full: 20, changed: [],
-  latest: { id: "r2", mode: "retrieval", status: "completed", total: 2, done: 2, passed: 1, error: null, started_at: new Date().toISOString(), finished_at: new Date().toISOString(), results: [good, bad] },
+  latest: { id: "r2", mode: "retrieval", trigger: "manual", status: "completed", total: 2, done: 2, passed: 1, error: null, started_at: new Date().toISOString(), finished_at: new Date().toISOString(), results: [good, bad] },
   compare: { delta: -0.5, broke: ["Where is the retry policy?"], fixed: [] }, ...o,
 });
 
@@ -50,6 +50,12 @@ describe("Quality checks", () => {
     expect(res).toHaveTextContent("Retrieval runs check which files were found");
   });
 
+  it("says when the last run started by itself after an index finished", async () => {
+    const o = overview();
+    open({ ...o, latest: { ...o.latest!, trigger: "reindex" } });
+    expect(await screen.findByLabelText("Latest result")).toHaveTextContent("retrieval run, ran by itself after indexing");
+  });
+
   it("says what changed since the last run", async () => {
     open(overview({ changed: ["the skills", "the indexed code or documents"] }));
     expect(await screen.findByRole("status")).toHaveTextContent("the skills and the indexed code or documents changed");
@@ -64,7 +70,7 @@ describe("Quality checks", () => {
   });
 
   it("shows progress while a run is going and disables starting another", async () => {
-    open(overview({ active: { id: "r9", mode: "full", status: "running", total: 4, done: 1, passed: 1, error: null, started_at: "", finished_at: null } }));
+    open(overview({ active: { id: "r9", mode: "full", trigger: "manual", status: "running", total: 4, done: 1, passed: 1, error: null, started_at: "", finished_at: null } }));
     expect(await screen.findByText(/Running: 1 of 4 questions/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Running…" })).toBeDisabled();
   });

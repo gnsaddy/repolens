@@ -13,8 +13,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import session_factory
 from ..models import GoldenQuestion, GoldenRun, Repository, Skill
+from ..telemetry import QUALITY_PASS, QUALITY_RUNS
 from . import answer_memory, embedding_state
 from . import knowledge as kb
 from .access import scope_for_user_id
@@ -128,11 +130,13 @@ def execute(run_id: str) -> None:
             )
             evaluate(db, run, questions)
             run.status = "completed"
+            QUALITY_PASS.labels(run.org_id).set(run.passed / max(1, run.total))
         except Exception as e:
             log.exception("golden run failed")
             run.status, run.error = "failed", str(e)[:300]
         run.finished_at = datetime.now(UTC)
         db.commit()
+        QUALITY_RUNS.labels(run.trigger, run.status).inc()
     finally:
         db.close()
 
@@ -149,17 +153,107 @@ def running(db: Session, org: str) -> GoldenRun | None:
     return None
 
 
-def start(db: Session, org: str, user_id: str, mode: str, inline: bool) -> GoldenRun:
+def _new_run(db: Session, org: str, user_id: str, mode: str, trigger: str) -> GoldenRun:
     total = db.scalar(select(func.count()).select_from(GoldenQuestion).where(GoldenQuestion.org_id == org)) or 0
-    run = GoldenRun(org_id=org, user_id=user_id, mode=mode, total=total, fingerprint=fingerprint(db, org))
+    run = GoldenRun(
+        org_id=org, user_id=user_id, mode=mode, trigger=trigger, total=total, fingerprint=fingerprint(db, org)
+    )
     db.add(run)
     db.commit()
+    return run
+
+
+def start(db: Session, org: str, user_id: str, mode: str, inline: bool) -> GoldenRun:
+    run = _new_run(db, org, user_id, mode, "manual")
     if inline:
         execute(run.id)
         db.refresh(run)
     else:
         threading.Thread(target=execute, args=(run.id,), name="golden", daemon=True).start()
     return run
+
+
+# --- Checking the saved questions by itself once an index has changed what answers are built from -------------------
+
+_waiting: dict[str, threading.Timer] = {}  # org id -> the check that will run when indexing goes quiet
+_waiting_lock = threading.Lock()
+
+
+def after_index(org_id: str, delay: float | None = None, timer=threading.Timer) -> None:
+    """Called when an index finishes. Several repositories often finish together, so each call pushes the check back and
+    only the last one runs it. With inline jobs (tests) it runs at once."""
+    s = get_settings()
+    if s.run_jobs_inline:
+        auto_run(org_id)
+        return
+    with _waiting_lock:
+        old = _waiting.pop(org_id, None)
+        if old is not None:
+            old.cancel()
+        t = timer(s.auto_quality_delay_s if delay is None else delay, auto_run, args=(org_id,))
+        t.daemon = True
+        _waiting[org_id] = t
+        t.start()
+
+
+def auto_run(org_id: str) -> bool:
+    """A free retrieval run of every saved question, unless there is nothing to check or nothing changed since the last
+    run. Returns whether one ran."""
+    with _waiting_lock:
+        _waiting.pop(org_id, None)
+    with session_factory()() as db:
+        has_questions = db.scalar(
+            select(func.count()).select_from(GoldenQuestion).where(GoldenQuestion.org_id == org_id)
+        )
+        if not has_questions or running(db, org_id):
+            return False
+        if db.scalar(
+            select(func.count())
+            .select_from(Repository)
+            .where(Repository.org_id == org_id, Repository.status == "indexing")
+        ):
+            return False  # the index still running will call after_index when it finishes
+        last = db.scalar(
+            select(GoldenRun)
+            .where(GoldenRun.org_id == org_id, GoldenRun.status == "completed")
+            .order_by(GoldenRun.started_at.desc())
+            .limit(1)
+        )
+        if last is not None and last.fingerprint == fingerprint(db, org_id):
+            return False  # an index that found nothing new changes no answer
+        run_id = _new_run(db, org_id, "", "retrieval", "reindex").id
+    execute(run_id)
+    with session_factory()() as db:
+        _report(db, run_id)
+    return True
+
+
+def _report(db: Session, run_id: str) -> None:
+    """Say in the log when the automatic run found questions that used to pass and no longer do."""
+    run = db.get(GoldenRun, run_id)
+    if run is None or run.status != "completed":
+        return
+    before = db.scalar(
+        select(GoldenRun)
+        .where(
+            GoldenRun.org_id == run.org_id,
+            GoldenRun.status == "completed",
+            GoldenRun.mode == run.mode,
+            GoldenRun.id != run.id,
+            GoldenRun.started_at < run.started_at,
+        )
+        .order_by(GoldenRun.started_at.desc())
+        .limit(1)
+    )
+    worse = compare(_summary(run), _summary(before) if before else None)["broke"]
+    if worse:
+        log.warning("quality check after re-index: %d of %d saved question(s) got worse", len(worse), run.total)
+    else:
+        log.info("quality check after re-index: %d of %d saved question(s) passed", run.passed, run.total)
+
+
+def _summary(r: GoldenRun) -> dict:
+    return {"total": r.total, "passed": r.passed, "results": r.results}
 
 
 def compare(latest: dict | None, previous: dict | None) -> dict:

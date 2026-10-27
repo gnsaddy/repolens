@@ -34,6 +34,7 @@ def _run_view(r: GoldenRun, full: bool = True) -> dict:
     return {
         "id": r.id,
         "mode": r.mode,
+        "trigger": r.trigger,
         "status": r.status,
         "total": r.total,
         "done": r.done,

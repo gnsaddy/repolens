@@ -4,10 +4,10 @@ import { useState, type ReactNode } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Meter, Spark } from "@/components/charts";
 import { Badge, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
-import { api, type Calibration, type FeedbackSummary, type MetricsOverview, type SysMetrics } from "@/lib/api";
+import { api, type Calibration, type FeedbackSummary, type MetricsOverview, type SysHealth, type SysMetrics } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Link } from "react-router-dom";
-import { dailyTokenSeries, fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens } from "@/lib/utils";
+import { dailyTokenSeries, fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens, timeAgo } from "@/lib/utils";
 
 const n = (v: number) => v.toLocaleString();
 
@@ -27,6 +27,7 @@ export default function Insights() {
   const [days, setDays] = useState(30);
   const { data: m } = useQuery({ queryKey: ["metrics", days], queryFn: () => api<MetricsOverview>(`/metrics/overview?days=${days}`) });
   const sys = useQuery({ queryKey: ["system"], enabled: user?.role === "admin", refetchInterval: 5000, retry: false, queryFn: () => api<SysMetrics>("/metrics/system") });
+  const health = useQuery({ queryKey: ["health"], enabled: user?.role === "admin", refetchInterval: 30000, retry: false, queryFn: () => api<SysHealth>("/metrics/health") });
   const fb = useQuery({ queryKey: ["feedback", days], queryFn: () => api<FeedbackSummary>(`/feedback/summary?days=${days}`) });
   const cal = useQuery({ queryKey: ["calibration"], queryFn: () => api<Calibration>("/dashboard/calibration") });
   const models = (m?.ai.by_model ?? []).filter((x) => x.input_tokens + x.output_tokens > 0 || x.cost > 0); // models that did nothing are not worth a row
@@ -82,6 +83,7 @@ export default function Insights() {
         </section>
 
         {user?.role === "admin" && <ServerLoad sys={sys.data} loading={sys.isLoading} />}
+        {user?.role === "admin" && health.data && <Housekeeping h={health.data} />}
 
         <section aria-label="Work done" className="space-y-3">
           <h2 className="text-sm font-semibold">Work done</h2>
@@ -109,6 +111,31 @@ export default function Insights() {
         </section>
       </div>)}
     </div>
+  );
+}
+
+const JOB_NAME: Record<string, string> = {
+  "daily-reindex": "Daily re-index", retention: "Old-record clean-up", "source-sync": "Connected sources", "investigation-reaper": "Stuck investigations",
+  "system-sampler": "Server readings", "checkout-cleanup": "Unused clones",
+};
+
+/** Whether RepoLens is doing its own housekeeping: its background loops, its indexes and the saved-question checks. */
+function Housekeeping({ h }: { h: SysHealth }) {
+  return (
+    <section aria-label="RepoLens health" className="space-y-3">
+      <div className="flex items-center gap-2"><h2 className="text-sm font-semibold">RepoLens health</h2>{h.ok ? <Badge tone="green">all running</Badge> : <Badge tone="red">needs attention</Badge>}<span className="text-xs text-muted">{h.version}</span></div>
+      {h.problems.length > 0 && <ul role="alert" className="list-disc rounded-lg bg-amber-50 p-3 pl-7 text-sm text-amber-800">{h.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="p-4 lg:col-span-2"><CardTitle>Background jobs</CardTitle>
+          <ul className="divide-y divide-line text-sm">{h.jobs.map((j) => (
+            <li key={j.name} className="flex flex-wrap items-center justify-between gap-2 py-1.5"><span>{JOB_NAME[j.name] ?? j.name}</span>
+              <span className="flex items-center gap-2 text-xs text-muted">{j.state === "failing" && j.last_error ? <span className="truncate text-red-700" title={j.last_error}>{j.last_error}</span> : j.last_ok ? `last ran ${timeAgo(new Date(j.last_ok * 1000).toISOString())}` : "has not run yet"}
+                <Badge tone={j.state === "ok" ? "green" : j.state === "waiting" ? "gray" : "red"}>{j.state}</Badge></span></li>))}</ul></Card>
+        <Card className="p-4"><CardTitle>Indexes and quality</CardTitle>
+          <div className="text-sm">{Object.entries(h.repositories).map(([s, n]) => <div key={s} className="flex justify-between py-0.5"><span className="capitalize">{s}</span><span className={s === "error" && n ? "font-medium text-red-700" : ""}>{n}</span></div>)}</div>
+          <p className="mt-3 text-xs text-muted">{h.quality ? `Saved questions: ${h.quality.passed} of ${h.quality.total} passed ${timeAgo(h.quality.at)}${h.quality.trigger === "reindex" ? " (checked by itself after indexing)" : ""}.` : "No saved questions have been run yet."}</p></Card>
+      </div>
+    </section>
   );
 }
 

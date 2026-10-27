@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # Once this many hours, repositories that changed since their last index (and ones whose last index failed) are
     # indexed again. 0 turns it off.
     auto_reindex_hours: float = 24.0
+    # When an index finishes and the workspace has saved questions, a free retrieval run checks them once this many
+    # seconds have passed with nothing else indexing (several repositories finish together: one run, not one each).
+    auto_quality_checks: bool = True
+    auto_quality_delay_s: float = 120.0
     # Local (server-side path) repositories are only allowed under these roots outside dev
     local_repo_roots: list[str] = Field(default_factory=list)
     # Embeddings: "hash" (local, offline) or "openai" (OpenAI-compatible endpoint)

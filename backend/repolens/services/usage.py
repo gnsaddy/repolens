@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import LLMCallEvent
+from ..telemetry import LLM_TOKENS
 
 
 class BudgetExceeded(Exception):
@@ -91,6 +92,9 @@ def record_event(
     )
     db.add(ev)
     db.commit()
+    for kind_, n in (("input", input_tokens), ("output", output_tokens), ("cached_input", cached_input_tokens)):
+        if n and usage_source != "local":  # the offline embedder spends no tokens anyone pays for
+            LLM_TOKENS.labels(kind_).inc(n)
     return ev
 
 

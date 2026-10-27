@@ -132,6 +132,20 @@ in-memory history is a few hundred small samples for the Insights page).
 - `./run-local.sh` writes `.run/repolens.log` (rotating); `.run/api.log` holds only start-up output and errors.
 - The database also grows: the daily retention sweep below keeps audit events, feedback and old sessions bounded.
 
+## Monitoring RepoLens
+
+- **In the app:** Insights → *RepoLens health* (admins) shows each background job, repository counts by status and the last saved-question run.
+  The same data is at `GET /api/metrics/health` (`"ok": false` plus a list of problems).
+- **For Prometheus:** scrape `/metrics` (set `REPOLENS_METRICS_TOKEN` and send it as a bearer token). Alerts worth having:
+  - a loop stopped: `time() - repolens_job_last_success_timestamp_seconds{job="daily-reindex"} > 2 * 86400` (use each loop's own interval);
+  - a loop is raising: `increase(repolens_job_failures_total[1h]) > 0`;
+  - indexes failing: `repolens_repositories{status="error"} > 0`, or `increase(repolens_index_runs_total{status="failed"}[1d]) > 0`;
+  - slow indexing: `histogram_quantile(0.95, rate(repolens_index_seconds_bucket[1d]))`;
+  - answers getting worse: `repolens_quality_pass_ratio` dropping (updated by every saved-question run, including the automatic one after an index);
+  - model trouble: `rate(repolens_answers_total{mode="failed"}[15m]) > 0`.
+- **Automatic quality check:** after an index finishes and something changed, saved questions run once (free, no model). Tune with
+  `REPOLENS_AUTO_QUALITY_CHECKS` (true) and `REPOLENS_AUTO_QUALITY_DELAY_S` (120).
+
 ## Retention and deleting data
 
 A daily job removes what is no longer useful: remembered answers past their lifetime, feedback older than 365 days, audit events older

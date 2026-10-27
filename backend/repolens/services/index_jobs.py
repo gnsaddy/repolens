@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import session_factory
 from ..models import Repository
+from ..telemetry import INDEX_RETRIES
 from . import gitops
 from .indexer import branch_ref, clone_auth_for
 
@@ -60,6 +61,7 @@ def after_run(
     log.info(
         "indexing %s failed (%s); trying again in %.0fs (try %d of %d)", repo_id, error, wait, made + 1, len(delays)
     )
+    INDEX_RETRIES.inc()
     t = timer(wait, _again, args=(repo_id, schedule))
     t.daemon = True
     t.start()

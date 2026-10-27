@@ -1,3 +1,5 @@
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -11,12 +13,13 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, IndexRun, RepoAccess, Repository, User
 from ..schemas import AccessIn, RepoCreate, RepoOut, StorageCleanup
 from ..security import redact_stored
-from ..services import checkouts, gitops, index_jobs, retrieval
+from ..services import checkouts, gitops, golden, index_jobs, retrieval
 from ..services.access import scope_for
 from ..services.indexer import clone_auth_for, index_repository
 from ..services.links import has_embedded_credentials
 from ..services.parsing import detect_language
 from ..services.policy import authorize
+from ..telemetry import INDEX_RUNS, INDEX_SECONDS
 
 router = APIRouter(prefix="/api", tags=["repositories"])
 _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="index")
@@ -47,15 +50,24 @@ def _with_errors(db: Session, repos: list[Repository]) -> list[Repository]:
 
 
 def _run_index(repo_id: str) -> None:
+    started = time.monotonic()
     db = session_factory()()
     try:
         run = index_repository(db, repo_id)
         status, error = run.status, run.error
+        org_id = db.scalar(select(Repository.org_id).where(Repository.id == repo_id))
     finally:
         db.close()
+    INDEX_RUNS.labels(status).inc()
+    INDEX_SECONDS.observe(time.monotonic() - started)
     s = get_settings()
     if not s.run_jobs_inline:  # a failure that can pass by itself (a timeout) is tried again after a wait
         index_jobs.after_run(repo_id, status, error, schedule_index, s.index_retry_delays)
+    if status == "completed" and org_id and s.auto_quality_checks:  # did the new index change any saved answer?
+        try:
+            golden.after_index(org_id)
+        except Exception:  # a side check must never turn a good index into a failed one
+            logging.getLogger("repolens.golden").exception("could not start the quality check after indexing")
 
 
 def schedule_index(repo_id: str) -> None:

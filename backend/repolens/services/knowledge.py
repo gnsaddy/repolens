@@ -3,12 +3,14 @@
 import hashlib
 import json
 import re
+import time
 from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
+from ..telemetry import ANSWER_SECONDS, ANSWERS
 from . import answer_memory, context, name_check, skills, usage, walkthrough
 from .access import Scope
 from .graph import neighbors, node_dict
@@ -466,6 +468,26 @@ def ask(
     scope: Scope | None = None,
     kinds: list[str] | None = None,
     fresh: bool = False,
+) -> dict:
+    """Answer a question from the indexed sources (see `_ask`), counting how it went for /metrics."""
+    started = time.monotonic()
+    out = _ask(db, org, query, repo_ids, k, user_jira_key, scope, kinds, fresh)
+    mode = str(out.get("mode", ""))
+    ANSWERS.labels(mode, "yes" if out.get("cached") else "no").inc()
+    ANSWER_SECONDS.labels(mode).observe(time.monotonic() - started)
+    return out
+
+
+def _ask(
+    db: Session,
+    org: str,
+    query: str,
+    repo_ids: list[str] | None,
+    k: int,
+    user_jira_key: str | None,
+    scope: Scope | None,
+    kinds: list[str] | None,
+    fresh: bool,
 ) -> dict:
     llm = LLMClient(db, org, "knowledge", "")
     failure = ""

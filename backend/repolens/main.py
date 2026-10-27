@@ -40,7 +40,7 @@ from .api import (
 from .config import get_settings
 from .db import create_all, get_engine
 from .middleware import EdgeGuard
-from .telemetry import setup_logging, setup_telemetry
+from .telemetry import job_failed, job_ok, register_job, setup_logging, setup_telemetry
 
 
 async def _checkout_janitor(hours: float = 6.0) -> None:
@@ -61,8 +61,10 @@ async def _checkout_janitor(hours: float = 6.0) -> None:
     while True:
         try:
             await asyncio.to_thread(sweep)
-        except Exception:
+            job_ok("checkout-cleanup")
+        except Exception as e:
             logging.getLogger("repolens.checkouts").exception("checkout cleanup failed")
+            job_failed("checkout-cleanup", e)
         await asyncio.sleep(hours * 3600)
 
 
@@ -88,8 +90,10 @@ async def _source_scheduler(minutes: float = 5.0) -> None:
     while True:
         try:
             await asyncio.to_thread(tick)
-        except Exception:
+            job_ok("source-sync")
+        except Exception as e:
             logging.getLogger("repolens.wiki").exception("scheduled source sync failed")
+            job_failed("source-sync", e)
         await asyncio.sleep(minutes * 60)
 
 
@@ -100,8 +104,10 @@ async def _system_sampler() -> None:
     while True:
         try:
             await asyncio.to_thread(sysmetrics.sample)
-        except Exception:
+            job_ok("system-sampler")
+        except Exception as e:
             logging.getLogger("repolens.system").exception("system sample failed")
+            job_failed("system-sampler", e)
         await asyncio.sleep(sysmetrics.INTERVAL)
 
 
@@ -120,8 +126,10 @@ async def _retention_sweeper(hours: float = 24.0) -> None:
     while True:
         try:
             await asyncio.to_thread(run)
-        except Exception:
+            job_ok("retention")
+        except Exception as e:
             logging.getLogger("repolens.retention").exception("retention sweep failed")
+            job_failed("retention", e)
         await asyncio.sleep(hours * 3600)
 
 
@@ -139,8 +147,10 @@ async def _auto_reindexer(hours: float) -> None:
     while True:
         try:
             await asyncio.to_thread(run)
-        except Exception:
+            job_ok("daily-reindex")
+        except Exception as e:
             logging.getLogger("repolens.indexer").exception("daily re-index check failed")
+            job_failed("daily-reindex", e)
         await asyncio.sleep(hours * 3600)
 
 
@@ -160,8 +170,10 @@ async def _investigation_reaper(seconds: float = 60.0) -> None:
     while True:
         try:
             await asyncio.to_thread(sweep, first)
-        except Exception:
+            job_ok("investigation-reaper")
+        except Exception as e:
             logging.getLogger("repolens.investigations").exception("investigation sweep failed")
+            job_failed("investigation-reaper", e)
         first = False
         await asyncio.sleep(seconds)
 
@@ -173,6 +185,12 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("REPOLENS_JWT_SECRET must be set outside dev, and be at least 32 characters")
     if s.env == "dev":  # other environments run `alembic upgrade head` (see Dockerfile entrypoint)
         create_all()
+    from .services import sysmetrics
+
+    register_job("source-sync", 300, 60)
+    register_job("investigation-reaper", 60, 5)
+    register_job("system-sampler", sysmetrics.INTERVAL)
+    register_job("retention", 24 * 3600, 600)
     tasks = [
         asyncio.create_task(_source_scheduler()),
         asyncio.create_task(_investigation_reaper()),
@@ -180,8 +198,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_retention_sweeper()),  # was written but never started, so the daily clean-up never ran
     ]
     if s.auto_reindex_hours > 0 and not s.run_jobs_inline:
+        register_job("daily-reindex", s.auto_reindex_hours * 3600, 900)
         tasks.append(asyncio.create_task(_auto_reindexer(s.auto_reindex_hours)))
     if s.checkout_ttl_days > 0:
+        register_job("checkout-cleanup", 6 * 3600, 600)
         tasks.append(asyncio.create_task(_checkout_janitor()))
     yield
     for t in tasks:

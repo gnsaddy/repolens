@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import VERSION_LABEL, telemetry
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import (
@@ -12,6 +13,7 @@ from ..models import (
     DocProposal,
     Document,
     DriftAlert,
+    GoldenRun,
     Investigation,
     KGEdge,
     KGNode,
@@ -100,3 +102,42 @@ def system(p: Principal = Depends(current_principal), db: Session = Depends(get_
     """CPU, memory, network and request rate of this server (admins)."""
     authorize(db, p, "llm.configure", "system-metrics", op="read")
     return sysmetrics.snapshot()
+
+
+@router.get("/health")
+def health(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Whether RepoLens is doing its own housekeeping: background loops, indexes, saved-question checks (admins)."""
+    authorize(db, p, "llm.configure", "system-health", op="read")
+    jobs = telemetry.job_report()
+    repos = dict(
+        db.execute(
+            select(Repository.status, func.count()).where(Repository.org_id == p.org_id).group_by(Repository.status)
+        ).all()
+    )
+    last = db.scalar(
+        select(GoldenRun)
+        .where(GoldenRun.org_id == p.org_id, GoldenRun.status == "completed")
+        .order_by(GoldenRun.started_at.desc())
+        .limit(1)
+    )
+    problems = [f"The {j['name']} loop is {j['state']}" for j in jobs if j["state"] in ("late", "failing")]
+    if repos.get("error"):
+        problems.append(f"{repos['error']} repositor{'y' if repos['error'] == 1 else 'ies'} failed to index")
+    return {
+        "version": VERSION_LABEL,
+        "ok": not problems,
+        "problems": problems,
+        "jobs": jobs,
+        "repositories": {s: repos.get(s, 0) for s in telemetry.REPO_STATUSES},
+        "quality": (
+            {
+                "passed": last.passed,
+                "total": last.total,
+                "trigger": last.trigger,
+                "mode": last.mode,
+                "at": last.finished_at or last.started_at,
+            }
+            if last
+            else None
+        ),
+    }

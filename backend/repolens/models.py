@@ -821,6 +821,9 @@ class GoldenRun(Base):
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     user_id: Mapped[str] = mapped_column(String(32), default="")
     mode: Mapped[str] = mapped_column(String(20), default="retrieval")  # retrieval (free) | full (uses the model)
+    trigger: Mapped[str] = mapped_column(
+        String(20), default="manual"
+    )  # manual | reindex (started by an index finishing)
     status: Mapped[str] = mapped_column(String(20), default="running")  # running | completed | failed
     total: Mapped[int] = mapped_column(Integer, default=0)
     done: Mapped[int] = mapped_column(Integer, default=0)

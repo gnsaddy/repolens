@@ -168,6 +168,14 @@ the files, needs no model and is free; a *full* run calls `ask` with the memory 
 20 questions (`MAX_FULL`). Every run stores a fingerprint of the index, the skills, `PIPELINE` and the search model, so a drop in the
 pass rate comes with which of those changed since the previous run.
 
+*Automatic runs* (migration 0026 adds `golden_runs.trigger`: `manual` or `reindex`). `api/repos._run_index` calls `golden.after_index(org)` when an
+index completes. Repositories often finish together, so each call replaces a pending `threading.Timer` for that organisation
+(`auto_quality_delay_s`, default 120 s) and only the last one fires; with inline jobs (tests) it runs at once. `auto_run` then does nothing
+unless the workspace has saved questions, no repository is still `indexing` (that index will call `after_index` itself), and the fingerprint
+differs from the last completed run's, so an index that found nothing new changes no answer and costs nothing. It starts a free retrieval run
+as user `""` (unrestricted scope, like a webhook; the run is visible to admins) and logs a warning with the count when questions that passed
+before now fail. It never calls the model; `auto_quality_checks=false` turns it off.
+
 **Independent review** of an investigation is off by default and switched by an admin (`llm_settings.independent_review`, read by
 `llm_router.review_enabled`). It is advisory: its result is recorded in `verification.review` and shown in the report, and it never
 changes the confidence or the ranking.
@@ -260,6 +268,21 @@ local branch head for local paths). One that cannot be reached is left for the n
 to the repository response as `last_error` (redacted, 300 characters) only while it is in the error state. The retention sweeper
 (`_retention_sweeper`) is started from the same lifespan; it had been written but never started, so the daily clean-up only ever ran from its
 manual endpoint.
+
+## Watching RepoLens itself
+`telemetry.py`. Besides HTTP request count and latency, `/metrics` (Prometheus text; bearer token when `REPOLENS_METRICS_TOKEN` is set) exposes:
+`repolens_index_runs_total{status}`, `repolens_index_seconds` (histogram), `repolens_index_retries_total`, `repolens_answers_total{mode,cached}` and
+`repolens_answer_seconds{mode}` (counted in `knowledge.ask`, so Ask, chat and full quality runs all show), `repolens_llm_tokens_total{kind}` (from
+`usage.record_event`; local embeddings spend none), `repolens_quality_runs_total{trigger,status}`, `repolens_quality_pass_ratio{org}`,
+`repolens_repositories{status}` (counted from the database when scraped, not kept up to date by writers), and per background loop
+`repolens_job_last_success_timestamp_seconds{job}` and `repolens_job_failures_total{job}`.
+
+Each loop started in `main.lifespan` registers itself (`register_job(name, every_s, first_s)`) and reports each pass (`job_ok` / `job_failed`).
+`job_report()` classifies a loop as `ok`; `waiting` (still inside its first delay); `failing` (the last pass raised); or `late` (no pass in
+two intervals plus a minute, or never ran past its first delay plus that). Registering up front is the point: the retention sweeper once
+never started and nothing showed it, whereas now it would show as `late`. `GET /api/metrics/health` (admin) returns the loops, repository counts
+by status, the last completed quality run and a list of plain-language problems; Insights shows it as "RepoLens health". A useful alert is
+`time() - repolens_job_last_success_timestamp_seconds > 2 * <interval>`, or `increase(repolens_job_failures_total[1h]) > 0`.
 
 ## Graph insights
 **Worlds.** `ForceGraph.layout` groups nodes by repository (`repoGroups`). With two or more, `placeWorlds` puts the repositories on a wide ring and

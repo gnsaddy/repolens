@@ -249,6 +249,11 @@ export interface SkillFile { name: string; filename: string; markdown: string; e
 
 export interface SysPoint { t: number; host_cpu: number | null; process_cpu: number | null; mem_used: number | null; mem_total: number | null; process_rss: number | null; rx_bps: number | null; tx_bps: number | null; rps: number; error_rate: number; p50_ms: number | null; p95_ms: number | null; container_limit: number | null }
 export interface SysMetrics { available: boolean; cores: number | null; load_average: number[] | null; uptime_s: number; threads: number | null; current: SysPoint; history: SysPoint[]; interval_s: number }
+export interface JobState { name: string; state: "ok" | "waiting" | "late" | "failing"; every_s: number; last_ok: number | null; failures: number; last_error: string | null }
+export interface SysHealth {
+  version: string; ok: boolean; problems: string[]; jobs: JobState[]; repositories: Record<string, number>;
+  quality: { passed: number; total: number; trigger: "manual" | "reindex"; mode: string; at: string } | null;
+}
 export interface CalibrationBand { from: number; to: number; n: number; mean_confidence: number | null; confirmed_rate: number | null }
 export interface Calibration { status: "empty" | "too_few" | "ok"; message: string; reviewed: number; min_for_curve: number; bands: CalibrationBand[]; confirmed_rate?: number; mean_confidence?: number; brier?: number; ece?: number; bias?: string }
 export interface FeedbackSummary { days: number; total: number; helpful_rate: number | null; by_kind: Record<string, { up: number; down: number }>; from_memory: { total: number; helpful_rate: number | null } }
@@ -319,7 +324,7 @@ export interface SkillList { items: SkillRow[]; builtin: { name: string; title: 
 
 export interface GoldenCheck { name: string; ok: boolean; detail: string }
 export interface GoldenResult { id: string; question: string; passed: boolean; checks: GoldenCheck[]; files: string[]; answer: string }
-export interface GoldenRunRow { id: string; mode: "retrieval" | "full"; status: "running" | "completed" | "failed"; total: number; done: number; passed: number; error: string | null; started_at: string; finished_at: string | null; results?: GoldenResult[] }
+export interface GoldenRunRow { id: string; mode: "retrieval" | "full"; trigger: "manual" | "reindex"; status: "running" | "completed" | "failed"; total: number; done: number; passed: number; error: string | null; started_at: string; finished_at: string | null; results?: GoldenResult[] }
 export interface GoldenQuestion { id: string; question: string; expect_files: string[]; expect_phrases: string[]; repo_ids: string[]; mine: boolean; last: GoldenResult | null }
 export interface GoldenOverview {
   questions: GoldenQuestion[]; runs: GoldenRunRow[]; latest: GoldenRunRow | null; active: GoldenRunRow | null; max_full: number;

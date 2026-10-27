@@ -48,7 +48,7 @@ export default function QualityPanel({ canWrite }: { canWrite: boolean }) {
 
       {l && (
         <Card aria-label="Latest result">
-          <CardTitle right={<span className="text-xs text-muted">{l.mode === "full" ? "full run" : "retrieval run"} · {timeAgo(l.finished_at ?? l.started_at)}</span>}>Latest result</CardTitle>
+          <CardTitle right={<span className="text-xs text-muted">{l.mode === "full" ? "full run" : "retrieval run"}{l.trigger === "reindex" ? ", ran by itself after indexing" : ""} · {timeAgo(l.finished_at ?? l.started_at)}</span>}>Latest result</CardTitle>
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="text-3xl font-semibold">{pct(l.passed, l.total)}</span>
             <span className="text-sm text-muted">{l.passed} of {l.total} questions passed</span>

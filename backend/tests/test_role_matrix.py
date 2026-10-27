@@ -265,6 +265,7 @@ ADMIN_ONLY_READS = {
     "/api/auth/people",
     "/api/auth/users",  # emails, roles and whether two-step sign-in is on, for everyone
     "/api/feedback/export",
+    "/api/metrics/health",  # background-job state and repository counts
     "/api/metrics/system",
     "/api/repositories/storage",
     "/api/repositories/{repo_id}/access",
