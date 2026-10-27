@@ -20,7 +20,8 @@ _AUTH = re.compile(r"^/api/auth/(login|register|reset|sso/(discover|start|exchan
 _HEAVY = re.compile(
     r"^/api/(mcp|knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"
     r"|investigations(/ci/start|/[^/]+/rerun)?|jira/(investigate|issues/[^/]+/analyze)|repositories(/[^/]+/(index|reindex))?"
-    r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*|chats/[^/]+/messages(/[^/]+)?|groups/[^/]+/overview)$"
+    r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*|chats/[^/]+/messages(/[^/]+)?"
+    r"|groups/[^/]+/overview|groups/ask)$"
 )
 
 HEADERS = [

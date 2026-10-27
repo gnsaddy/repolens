@@ -7,7 +7,7 @@ import Modal from "@/components/Modal";
 import ForceGraph, { NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import SystemGraph, { heatColor, TRUST_COLOR, type HeatMetric } from "@/components/SystemGraph";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
-import { api, type ChangePair, type CodeGraph, type Impact, type LinkChanges, type LinkCoverage, type Repo, type Surface, type SystemAnalysis, type SystemGroup, type SystemLink, type SystemOverview } from "@/lib/api";
+import { api, type AskResult, type ChangePair, type CodeGraph, type Impact, type LinkChanges, type LinkCoverage, type Repo, type Surface, type SystemAnalysis, type SystemGroup, type SystemLink, type SystemOverview } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import Markdown from "./wiki/Markdown";
@@ -38,6 +38,8 @@ export default function GraphPage() {
   const [saving, setSaving] = useState<"new" | "update" | null>(null);
   const [weak, setWeak] = useState(false);
   const [node, setNode] = useState<string | null>(null);
+  const [askReq, setAskReq] = useState<AskRequest | null>(null);
+  const explain = (r: Omit<AskRequest, "n">) => { setAskReq({ n: Date.now(), ...r }); document.getElementById("ask-system")?.scrollIntoView?.({ behavior: "smooth" }); };
 
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api<{ groups: SystemGroup[]; max_repos: number }>("/groups") });
@@ -98,8 +100,9 @@ export default function GraphPage() {
 
         <div className="space-y-4 lg:col-span-3">
           {!picked.length ? <Empty>Choose two or more repositories to see how they connect.</Empty> : analysis.isLoading ? <Spinner /> : !a ? <ErrorNote error={analysis.error} /> : (<>
+            <AskSystem ids={picked} repos={a.repos} links={a.links} req={askReq} onNode={setNode} />
             {picked.length > 1 && <CodeDependencies coverage={a.coverage} names={pairs} cg={code.data} loading={code.isLoading} error={code.error} weak={weak} onWeak={setWeak} node={node} onNode={setNode}
-              focus={link ? `${pairs.get(link.src)} → ${pairs.get(link.dst)}` : null} onClear={() => { setLink(null); setSelected(null); }} />}
+              focus={link ? `${pairs.get(link.src)} → ${pairs.get(link.dst)}` : null} onClear={() => { setLink(null); setSelected(null); }} onAsk={(id) => explain({ node_id: id })} />}
             {picked.length > 1 && <WhatChanged ids={key} names={pairs} />}
             <Card aria-label="Repository map">
               <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Colour repositories by
@@ -115,6 +118,7 @@ export default function GraphPage() {
               {picked.length > 1 && !a.links.length && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-muted">No links between these repositories were found in the code or documents. They may still be related through something this analysis cannot see, such as a shared database or a message queue.</p>}
               {shownLink && (
                 <div className="mt-3 rounded-lg border border-line p-3 text-sm" aria-label="Link details">
+                  <Button size="sm" variant="outline" className="float-right" onClick={() => explain({ src: shownLink.src, dst: shownLink.dst })}><Sparkles className="h-4 w-4" />Explain this link</Button>
                   <div className="font-medium">{pairs.get(shownLink.src)} → {pairs.get(shownLink.dst)} <Badge tone={shownLink.trust === "fact" ? "green" : "amber"}>{TRUST[shownLink.trust]}</Badge></div>
                   <div className="text-xs text-muted">{Object.entries(shownLink.rels).map(([k, n]) => `${REL[k] ?? k.toLowerCase()} ${n}`).join(", ")}{shownLink.weak > 0 && ` · ${shownLink.weak} matched by name only`}</div>
                   <ul className="mt-2 space-y-1 text-xs">{shownLink.examples.map((e, i) => <li key={i}><code>{e.from}</code> → <code>{e.to}</code>{e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>)}</ul>
@@ -187,7 +191,8 @@ function SaveSystem({ mode, active, ids, onClose, onSaved }: { mode: "new" | "up
 }
 
 /** The classes, functions and files on both ends of each link, grouped by repository: the real dependency graph. */
-function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focus, onClear, coverage, names }: {
+function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focus, onClear, coverage, names, onAsk }: {
+  onAsk: (nodeId: string) => void;
   coverage?: Record<string, LinkCoverage>; names: Map<string, string>;
   cg?: CodeGraph; loading: boolean; error: unknown; weak: boolean; onWeak: (v: boolean) => void;
   node: string | null; onNode: (id: string | null) => void; focus: string | null; onClear: () => void;
@@ -201,7 +206,7 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
   const label = (id: string) => { const n = byId.get(id); return n ? `${n.repo}: ${n.qualname || n.name}` : id; };
   const crossing = cg ? cg.edges.filter((e) => e.rel !== "CONTAINS" && byId.get(e.source)?.repo_id !== byId.get(e.target)?.repo_id).length : 0;
   return (
-    <Card aria-label="Code dependencies">
+    <Card id="code-dependencies" aria-label="Code dependencies">
       <CardTitle right={focus && <button className="text-xs text-brand hover:underline" onClick={onClear}>Show every pair</button>}>Code dependencies{focus ? `: ${focus}` : ""}</CardTitle>
       {loading ? <Spinner /> : error ? <ErrorNote error={error} /> : !cg ? null : (<>
         {!cg.nodes.length ? (
@@ -230,6 +235,7 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
               <li key={e.id}>{e.source === node ? "→" : "←"} <strong>{REL[e.rel] ?? e.rel.toLowerCase()}</strong> <code>{label(e.source === node ? e.target : e.source)}</code>
                 {" "}<Badge tone={e.trust === "fact" ? "green" : "amber"}>{proof(e.rel, e.trust ?? "")}</Badge>
                 {e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>))}</ul>}
+            <div className="mt-2"><Button size="sm" variant="outline" onClick={() => onAsk(picked.id)}><Sparkles className="h-4 w-4" />Explain what depends on this</Button></div>
             <BlastRadius id={picked.id} />
           </div>)}
         {unread.length > 0 && (
@@ -300,6 +306,60 @@ function PublicSurface({ repos }: { repos: { id: string; name: string }[] }) {
         {s.hidden > 0 && <p className="mt-1 text-xs text-muted">{s.hidden} more use it in repositories you cannot access.</p>}
         <p className="mt-2 text-xs text-muted">{s.note}</p>
       </>)}
+    </Card>
+  );
+}
+
+type AskRequest = { n: number; question?: string; src?: string; dst?: string; node_id?: string };
+
+/** A question about the chosen repositories only: answered from their code and documents and from the dependency analysis
+ *  (the links, with their proof), with every source numbered so a claim can be checked, and a way back to the graph. */
+function AskSystem({ ids, repos, links, req, onNode }: {
+  ids: string[]; repos: { id: string; name: string }[]; links: SystemLink[]; req: AskRequest | null; onNode: (id: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [answers, setAnswers] = useState<{ question: string; res: AskResult }[]>([]);
+  const name = new Map(repos.map((r) => [r.id, r.name]));
+  const ask = useMutation({
+    mutationFn: (b: { question?: string; src?: string; dst?: string; node_id?: string }) => api<AskResult>("/groups/ask", { method: "POST", json: { repo_ids: ids, ...b } }),
+    onSuccess: (res) => setAnswers((a) => [{ question: res.query, res }, ...a].slice(0, 3)),
+  });
+  useEffect(() => {
+    if (req) ask.mutate({ question: req.question ?? "", src: req.src, dst: req.dst, node_id: req.node_id });
+  }, [req?.n]); // eslint-disable-line react-hooks/exhaustive-deps
+  const top = links.filter((l) => l.strong + l.http + l.imports > 0).slice(0, 2);
+  const chips = [
+    ...top.map((l) => `How does ${name.get(l.src)} depend on ${name.get(l.dst)}?`),
+    ids.length > 1 ? "How do these repositories fit together, and how does a call flow between them?" : "What does this repository do, and what does it depend on?",
+    ids.length > 1 ? "What changes together across these repositories?" : "Where is the entry point?",
+  ];
+  const submit = () => { if (q.trim().length >= 3) { ask.mutate({ question: q.trim() }); setQ(""); } };
+  return (
+    <Card id="ask-system" aria-label="Ask about these repositories">
+      <CardTitle>Ask about {ids.length === 1 ? "this repository" : `these ${ids.length} repositories`}</CardTitle>
+      <p className="mb-2 text-xs text-muted">Answered only from {ids.length === 1 ? "this repository" : "these repositories"}: their code and documents, and the dependency analysis below. Nothing from other repositories is used.</p>
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <Input aria-label="Your question" value={q} onChange={(e) => setQ(e.target.value)} placeholder="How does an order flow from orders to pricing?" />
+        <Button disabled={ask.isPending || q.trim().length < 3}>{ask.isPending ? "Asking…" : "Ask"}</Button>
+      </form>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Suggested questions">
+        {chips.map((c) => <button key={c} type="button" disabled={ask.isPending} onClick={() => ask.mutate({ question: c })} className="rounded-full border border-line px-2.5 py-1 text-xs text-muted hover:bg-slate-50 disabled:opacity-50">{c}</button>)}
+      </div>
+      <ErrorNote error={ask.error} />
+      {answers.map((a, i) => (
+        <article key={i} aria-label="Answer" className={`mt-4 ${i ? "border-t border-line pt-4 opacity-80" : ""}`}>
+          <div className="mb-1 text-sm font-medium">{a.question}</div>
+          {a.res.mode === "extractive" && <p role="status" className="mb-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">No language model is configured, so these are the most relevant passages, not a written answer.</p>}
+          {a.res.mode === "failed" && <p role="alert" className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">The AI model could not answer.</p>}
+          {(a.res.unsupported_names ?? []).length > 0 && <p role="status" className="mb-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">Check these names, they are not in the sources: {(a.res.unsupported_names ?? []).join(", ")}</p>}
+          <Markdown text={a.res.answer} onOpen={() => {}} />
+          {a.res.sources.length > 0 && (
+            <details className="mt-2 text-xs" open={i === 0}><summary className="cursor-pointer text-muted">Sources ({a.res.sources.length})</summary>
+              <ol className="mt-1 space-y-1">{a.res.sources.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-baseline gap-1.5"><span className="font-medium">{s.id}</span><code>{s.repo}: {s.file}</code>
+                  {s.kind === "analysis" && <Badge tone="brand">dependency analysis</Badge>}
+                  {s.node_id && <button type="button" className="text-brand hover:underline" onClick={() => { onNode(s.node_id as string); document.getElementById("code-dependencies")?.scrollIntoView?.({ behavior: "smooth" }); }}>show in graph</button>}</li>))}</ol></details>)}
+        </article>))}
     </Card>
   );
 }

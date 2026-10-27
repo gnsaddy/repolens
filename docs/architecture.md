@@ -342,6 +342,15 @@ links that existed then are never reported as new. `after_index` (called from `_
 index, so a new dependency is noticed with nobody watching; the page also refreshes lazily when the fingerprint is stale. Settings: `auto_link_refresh`,
 `auto_link_delay_s`. `DETECTION_VERSION` is part of the fingerprint: change it whenever a detector finds links differently, and every workspace works its links out again. Metrics: `repolens_repo_links{kind}` and `repolens_repo_links_new_total`.
 
+* **Asking about a system** (`groups.ask`, `POST /api/groups/ask`). It calls the ordinary `knowledge.ask` with the chosen repository ids (so retrieval is limited
+  to them and to the caller's `Scope`) and three extra parameters: `extra`, `memory_tag` and `addon`. `extra` are pseudo-results of kind `analysis` built by
+  `system_facts` (the fit-together overview, the stored proof lines ranked by overlap with the question's key words or limited to one pair, the impact of one
+  node, and the coupling), appended after the retrieved ones so they are numbered, cited and name-checked like any other source; `context.blocks` keeps
+  them whole instead of condensing them to the query terms. `memory_tag` is the link-state fingerprint plus the focus, so a saved answer is never reused
+  after the dependencies change. `addon` tells the model what the analysis sources are and not to claim a dependency no source states.
+  `retrieval_focus` limits retrieval to code and pull requests (documents too when the question names them) and passes `skip_paths` so a locale folder
+  under a docs directory is dropped, unless the question is not ASCII. The action
+  `group.ask` is open to viewers and rate limited with the other model-backed calls.
 * **Coverage.** Each detector says which languages it reads (`languages`); `link_states.coverage` records, per repository, the languages found (function, method
   and class chunks), the ones a detector cannot read (`unread`), the packages it provides and its route files. The Graph page prints "Not read: go in
   orders-svc" so an empty graph is not mistaken for "no dependencies".

@@ -130,6 +130,26 @@ def analyse_selection(
     return svc.analyse(db, p.org_id, ids, days)
 
 
+class AskIn(BaseModel):
+    repo_ids: list[str] = Field(min_length=1, max_length=svc.MAX_REPOS)
+    question: str = Field(default="", max_length=1000)
+    src: str | None = Field(default=None, max_length=64)  # explain the link from this repository ...
+    dst: str | None = Field(default=None, max_length=64)  # ... to this one
+    node_id: str | None = Field(default=None, max_length=64)  # or what depends on this class, function or file
+    fresh: bool = False
+
+
+@router.post("/ask")
+def ask(body: AskIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Ask about the chosen repositories: answered from their code and documents and from the dependency analysis."""
+    if len(body.question.strip()) < 3 and not (body.src and body.dst) and not body.node_id:
+        raise HTTPException(422, "Ask a question, or choose a link or a class to explain")
+    authorize(db, p, "group.ask", body.question[:80])
+    scope = scope_for(db, p)
+    ids = svc.clean_ids(db, p.org_id, scope, body.repo_ids)
+    return svc.ask(db, p.org_id, scope, ids, body.question, body.src, body.dst, body.node_id, body.fresh)
+
+
 @router.get("/impact")
 def impact(
     node_id: str = Query(min_length=1, max_length=64),

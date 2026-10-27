@@ -48,6 +48,7 @@ ACTION_MIN_ROLE = {
     "golden.run": "member",
     "group.write": "member",  # a saved set of repositories, shared in the workspace
     "group.overview": "member",  # writing an overview uses the model
+    "group.ask": "viewer",  # a question about chosen repositories, answered like Ask
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}
 

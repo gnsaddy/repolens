@@ -59,4 +59,5 @@ def blocks(sources: list[dict], results: list[dict], query: str, budget: int) ->
             keep.append((s, r))
     terms = _terms(query)
     per = max(400, budget // max(len(keep), 1))
-    return [(s, condense(r["content"], terms, per)) for s, r in keep]
+    # dependency analysis is already short and every line of it is a proof, so it is not cut down to the query terms
+    return [(s, r["content"] if r.get("kind") == "analysis" else condense(r["content"], terms, per)) for s, r in keep]

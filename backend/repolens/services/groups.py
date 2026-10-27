@@ -19,7 +19,9 @@ from sqlalchemy.orm import Session, aliased
 
 from ..models import Change, DriftAlert, GroupOverview, KGEdge, KGNode, RepoGroup, Repository
 from . import graph as kg
+from . import knowledge as kb
 from . import repo_links as lk
+from . import walkthrough
 from .access import Scope
 from .graph_insights import FACT
 from .llm import LLMClient, LLMUnavailable, describe_failure
@@ -551,3 +553,177 @@ def code_graph(
         "shown_weak": weak,
         "truncated": len(proven) + len(over_http) + (strong_n + (weak_n if weak else 0)) > limit,
     }
+
+
+# --- asking about a system ---------------------------------------------------------------------------------------
+
+ASK_ADDON = (
+    " Some sources are 'dependency analysis' worked out from the code of several repositories: each line is a link "
+    "between two repositories with the code on both ends and the proof (an import line, or a URL that matches a "
+    "route). Use them to explain how the repositories depend on each other and how a call or a request flows "
+    "between them, naming the repositories and functions involved, and say how sure a link is when it is marked "
+    "inferred or uncertain. Never claim a dependency that no source states."
+)
+MAX_FACT_CHARS = 2000
+
+
+def _fact(title: str, content: str, node_id: str | None = None) -> dict:
+    """A piece of analysis in the shape of a retrieved source, so it is numbered, cited and name-checked like one."""
+    return {
+        "repo": "dependency analysis",
+        "repo_id": "",
+        "file": title,
+        "kind": "analysis",
+        "chunk_type": "analysis",
+        "title": title,
+        "symbol": "",
+        "start_line": 0,
+        "end_line": 0,
+        "node_id": node_id,
+        "via_graph": None,
+        "url": "",
+        "content": content[:MAX_FACT_CHARS],
+        "connections": [],
+        "chunk_id": "",
+        "score": 1.0,
+    }
+
+
+def system_facts(
+    db: Session,
+    org: str,
+    scope: Scope,
+    ids: list[str],
+    question: str,
+    src: str | None = None,
+    dst: str | None = None,
+    node_id: str | None = None,
+) -> tuple[list[dict], str, dict[str, str], str | None]:
+    """What is known about how these repositories relate, as sources for a question: the overview, the proof lines that
+    match the question (or those of one pair, or what depends on one node), and what changes together. Also a tag
+    that changes whenever the analysis does, so a saved answer is not reused after it, the repository names, and the
+    name of the node asked about."""
+    a = analyse(db, org, ids)
+    names = {r["id"]: r["name"] for r in a["repos"]}
+    state = lk.refresh(db, org)
+    overview = ["Repositories:"]
+    for r in a["repos"]:
+        cov = a["coverage"].get(r["id"], {})
+        offers = ", ".join(cov.get("provides", []))
+        kind = "documents" if r["source"] == "docs" else "code"
+        extra = f", offers package {offers}" if offers else ""
+        overview.append(f"- {r['name']} ({kind}, {r['files']} files{extra})")
+    overview.append("Dependencies between them:")
+    if not a["links"]:
+        overview.append("- none found in the code")
+    for p in a["links"][:12]:
+        proven = p["strong"] + p["http"] + p["imports"]
+        kinds = ", ".join(f"{REL_WORD.get(k, k.lower())} {n}" for k, n in sorted(p["rels"].items()))
+        guess = f"; plus {p['weak']} calls matched by name only, not counted" if p["weak"] else ""
+        overview.append(
+            f"- {names[p['src']]} depends on {names[p['dst']]}: {proven} proven links ({kinds}); how sure: "
+            f"{p['trust']}{guess}"
+        )
+    unread = sorted({(u["language"], names[i]) for i, c in a["coverage"].items() for u in c.get("unread", [])})
+    if unread:
+        said = ", ".join(f"{lang} in {name}" for lang, name in unread)
+        overview.append(f"Not read yet, so dependencies through these may be missing: {said}")
+    facts = [_fact("How these repositories fit together", "\n".join(overview))]
+
+    want = walkthrough.key_words(question)
+    rows = lk.rows(db, org, ids, "import") + lk.rows(db, org, ids, "http")
+    if src and dst:
+        rows = [r for r in rows if (r["src_repo"], r["dst_repo"]) == (src, dst)]
+
+    def score(r: dict) -> int:
+        return len(want & walkthrough._tokens(f"{r['from']} {r['to']} {r['evidence']}"))
+
+    ranked = sorted(rows, key=lambda r: (-score(r), -r["weight"], r["from"], r["to"]))
+    pick = ranked[:15] if (src and dst) else [r for r in ranked if score(r) > 0][:12] or ranked[:8]
+    if pick:
+        title = f"The link from {names[src]} to {names[dst]}" if src and dst else "Dependencies that match the question"
+        lines = [
+            f"{names[r['src_repo']]}: {r['from']} -> {names[r['dst_repo']]}: {r['to']} | {r['evidence']} [{r['trust']}]"
+            for r in pick
+        ]
+        facts.append(_fact(title, "\n".join(lines), node_id=pick[0]["src"]))
+    node_name: str | None = None
+    if node_id:
+        hit = lk.impact(db, org, scope, node_id)
+        if hit is None:
+            raise HTTPException(404, "Not found")
+        node_name = hit["node"]["name"]
+        lines = [f"{d['repo']}: {d['label']} | {d['evidence']} [{d['trust']}]" for d in hit["direct"]]
+        lines += [f"{i['repo']}: {i['label']} calls {i['through']}" for i in hit["indirect"]]
+        facts.append(
+            _fact(f"What depends on {node_name}", "\n".join(lines) or "Nothing in other repositories.", node_id)
+        )
+    if a["coupling"]:
+        lines = [
+            f"{names[c['a']]} and {names[c['b']]}: {c['tickets']} shared tickets, "
+            f"{c['days']} days the same person changed both"
+            for c in a["coupling"][:5]
+        ]
+        facts.append(_fact("What changes together", "\n".join(lines)))
+    tag = "|".join([state.fingerprint, src or "", dst or "", node_id or ""])
+    return facts, tag, names, node_name
+
+
+def default_question(names: dict[str, str], src: str | None, dst: str | None, node_name: str | None) -> str:
+    if src and dst:
+        return (
+            f"Explain how {names[src]} depends on {names[dst]}: what it uses, where in the code, and what a change to "
+            "that would affect."
+        )
+    if node_name:
+        return f"What depends on {node_name}, and what would break if it changed?"
+    return "How do these repositories fit together, and how does a call flow between them?"
+
+
+def ask(
+    db: Session,
+    org: str,
+    scope: Scope,
+    ids: list[str],
+    question: str,
+    src: str | None = None,
+    dst: str | None = None,
+    node_id: str | None = None,
+    fresh: bool = False,
+) -> dict:
+    """Answer a question about the chosen repositories only: their code and documents, plus the dependency analysis as
+    numbered sources. Uses the same engine as Ask, so a failed model call is reported and invented names are flagged."""
+    if (src or dst) and not (src in ids and dst in ids):
+        raise HTTPException(404, "Repository not found")
+    facts, tag, names, node_name = system_facts(db, org, scope, ids, question, src, dst, node_id)
+    q = question.strip() or default_question(names, src, dst, node_name)
+    kinds, skip = retrieval_focus(q)
+    return kb.ask(
+        db,
+        org,
+        q,
+        ids,
+        k=10,
+        scope=scope,
+        kinds=kinds,
+        fresh=fresh,
+        extra=facts,
+        memory_tag=tag,
+        addon=ASK_ADDON,
+        skip_paths=skip,
+    )
+
+
+# A question about how repositories relate is answered from code and from the dependency analysis; documents are added
+# when the question asks for them, and a translated copy of a document never is (unless the question is not in ASCII, so
+# written in another language, when a team's only documents may be in that language).
+DOC_WORDS = re.compile(r"\b(docs?|documentation|readme|guide|tutorial|wiki|manual|changelog|runbook|adr)\b", re.I)
+TRANSLATED = re.compile(
+    r"(^|/)(docs?|documentation|i18n|locales?|translations?|l10n)/(?!en(?:[-_][A-Za-z]{2,4})?/)[a-z]{2,3}(?:[-_][A-Za-z]{2,4})?/"
+)
+
+
+def retrieval_focus(question: str) -> tuple[list[str], re.Pattern[str] | None]:
+    """Which kinds of source a system question searches, and which paths it leaves out."""
+    kinds = ["code", "pr", "doc"] if DOC_WORDS.search(question) else ["code", "pr"]
+    return kinds, (None if not question.isascii() else TRANSLATED)

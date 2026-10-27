@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
-import type { ChangePair, CodeGraph, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
+import type { AskResult, ChangePair, CodeGraph, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
 import GraphPage from "@/pages/Graph";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(b === null ? null : JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
@@ -50,7 +50,15 @@ const surface: Surface = {
 const pairOf = (n: number): ChangePair => ({ src: "a", dst: "b", from: "orders-svc", to: "pricing-svc", count: n, examples: [{ from: "orders/reports.py:report", to: "userlib/core.py:unused_helper", evidence: "report calls unused_helper, imported with `from userlib import unused_helper`", at: new Date().toISOString() }] });
 const changes: LinkChanges = { days: 7, tracking_since: new Date(Date.now() - 86400000).toISOString(), new: [pairOf(2)], removed: [pairOf(1)], computed_at: new Date().toISOString() };
 
-function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges } = {}) {
+const askResult: AskResult = {
+  query: "How does orders-svc depend on pricing-svc?", answer: "orders-svc calls the pricing handler over HTTP [S1].", mode: "llm", unsupported_names: ["ghost.py"],
+  sources: [
+    { id: "S1", repo: "dependency analysis", file: "The link from orders-svc to pricing-svc", kind: "analysis", title: "The link", start_line: 0, end_line: 0, node_id: "n1", snippet: "", via_graph: null },
+    { id: "S2", repo: "orders-svc", file: "orders/client.py", kind: "code", title: "fetch_quote", start_line: 3, end_line: 9, node_id: null, snippet: "", via_graph: null }],
+  connections: [],
+};
+
+function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges; ask?: AskResult } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -58,6 +66,7 @@ function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemO
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
     if (url.includes("/groups/analysis")) return json(analysis);
+    if (url.endsWith("/groups/ask")) return json(opts.ask ?? askResult);
     if (url.includes("/groups/impact")) return json(impact);
     if (url.includes("/groups/surface")) return json(surface);
     if (url.includes("/groups/changes")) return json(opts.changes ?? changes);
@@ -170,6 +179,61 @@ describe("Graph: systems", () => {
     await userEvent.click(screen.getByLabelText("pricing-svc"));
     const card = await screen.findByLabelText("Code dependencies");
     expect(await within(card).findByRole("note")).toHaveTextContent("Not read: go in orders-svc (2 files)");
+  });
+
+  it("answers a question about the chosen repositories and shows numbered sources, marking the analysis", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Ask about these repositories");
+    await userEvent.type(within(card).getByLabelText("Your question"), "How does orders call pricing?");
+    await userEvent.click(within(card).getByRole("button", { name: "Ask" }));
+    const ans = await within(card).findByLabelText("Answer");
+    expect(ans).toHaveTextContent("orders-svc calls the pricing handler over HTTP [S1].");
+    expect(ans).toHaveTextContent("Check these names, they are not in the sources: ghost.py");
+    expect(ans).toHaveTextContent("dependency analysis");
+    expect(ans).toHaveTextContent("orders/client.py");
+    expect(calls.find((c) => c.url.endsWith("/groups/ask"))?.body).toEqual({ repo_ids: ["a", "b"], question: "How does orders call pricing?" });
+  });
+
+  it("says the answer is plain passages when no model is configured, and says when the model failed", async () => {
+    open({ ask: { ...askResult, mode: "extractive", unsupported_names: [] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Ask about these repositories");
+    await userEvent.click(within(card).getByRole("button", { name: /fit together/ }));
+    expect(await within(card).findByText(/No language model is configured/)).toBeInTheDocument();
+  });
+
+  it("offers questions drawn from the links it found, and asks one with a click", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Ask about these repositories");
+    await userEvent.click(await within(card).findByRole("button", { name: "How does orders-svc depend on pricing-svc?" }));
+    await waitFor(() => expect(calls.find((c) => c.url.endsWith("/groups/ask"))?.body).toEqual({ repo_ids: ["a", "b"], question: "How does orders-svc depend on pricing-svc?" }));
+  });
+
+  it("explains a selected link without typing a question", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    await userEvent.click(await screen.findByRole("button", { name: "orders-svc depends on pricing-svc: 3 links, 0 by name only, fact" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Explain this link/ }));
+    await waitFor(() => expect(calls.find((c) => c.url.endsWith("/groups/ask"))?.body).toMatchObject({ src: "a", dst: "b", question: "" }));
+  });
+
+  it("explains what depends on a selected class, and a cited source can be shown in the graph", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const dep = await screen.findByLabelText("Code dependencies");
+    await userEvent.click(await within(dep).findByRole("button", { name: "class UserClient" }));
+    await userEvent.click(await within(dep).findByRole("button", { name: /Explain what depends on this/ }));
+    await waitFor(() => expect(calls.find((c) => c.url.endsWith("/groups/ask"))?.body).toMatchObject({ node_id: "n4" }));
+    const ask = await screen.findByLabelText("Ask about these repositories");
+    await userEvent.click(await within(ask).findByRole("button", { name: "show in graph" }));
+    expect(await within(dep).findByLabelText("Selected code")).toHaveTextContent("fetch_quote");
   });
 
   it("keeps calls matched by name alone out of the picture until asked, and says why", async () => {
