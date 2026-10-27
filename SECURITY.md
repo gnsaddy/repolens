@@ -10,6 +10,11 @@ Controls implemented (see `docs/architecture.md` for the threat model summary):
   same `Scope` object filters repository lists, search, Ask, the knowledge graph (nodes, edges, paths), investigations,
   incident memory, risk assessments and dashboard counts; hidden items answer 404, never 403. Background jobs run with
   their creator's scope, re-evaluated at run time.
+- Systems (Graph page): a saved set of repositories is shared with the workspace, but a repository you cannot see is only counted in
+  it, never named, and is left out of its analysis. A written overview is stored with the ids of the repositories it was built from and
+  is returned only to someone whose scope covers all of them, checked on every read. Changing or deleting a system needs its author or
+  an admin; writing an overview is a member action and rate limited with the other model-backed calls. The model sees only computed facts
+  about the chosen repositories, treated as data, and names in its answer that are not in those facts are flagged.
 - Stored text is scrubbed of high-confidence secrets (`redact_stored`) at ingestion; real `.env`/key/certificate files are
   never indexed. Repository URLs may not embed credentials; private clones use the connected GitHub token via an
   environment-passed header and only for its own host.

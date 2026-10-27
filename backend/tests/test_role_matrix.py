@@ -323,6 +323,11 @@ VIEWER_READS = """
     /api/golden
     /api/golden/runs/{rid}
     /api/graph/communities
+    /api/groups
+    /api/groups/analysis
+    /api/groups/code-graph
+    /api/groups/{gid}/analysis
+    /api/groups/{gid}/overviews
     /api/graph/nodes
     /api/graph/nodes/{node_id}
     /api/graph/nodes/{node_id}/brief

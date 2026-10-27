@@ -10,6 +10,7 @@ export const PAGES = [
   { label: "Investigations", to: "/investigations", hint: "find the root cause of a bug" },
   { label: "Knowledge: ask & search", to: "/knowledge", hint: "ask questions over code and docs" },
   { label: "Knowledge: graph", to: "/knowledge?tab=graph", hint: "explore connections and heat map" },
+  { label: "Graph: systems", to: "/graph", hint: "how repositories depend on each other, change together, overview" },
   { label: "DeepMind Wiki: browse", to: "/wiki", hint: "documentation" },
   { label: "DeepMind Wiki: add content", to: "/wiki?tab=sources", hint: "README, text, URL, Confluence" },
   { label: "DeepMind Wiki: health", to: "/wiki?tab=health", hint: "orphans, broken links, stale pages" },

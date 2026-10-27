@@ -833,3 +833,36 @@ class GoldenRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RepoGroup(Base):
+    """A saved set of repositories analysed as one system: how they depend on each other, change together, and fit."""
+
+    __tablename__ = "repo_groups"
+    __table_args__ = (UniqueConstraint("org_id", "name"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str] = mapped_column(Text, default="")
+    repo_ids: Mapped[list] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class GroupOverview(Base):
+    """A written overview of a group, shared with the workspace and signed with who asked for it."""
+
+    __tablename__ = "group_overviews"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    group_id: Mapped[str] = mapped_column(ForeignKey("repo_groups.id", ondelete="CASCADE"), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(12), default="extractive")  # llm | extractive
+    model: Mapped[str] = mapped_column(String(100), default="")
+    repo_ids: Mapped[list] = mapped_column(
+        JSON, default=list
+    )  # what it was built from; shown only to those who see all
+    unsupported_names: Mapped[list] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

@@ -284,6 +284,52 @@ never started and nothing showed it, whereas now it would show as `late`. `GET /
 by status, the last completed quality run and a list of plain-language problems; Insights shows it as "RepoLens health". A useful alert is
 `time() - repolens_job_last_success_timestamp_seconds > 2 * <interval>`, or `increase(repolens_job_failures_total[1h]) > 0`.
 
+## Systems: repositories analysed together
+`services/groups.py`, `api/groups.py`, tables `repo_groups` and `group_overviews` (migration 0027), page `pages/Graph.tsx` with `SystemGraph.tsx`.
+A group is a saved list of up to 15 repository ids with a name, a description and `created_by`; it is shared in the workspace. Nothing about the
+picture is stored: `analyse(db, org, ids, days)` computes it when asked, from data that is already indexed.
+
+* **Links.** `_links` joins `kg_edges` to `kg_nodes` twice (source and destination) and keeps the edges whose two ends are in different chosen
+  repositories, except `CONTAINS`. They are aggregated per ordered pair (count, summed weight, count by relation) with the best `trust`
+  (`graph_insights.trust`: fact, inferred or uncertain) and up to three example edges per pair, strongest first, each with its evidence string.
+  Cross-repository edges are created by `graph.build_repo_graph` (a call to a name that exists in exactly one other repository, document mentions,
+  semantic similarity), so a repository must be indexed after the others it uses for the arrow to appear; the daily re-index repairs that.
+* **Strong, URL and name-only.** A cross-repository edge below weight 0.8 is a call matched by name alone (`graph.build_repo_graph` adds one when
+  a name exists in exactly one other repository); it is counted as `weak`, the pair's trust stays `uncertain`, and it is left out of the code graph
+  unless `weak=true`. `_http_links` adds a third kind that is not stored in the graph: for every function, method or class chunk, quoted strings are
+  searched for URL paths and compared with the route inventory (`routes.parse` of each repository's `routes` chunks) by full path and by tail, so a
+  caller that leaves out a gateway prefix still matches. A route counts only with two fixed words of three or more letters (or one of eight), and files
+  under docs, examples, tutorials, scripts or tests are skipped on both sides. The result is cached per set of repositories and index versions. The
+  edge runs from the function holding the URL to the route's handler (`rel` `HTTP`, trust `inferred`, weight 0.7).
+* **Imports.** `_import_links` is the strongest proof and is not stored in the graph either. `_packages` lists what each repository offers: the top
+  directories of its Python packages (a directory with `__init__.py` whose parent has none, outside docs, examples and tests) and each `package.json`
+  `name`. Every function, method and class chunk of the other repositories carries its file's import statements (`CodeChunk.imports`, kept on
+  definitions only) and the names it calls (`calls`); `parse_imports` reads those and keeps the ones that name another repository's package. For
+  `from userlib import get_user` the `_Resolver` looks for `get_user` defined in `userlib/__init__.py`, and when that file only re-exports it
+  (`from .core import get_user as get_user`, read from the file's own text and import lines) follows the re-export up to three files deep to the
+  definition (`fact`). A name the package takes from a third package (`from starlette.responses import Response`) is dropped, since it is not defined in
+  the repository; one found only somewhere under the package directory is `inferred`. An edge runs from the function that calls the name to the
+  definition (`rel` `USES`), or from the file when only the import exists (`IMPORTS`); `import userlib` then `userlib.get_user()` links through the call
+  name and is `inferred`. At most four calling functions are drawn per definition and the rest are counted in the first edge's evidence. A proved edge
+  replaces a name-matched `CALLS` edge between the same two nodes. In `_links` imports count in `imports` and make the pair `fact`.
+* **Code graph.** `GET /api/groups/code-graph` returns what the knowledge-graph view draws (`node_dict`, `edge_dict`): the nodes at both ends of up
+  to 60 cross-repository links (imports first, then HTTP, then calls the graph states), the file or class that contains each, and up to two callers or callees in the same
+  repository, at most 150 nodes. `src` and `dst` narrow it to one direction of one pair. The page draws it with `ForceGraph`, which already puts
+  each repository in its own area and bridges between them.
+* **Change together.** `_coupling` reads commits in the window: a ticket key (`[A-Z][A-Z0-9]+-\d+`) in messages of two repositories is weighted three,
+  the same author changing two repositories on one day is weighted one; bot authors (`ownership.BOT`) are skipped.
+* **Heat.** `_risk` counts commits, changed lines, fix commits (the same words `/api/graph/heat` uses) and open drift alerts per repository;
+  `_heat` scales each to 0..1 on a log scale across the chosen repositories.
+* **Overview.** `facts()` renders the analysis as plain lines; `generate` shows the model only those lines (`SYSTEM` forbids other names), flags
+  paths, routes and functions in the answer that are not in the facts (`unsupported`, a string comparison, no database), and stores the result in
+  `group_overviews` with `created_by`, the model, and the repository ids it was built from. A failed model call raises 502 with the reason and
+  stores nothing; with no model the facts are stored under a label saying so. The newest ten per system are kept.
+* **Access.** A group's response lists only repositories in the caller's `Scope` and counts the rest; analysis runs on the visible ones only; an
+  overview is returned only when `scope.can_all(overview.repo_ids)`, re-checked on every read like investigations. Unknown and invisible
+  repository ids are the same 404. Writes go through `authorize` (`group.write`, `group.overview`, both member); changing or deleting a group needs
+  its author or an admin. `purge_repository` calls `forget_repo`, which removes the repository from its groups (deleting a group left empty) and
+  deletes overviews written from it. `POST /api/groups/{id}/overview` is in the heavy-call rate limit.
+
 ## Graph insights
 **Worlds.** `ForceGraph.layout` groups nodes by repository (`repoGroups`). With two or more, `placeWorlds` puts the repositories on a wide ring and
 relaxes their centres: they never overlap, and repositories with links between them are pulled to just beyond touching, in proportion to the number

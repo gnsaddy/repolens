@@ -330,3 +330,12 @@ export interface GoldenOverview {
   questions: GoldenQuestion[]; runs: GoldenRunRow[]; latest: GoldenRunRow | null; active: GoldenRunRow | null; max_full: number;
   compare: { delta: number | null; broke: string[]; fixed: string[] }; changed: string[];
 }
+
+export interface SystemGroup { id: string; name: string; description: string; repo_ids: string[]; hidden: number; created_by: string; created_by_name: string; created_at: string; updated_at: string }
+export interface SystemRepo { id: string; name: string; source: string; status: string; files: number; chunks: number; risk: SystemRisk; heat: SystemRisk }
+export interface SystemRisk { commits: number; lines: number; fixes: number; drift_open: number }
+export interface CodeGraph { nodes: GraphNode[]; edges: GraphEdge[]; available: { strong: number; weak: number }; shown_weak: boolean; truncated: boolean }
+export interface SystemLink { src: string; dst: string; count: number; strong: number; http: number; imports: number; weak: number; strength: number; rels: Record<string, number>; trust: "fact" | "inferred" | "uncertain"; examples: { rel: string; from: string; to: string; evidence: string }[] }
+export interface SystemCoupling { a: string; b: string; tickets: number; ticket_examples: string[]; days: number; score: number }
+export interface SystemAnalysis { window_days: number; repos: SystemRepo[]; links: SystemLink[]; coupling: SystemCoupling[]; estimate_tokens: number }
+export interface SystemOverview { id: string; content: string; mode: "llm" | "extractive"; model: string; unsupported_names: string[]; created_by: string; created_by_name: string; created_at: string; repositories: number; partial: boolean }

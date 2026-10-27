@@ -11,7 +11,7 @@ export const communityColor = (c: number | null | undefined) => (c == null ? "#c
 export const trustDash = (t?: string) => (t === "inferred" ? "5 3" : t === "uncertain" ? "1.5 3" : undefined);
 export const REL_COLORS: Record<string, string> = {
   CALLS: "#4f46e5", IMPORTS: "#64748b", MENTIONS: "#0ea5e9", LINKS_TO: "#06b6d4", TESTS: "#10b981",
-  MODIFIES: "#f59e0b", RELATED_TO: "#ec4899", CONTAINS: "#cbd5e1", INCLUDES: "#10b981",
+  MODIFIES: "#f59e0b", RELATED_TO: "#ec4899", CONTAINS: "#cbd5e1", INCLUDES: "#10b981", HTTP: "#0d9488", USES: "#c026d3",
 };
 
 /** blue (cold) -> yellow -> red (hot) */
@@ -22,7 +22,7 @@ export function heatColor(t: number): string {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 export const HEAT_GRADIENT = "linear-gradient(90deg, rgb(59,130,246), rgb(250,204,21), rgb(239,68,68))";
-const DIRECTED = new Set(["CALLS", "IMPORTS", "TESTS", "MENTIONS", "LINKS_TO", "MODIFIES", "INCLUDES"]);
+const DIRECTED = new Set(["CALLS", "IMPORTS", "TESTS", "MENTIONS", "LINKS_TO", "MODIFIES", "INCLUDES", "HTTP", "USES"]);
 
 interface P { x: number; y: number; vx: number; vy: number }
 const W = 900, H = 600;

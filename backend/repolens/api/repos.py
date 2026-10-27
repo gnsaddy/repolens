@@ -13,7 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, IndexRun, RepoAccess, Repository, User
 from ..schemas import AccessIn, RepoCreate, RepoOut, StorageCleanup
 from ..security import redact_stored
-from ..services import checkouts, gitops, golden, index_jobs, retrieval
+from ..services import checkouts, gitops, golden, groups, index_jobs, retrieval
 from ..services.access import scope_for
 from ..services.indexer import clone_auth_for, index_repository
 from ..services.links import has_embedded_credentials
@@ -198,6 +198,7 @@ def purge_repository(db: Session, repo: Repository) -> None:
         if "repo_id" in table.c and table.name != "repositories":
             db.execute(table.delete().where(table.c.repo_id == repo.id))
     checkouts.remove_if_unshared(db, repo)
+    groups.forget_repo(db, repo.org_id, repo.id)
     db.delete(repo)
     db.commit()
 
