@@ -16,7 +16,7 @@ from it with citations while keeping model cost low: several models are routed b
 answered from a local memory, and retrieved context is condensed before it reaches a model. Nothing needs a model to work;
 connecting one only improves the wording.
 
-**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
+**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **Graph** (how repositories depend on each other, with the proof), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
 Investigation View (root cause, confidence, timeline, code/commit/doc/test/PR evidence, report, human review), **Change
 Risk** (score a commit, branch or PR with signals, blast radius and tests to run), Token Usage & Cost, Jira, Settings (LLM
 provider + key, GitHub sign-in).
@@ -57,6 +57,7 @@ Everything left of the model router runs on your own machine without calling any
 * **Answer memory**: earlier answers to similar questions are shown first and reused when the sources have not changed.
 * **DeepMind Wiki**: search by meaning, edit pages in place, a per-repository code atlas, and an at-a-glance card (kind, owner, warnings, commands) for every page.
 * **Ask (chat)**: a private chat over your repositories and documents with history, scope, editing, archiving, and a `.txt`/`.log` attachment for debugging; answers cite their sources; a **Gaps** tab lists the questions it could not answer, with a one-click starter page.
+* **Graph**: pick repositories, or save them as a named system, and see how they depend on each other. Every link carries its proof: the import line (followed to the class or function it names in the other repository) or the URL that matches a route the other one serves; calls matched by a name alone are hidden by default. Click a class or function for what breaks if it changes and who to ask, see what other repositories use from one repository, see which dependencies appeared or went away, and ask a question that is answered only from the repositories you chose.
 * **Measure it on your repo**: tests how often RepoLens finds the files behind your own past bug fixes, on your machine, with a confidence range.
 * **Suggested fixes**: a drafted patch for a confirmed cause that a person approves before a draft pull request is opened; never merged.
 * **Editor and CI**: an MCP server for Claude Code, Cursor and others, and a GitHub Action that comments change risk on every pull request.
