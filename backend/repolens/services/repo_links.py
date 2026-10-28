@@ -19,11 +19,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import Change, CodeChunk, KGEdge, KGNode, LinkState, RepoLink, Repository
+from ..security import redact_stored
+from . import identifiers, manifests
 from . import routes as routes_svc
 from .access import Scope
 
@@ -39,6 +41,20 @@ _PARAM = re.compile(r"\$\{[^}]*\}|\{[^}]*\}|<[^>]*>|:\w+")
 _EXAMPLE = re.compile(
     r"(^|/)(docs?|docs_src|examples?|samples?|tutorials?|fixtures?|vendor|third_party|scripts)(/|$)", re.I
 )
+
+
+def _symbol_nodes(db: Session, chunk_ids: list[str]) -> dict[str, str]:
+    """The function, method or class node of each chunk. A file's node is registered with the id of its first chunk, so
+    one chunk id can belong to two nodes (the file and the function that opens it); only the symbol is the caller."""
+    out: dict[str, str] = {}
+    wanted = list(dict.fromkeys(chunk_ids))
+    for i in range(0, len(wanted), 400):
+        for chunk, node in db.execute(
+            select(KGNode.chunk_id, KGNode.id).where(KGNode.chunk_id.in_(wanted[i : i + 400]), KGNode.type.in_(SYMBOLS))
+        ):
+            if chunk:
+                out[chunk] = node
+    return out
 
 
 def _norm(path: str) -> str:
@@ -98,8 +114,7 @@ def _http_links(db: Session, ids: list[str]) -> list[dict]:
                             break
             if len(callers) >= MAX_HTTP:
                 break
-        node_rows = db.execute(select(KGNode.chunk_id, KGNode.id).where(KGNode.chunk_id.in_([c[0] for c in callers])))
-        by_chunk = {chunk: node for chunk, node in node_rows}
+        by_chunk = _symbol_nodes(db, [c[0] for c in callers])
         for cid, repo_id, file, sym, run, (dst_repo, dst_file, route) in callers:
             target = db.scalar(
                 select(KGNode.id)
@@ -395,17 +410,7 @@ def _scan_imports(db: Session, ids: list[str], pkgs: dict[str, list[tuple[str, s
         if len(uses) >= 5000:
             break
     chunk_ids = list({u["chunk"] for u in uses.values()})
-    nodes: dict[str, str] = {}
-    for i in range(0, len(chunk_ids), 400):
-        nodes.update(
-            {
-                c: n
-                for c, n in db.execute(
-                    select(KGNode.chunk_id, KGNode.id).where(KGNode.chunk_id.in_(chunk_ids[i : i + 400]))
-                )
-                if c
-            }
-        )
+    nodes = _symbol_nodes(db, chunk_ids)
     by_dst: dict[str, list[dict]] = defaultdict(list)
     for u in uses.values():
         if u["chunk"] in nodes:
@@ -499,7 +504,7 @@ CODE_EXT = {  # by file extension, because the parser files most languages under
 }
 # Change this whenever a detector finds links differently or coverage changes shape: stored links are then worked out
 # again even though no repository was indexed (the same idea as `answer_memory.PIPELINE`).
-DETECTION_VERSION = "d2"
+DETECTION_VERSION = "d4"
 KEEP_GONE_DAYS = 180  # a link that disappeared stays listed as removed this long
 SYMBOLS = ("function", "method", "class")
 
@@ -527,6 +532,7 @@ class Detector:
 
     name = ""
     kind = ""
+    kinds: tuple[str, ...] = ()  # the kinds of link it stores, when it stores more than one
     languages: tuple[str, ...] = ()
 
     def detect(self, db: Session, ids: list[str]) -> tuple[list[Link], dict[str, dict]]:
@@ -599,20 +605,329 @@ class HttpDetector(Detector):
         return links, info
 
 
-DETECTORS: list[Detector] = [ImportDetector(), HttpDetector()]
+class ManifestDetector(Detector):
+    """A repository's manifest says it needs a package that another repository's manifest says it is: the declared
+    dependency, the same in every ecosystem. It is the cheapest proof there is, and it also shows the gaps between what
+    is declared and what is used."""
+
+    name = "manifests"
+    kind = "manifest"
+
+    def detect(self, db: Session, ids: list[str]) -> tuple[list[Link], dict[str, dict]]:
+        texts = _manifest_texts(db, ids)
+        parsed = {key: manifests.parse(key[1], text) for key, text in texts.items()}
+        info: dict[str, dict] = {}
+        offered: dict[tuple[str, str], list[tuple[str, str, str]]] = defaultdict(
+            list
+        )  # package -> where it is declared
+        for (repo, path), m in parsed.items():
+            info.setdefault(repo, {}).setdefault("manifests", []).append(
+                {
+                    "file": path,
+                    "ecosystem": m.eco,
+                    "provides": [n for n, _ in m.provides],
+                    "requires": len(m.requires),
+                    "error": m.error,
+                }
+            )
+            for pname, _line in m.provides:
+                offered[(m.eco, manifests.norm(m.eco, pname))].append((repo, path, pname))
+        if len(ids) < 2 or not offered:
+            return [], info
+        nodes: dict[tuple[str, str], str] = {}
+        paths = sorted({p for _, p in texts})
+        for i in range(0, len(paths), 400):
+            for repo, path, nid in db.execute(
+                select(KGNode.repo_id, KGNode.path, KGNode.id).where(
+                    KGNode.repo_id.in_(ids), KGNode.type == "file", KGNode.path.in_(paths[i : i + 400])
+                )
+            ):
+                nodes[(repo, path)] = nid
+        found: dict[tuple[str, str], dict] = {}
+        for (repo, path), m in parsed.items():
+            for req in m.requires:
+                for b_repo, b_path, b_name in offered.get((m.eco, manifests.norm(m.eco, req.name)), []):
+                    src, dst = nodes.get((repo, path)), nodes.get((b_repo, b_path))
+                    if b_repo == repo or not src or not dst:
+                        continue
+                    spec = f" {req.spec}" if req.spec else ""
+                    ev = (
+                        f"{path}:{req.line or 1} requires {req.name}{spec} ({req.scope}); "
+                        f"{b_path} names the package {b_name}"
+                    )
+                    entry = found.setdefault(
+                        (src, dst),
+                        {
+                            "repo": (repo, b_repo),
+                            "label": (f"{path}:{req.name}", f"{b_path}:{b_name}"),
+                            "ev": ev,
+                            "n": 0,
+                        },
+                    )
+                    entry["n"] += 1
+        links = [
+            Link(
+                "manifest",
+                "DECLARES",
+                "declared",
+                "fact",
+                1.0,
+                e["repo"][0],
+                e["repo"][1],
+                src,
+                dst,
+                e["label"][0],
+                e["label"][1],
+                e["ev"],
+                e["n"] - 1,
+            )
+            for (src, dst), e in found.items()
+        ]
+        return links, info
+
+
+def _manifest_texts(db: Session, ids: list[str]) -> dict[tuple[str, str], str]:
+    """Each manifest file's text, put back together from its chunks line by line. Manifests in tests, examples and
+    vendored folders describe fixtures, not the repository, and are skipped."""
+    likes = [CodeChunk.file_path.like(f"%{n}%") for n in MANIFEST_LIKE]
+    lines: dict[tuple[str, str], dict[int, str]] = defaultdict(dict)
+    for repo, path, start, content in db.execute(
+        select(CodeChunk.repo_id, CodeChunk.file_path, CodeChunk.start_line, CodeChunk.content).where(
+            CodeChunk.repo_id.in_(ids), CodeChunk.chunk_type != "pr", or_(*likes)
+        )
+    ):
+        if manifests.is_manifest(path) and not (_EXAMPLE.search(path) or routes_svc.TESTISH.search(path)):
+            for n, text in enumerate(content.split("\n"), start):
+                lines[(repo, path)][n] = text
+    return {key: "\n".join(v[n] for n in sorted(v)) for key, v in lines.items()}
+
+
+IDENT_KINDS = identifiers.KINDS
+# kind of name -> (how sure a match is, how the link reads: the source ... the destination)
+IDENT_MAP = {
+    "repo_ref": ("fact", "REFERENCES"),  # a module, a workflow or a script points at the repository
+    "image": ("fact", "DEPLOYS"),  # a manifest runs the image the other repository builds
+    "host": ("inferred", "CONNECTS"),  # a URL calls the service the other repository defines
+    "queue": ("inferred", "USES_QUEUE"),  # code uses the queue, topic or bucket the other repository creates
+    "env": ("uncertain", "CONFIGURED"),  # code reads a variable the other repository sets
+}
+IDENT_WEIGHT = {"fact": 1.0, "inferred": 0.7, "uncertain": 0.4}
+MAX_SHARED_DEFINERS = 3  # a name defined in more repositories than this says nothing about which one is meant
+MAX_PAIRS_PER_KIND = 6  # file pairs kept for one pair of repositories and one kind of name; the rest are counted
+_SAYS_REFER = {
+    "repo_ref": "refers to the repository {v}",
+    "image": "uses the image {v}",
+    "host": "connects to {v}",
+    "queue": "uses {v}",
+    "env": "reads {v}",
+}
+_SAYS_DEFINE = {
+    "repo_ref": "is that repository",
+    "image": "builds that image",
+    "host": "defines that service",
+    "queue": "creates it",
+    "env": "sets it",
+}
+_ANCHORS = ("readme.md", "readme.rst", "readme", "pyproject.toml", "package.json", "go.mod", "cargo.toml", "pom.xml")
+
+
+class IdentifierDetector(Detector):
+    """The names that tie repositories together without an import: an image one builds and another deploys, a service
+    and the URL that calls it, a queue Terraform creates and the code that uses it, a variable one sets and another
+    reads, a
+    repository a module or a script points at. One rule for all of them: one repository defines the name, another refers
+    to it. Infrastructure, pipelines, scripts and configuration are read; so is application code, but only for the names
+    some repository defines."""
+
+    name = "infrastructure"
+    kind = "ident"
+    kinds = IDENT_KINDS
+
+    def detect(self, db: Session, ids: list[str]) -> tuple[list[Link], dict[str, dict]]:
+        texts = _infra_texts(db, ids)
+        defs: dict[tuple[str, str], list[tuple[str, str, int, str]]] = defaultdict(list)  # name -> where it is defined
+        refs: dict[tuple[str, str], list[tuple[str, str, int, str]]] = defaultdict(list)
+        read: dict[str, int] = defaultdict(int)
+        for (repo, path), text in texts.items():
+            read[repo] += 1
+            for i in identifiers.extract(path, text):
+                (defs if i.role == "defines" else refs)[(i.kind, i.value)].append((repo, path, i.line, i.note))
+        repos = {r.id: r for r in db.scalars(select(Repository).where(Repository.id.in_(ids)))}
+        for rid, r in repos.items():  # a repository is its own address
+            for url in (r.url, r.web_url):
+                if key := identifiers.norm_repo(url or ""):
+                    defs[("repo_ref", key)].append((rid, "", 0, "the repository itself"))
+        info = {repo: {"infra_files": n} for repo, n in read.items()}
+        if len(ids) < 2 or not defs:
+            return [], info
+        queues = {v for (k, v) in defs if k == "queue"}
+        hosts = {v for (k, v) in defs if k == "host"}
+        want_env = any(k == "env" for k, _ in defs)
+        if queues or hosts or want_env:
+            for repo, path, start, content in _code_chunks(db, ids):
+                for i in identifiers.code_refs(content, queues, hosts, want_env):
+                    refs[(i.kind, i.value)].append((repo, path, start + i.line - 1, i.note))
+        return self._join(db, ids, repos, defs, refs), info
+
+    def _join(self, db, ids, repos, defs, refs) -> list[Link]:  # type: ignore[no-untyped-def]
+        grouped: dict[tuple[str, str, str], dict[tuple[str, str], dict]] = defaultdict(dict)
+        for (kind, value), referrers in refs.items():
+            definers = defs.get((kind, value), [])
+            if not definers or len({d[0] for d in definers}) > MAX_SHARED_DEFINERS:
+                continue
+            for rrepo, rpath, rline, rnote in referrers:
+                for drepo, dpath, dline, dnote in definers:
+                    if rrepo == drepo:
+                        continue
+                    pair = grouped[(kind, rrepo, drepo)]
+                    entry = pair.setdefault(
+                        (rpath, dpath),
+                        {"value": value, "r": (rpath, rline, rnote), "d": (dpath, dline, dnote), "n": 0},
+                    )
+                    entry["n"] += 1
+        wanted = {(rrepo, e["r"][0]) for (_, rrepo, _), p in grouped.items() for e in p.values()}
+        wanted |= {(drepo, e["d"][0]) for (_, _, drepo), p in grouped.items() for e in p.values() if e["d"][0]}
+        nodes = _file_nodes(db, ids, wanted)
+        anchors = _anchors(db, {drepo for (_, _, drepo), p in grouped.items() for e in p.values() if not e["d"][0]})
+        links: list[Link] = []
+        for (kind, rrepo, drepo), pair in grouped.items():
+            trust, rel = IDENT_MAP[kind]
+            ordered = sorted(pair.items(), key=lambda kv: (kv[0][0], kv[0][1]))
+            for n, ((rpath, dpath), e) in enumerate(ordered[:MAX_PAIRS_PER_KIND]):
+                src = nodes.get((rrepo, rpath))
+                dpath_real, dst = (dpath, nodes.get((drepo, dpath))) if dpath else anchors.get(drepo, ("", None))
+                if not src or not dst:
+                    continue
+                v, (rp, rl, rnote), (dp, dl, dnote) = e["value"], e["r"], e["d"]
+                where_d = f"{dp}:{dl}" if dp else dpath_real or repos[drepo].name
+                ev = f"{rp}:{rl} ({rnote}) {_SAYS_REFER[kind].format(v=v)}; {where_d} ({dnote}) {_SAYS_DEFINE[kind]}"
+                more = e["n"] - 1 + (len(ordered) - MAX_PAIRS_PER_KIND if n == 0 else 0)
+                links.append(
+                    Link(
+                        kind,
+                        rel,
+                        "named",
+                        trust,
+                        IDENT_WEIGHT[trust],
+                        rrepo,
+                        drepo,
+                        src,
+                        dst,
+                        f"{rpath}:{v}",
+                        f"{dpath_real}:{v}",
+                        redact_stored(ev)[0],
+                        max(0, more),
+                    )
+                )
+        return links
+
+
+def _infra_texts(db: Session, ids: list[str]) -> dict[tuple[str, str], str]:
+    """Each infrastructure, pipeline, script or configuration file, put back together from its chunks."""
+    lines: dict[tuple[str, str], dict[int, str]] = defaultdict(dict)
+    for repo, path, start, content in db.execute(
+        select(CodeChunk.repo_id, CodeChunk.file_path, CodeChunk.start_line, CodeChunk.content).where(
+            CodeChunk.repo_id.in_(ids),
+            CodeChunk.chunk_type != "pr",
+            CodeChunk.language.in_(("config", "text")),
+        )
+    ):
+        if identifiers.classify(path) and not (_EXAMPLE.search(path) or routes_svc.TESTISH.search(path)):
+            for n, text in enumerate(content.split("\n"), start):
+                lines[(repo, path)][n] = text
+    return {key: "\n".join(v[n] for n in sorted(v)) for key, v in lines.items()}
+
+
+def _code_chunks(db: Session, ids: list[str]):  # type: ignore[no-untyped-def]
+    """Application code, a function at a time, for the references that only code can make."""
+    rows = db.execute(
+        select(CodeChunk.repo_id, CodeChunk.file_path, CodeChunk.start_line, CodeChunk.content)
+        .where(CodeChunk.repo_id.in_(ids), CodeChunk.chunk_type.in_(SYMBOLS))
+        .execution_options(yield_per=500)
+    )
+    for repo, path, start, content in rows:
+        if not (_EXAMPLE.search(path) or routes_svc.TESTISH.search(path)):
+            yield repo, path, start, content
+
+
+def _file_nodes(db: Session, ids: list[str], wanted: set[tuple[str, str]]) -> dict[tuple[str, str], str]:
+    out: dict[tuple[str, str], str] = {}
+    paths = sorted({p for _, p in wanted})
+    for i in range(0, len(paths), 400):
+        for repo, path, nid in db.execute(
+            select(KGNode.repo_id, KGNode.path, KGNode.id).where(
+                KGNode.repo_id.in_(ids), KGNode.type == "file", KGNode.path.in_(paths[i : i + 400])
+            )
+        ):
+            if (repo, path) in wanted:
+                out[(repo, path)] = nid
+    return out
+
+
+def _anchors(db: Session, repos: set[str]) -> dict[str, tuple[str, str]]:
+    """For a link to a whole repository: one file that stands for it (its README or manifest, else its first file)."""
+    out: dict[str, tuple[str, str]] = {}
+    for repo in repos:
+        files = db.execute(
+            select(KGNode.path, KGNode.id)
+            .where(KGNode.repo_id == repo, KGNode.type == "file")
+            .order_by(KGNode.path)
+            .limit(3000)
+        ).all()
+        if not files:
+            continue
+        best = min(files, key=lambda f: (posixpath.basename(f.path).lower() not in _ANCHORS, f.path.count("/"), f.path))
+        out[repo] = (best.path, best.id)
+    return out
+
+
+MANIFEST_LIKE = (
+    "pyproject.toml",
+    "requirements",
+    "package.json",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "cargo.toml",
+    "gemfile",
+    ".gemspec",
+    "composer.json",
+    ".csproj",
+)
+DETECTORS: list[Detector] = [ImportDetector(), HttpDetector(), ManifestDetector(), IdentifierDetector()]
+
+
+INFRA_CLASSES = ("dockerfile", "ci", "compose", "terraform", "shell", "yaml")
+
+
+def _role(code: int, infra: int) -> str:
+    """What a repository mostly is, from its files: infrastructure (pipelines, manifests, Terraform, scripts) or app."""
+    if infra >= 5 and infra >= 2 * code:
+        return "infrastructure"
+    return "application" if code else ""
 
 
 def _coverage(db: Session, ids: list[str], infos: dict[str, dict[str, dict]]) -> dict[str, dict]:
     """Per repository: the languages found, which detectors cannot read them, what it offers other repositories."""
     langs: dict[str, dict[str, int]] = defaultdict(dict)
+    code_files: dict[str, int] = defaultdict(int)
+    infra_files: dict[str, int] = defaultdict(int)
     for repo, path in db.execute(
         select(CodeChunk.repo_id, CodeChunk.file_path)
         .where(CodeChunk.repo_id.in_(ids), CodeChunk.chunk_type != "pr")
         .distinct()
     ):
+        path_lower = path.lower()
         lang = CODE_EXT.get(posixpath.splitext(path)[1].lower())
         if lang and not (_EXAMPLE.search(path) or routes_svc.TESTISH.search(path)):
             langs[repo][lang] = langs[repo].get(lang, 0) + 1
+            code_files[repo] += 1
+        elif (
+            identifiers.classify(path) in INFRA_CLASSES
+            and not routes_svc.TESTISH.search(path)
+            and ".github/" not in path_lower
+        ):
+            infra_files[repo] += 1
     out: dict[str, dict] = {}
     for repo in ids:
         mine = langs.get(repo, {})
@@ -625,7 +940,10 @@ def _coverage(db: Session, ids: list[str], infos: dict[str, dict[str, dict]]) ->
                 for lang, n in sorted(mine.items(), key=lambda kv: -kv[1])
                 if lang not in d.languages
             ],
+            "role": _role(code_files.get(repo, 0), infra_files.get(repo, 0)),
+            "infrastructure": infos.get("infrastructure", {}).get(repo, {}),
             "provides": sorted(infos.get("imports", {}).get(repo, {}).get("provides", [])),
+            "manifests": infos.get("manifests", {}).get(repo, {}).get("manifests", []),
             "route_files": infos.get("urls", {}).get(repo, {}).get("route_files", 0),
             "detectors": [d.name for d in DETECTORS],
         }
@@ -677,7 +995,7 @@ def refresh(db: Session, org: str, force: bool = False) -> LinkState:
                 links, info = d.detect(db, ids) if len(ids) > 1 else ([], {})
             except Exception:  # one finder failing must not wipe what the others know
                 log.exception("link detector %s failed", d.name)
-                failed.add(d.kind)
+                failed.update(d.kinds or (d.kind,))
                 continue
             found += links
             infos[d.name] = info
@@ -753,18 +1071,20 @@ def _store(db: Session, org: str, found: list[Link], now: datetime, failed: set[
     return created, removed
 
 
-def rows(db: Session, org: str, ids: list[str], kind: str) -> list[dict]:
-    """The stored links of one kind between the given repositories, in the shape the graph code uses."""
+def rows(db: Session, org: str, ids: list[str], kind: str | tuple[str, ...]) -> list[dict]:
+    """The stored links of one kind (or of several) between the given repositories, in the shape the graph code uses."""
     refresh(db, org)
+    kinds = (kind,) if isinstance(kind, str) else kind
     q = select(RepoLink).where(
         RepoLink.org_id == org,
-        RepoLink.kind == kind,
+        RepoLink.kind.in_(kinds),
         RepoLink.gone_at.is_(None),
         RepoLink.src_repo_id.in_(ids),
         RepoLink.dst_repo_id.in_(ids),
     )
     return [
         {
+            "kind": r.kind,
             "rel": r.rel,
             "src": r.src_node_id,
             "dst": r.dst_node_id,
@@ -966,7 +1286,8 @@ def surface(db: Session, org: str, scope: Scope, repo_id: str) -> dict | None:
     seen = [r for r in found if scope.can(r.src_repo_id)]
     grouped: dict[str, list[RepoLink]] = defaultdict(list)
     for r in seen:
-        grouped[r.dst_node_id].append(r)
+        if r.kind in ("import", "http"):  # other links end at a file, not at a class or a function
+            grouped[r.dst_node_id].append(r)
     nodes = nodes_by_id(db, set(grouped))
     symbols: list[dict[str, Any]] = []
     for nid, rs in grouped.items():
@@ -1009,6 +1330,16 @@ def surface(db: Session, org: str, scope: Scope, repo_id: str) -> dict | None:
         "repo": {"id": repo.id, "name": repo.name},
         "symbols": symbols[:100],
         "dependants": sorted({names.get(r.src_repo_id, "") for r in seen}),
+        "declared_by": [
+            {"repo": names.get(r.src_repo_id, ""), "file": r.src_label, "evidence": r.evidence}
+            for r in seen
+            if r.kind == "manifest"
+        ],
+        "linked_by": [  # repositories that point at this one by name: deploy it, call it, are configured by it
+            {"repo": names.get(r.src_repo_id, ""), "rel": r.rel, "file": r.src_label, "evidence": r.evidence}
+            for r in seen
+            if r.kind in IDENT_KINDS
+        ],
         "hidden": len(found) - len(seen),
         "exports": len(exports),
         "unused_exports": [

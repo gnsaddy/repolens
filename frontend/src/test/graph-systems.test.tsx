@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
-import type { AskResult, ChangePair, CodeGraph, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
+import type { AskResult, ChangePair, CodeGraph, GraphEdge, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
 import GraphPage from "@/pages/Graph";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(b === null ? null : JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
@@ -17,8 +17,8 @@ const repos = [{ id: "a", name: "orders-svc", source: "git" }, { id: "b", name: 
 const risk = (commits: number, fixes: number) => ({ commits, lines: commits * 10, fixes, drift_open: 0 });
 const analysis: SystemAnalysis = {
   window_days: 90, estimate_tokens: 1500,
-  repos: [{ id: "a", name: "orders-svc", source: "git", status: "ready", files: 3, chunks: 9, risk: risk(1, 0), heat: risk(0.5, 0) }, { id: "b", name: "pricing-svc", source: "git", status: "ready", files: 2, chunks: 6, risk: risk(2, 1), heat: risk(1, 1) }],
-  links: [{ src: "a", dst: "b", count: 3, strong: 2, http: 1, imports: 0, weak: 0, strength: 1.2, rels: { CALLS: 2, HTTP: 1 }, trust: "fact", examples: [{ rel: "CALLS", from: "orders-svc: orders/handlers.py", to: "pricing-svc: pricing/engine.py", evidence: "handle_order calls compute_total()" }] }],
+  repos: [{ id: "a", name: "orders-svc", source: "git", status: "ready", files: 3, role: "application", chunks: 9, risk: risk(1, 0), heat: risk(0.5, 0) }, { id: "b", name: "pricing-svc", source: "git", status: "ready", files: 2, role: "infrastructure", chunks: 6, risk: risk(2, 1), heat: risk(1, 1) }],
+  links: [{ src: "a", dst: "b", count: 3, strong: 2, http: 1, imports: 0, declared: 0, infra: 0, weak: 0, strength: 1.2, rels: { CALLS: 2, HTTP: 1 }, trust: "fact", examples: [{ rel: "CALLS", from: "orders-svc: orders/handlers.py", to: "pricing-svc: pricing/engine.py", evidence: "handle_order calls compute_total()" }] }],
   coupling: [{ a: "a", b: "b", tickets: 1, ticket_examples: ["ORD-7"], days: 2, score: 5 }],
   coverage: { a: { languages: { python: 4, go: 2 }, unread: [{ detector: "imports", language: "go", files: 2 }], provides: [], route_files: 0, detectors: ["imports", "urls"] }, b: { languages: { python: 3 }, unread: [], provides: ["pricing"], route_files: 1, detectors: ["imports", "urls"] } },
 };
@@ -45,7 +45,7 @@ const impact: Impact = {
 const surface: Surface = {
   repo: { id: "a", name: "orders-svc" },
   symbols: [{ id: "n4", name: "UserClient", type: "class", path: "userlib/core.py", uses: 5, repos: ["shop-app"], kinds: ["import"], trust: "fact" }],
-  dependants: ["shop-app"], hidden: 0, exports: 3, unused_exports: [{ name: "unused_helper", package: "userlib", path: "userlib/core.py" }], note: "Counts the repositories RepoLens has indexed.",
+  dependants: ["shop-app"], declared_by: [{ repo: "shop-app", file: "pyproject.toml:user-lib", evidence: "pyproject.toml:3 requires user-lib" }], linked_by: [{ repo: "platform-infra", rel: "DEPLOYS", file: "k8s/a.yaml:ghcr.io/acme/payments", evidence: "uses the image" }], hidden: 0, exports: 3, unused_exports: [{ name: "unused_helper", package: "userlib", path: "userlib/core.py" }], note: "Counts the repositories RepoLens has indexed.",
 };
 const pairOf = (n: number): ChangePair => ({ src: "a", dst: "b", from: "orders-svc", to: "pricing-svc", count: n, examples: [{ from: "orders/reports.py:report", to: "userlib/core.py:unused_helper", evidence: "report calls unused_helper, imported with `from userlib import unused_helper`", at: new Date().toISOString() }] });
 const changes: LinkChanges = { days: 7, tracking_since: new Date(Date.now() - 86400000).toISOString(), new: [pairOf(2)], removed: [pairOf(1)], computed_at: new Date().toISOString() };
@@ -58,14 +58,14 @@ const askResult: AskResult = {
   connections: [],
 };
 
-function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges; ask?: AskResult } = {}) {
+function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges; ask?: AskResult; analysis?: SystemAnalysis } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
     if (method !== "GET") calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
-    if (url.includes("/groups/analysis")) return json(analysis);
+    if (url.includes("/groups/analysis")) return json(opts.analysis ?? analysis);
     if (url.endsWith("/groups/ask")) return json(opts.ask ?? askResult);
     if (url.includes("/groups/impact")) return json(impact);
     if (url.includes("/groups/surface")) return json(surface);
@@ -234,6 +234,69 @@ describe("Graph: systems", () => {
     const ask = await screen.findByLabelText("Ask about these repositories");
     await userEvent.click(await within(ask).findByRole("button", { name: "show in graph" }));
     expect(await within(dep).findByLabelText("Selected code")).toHaveTextContent("fetch_quote");
+  });
+
+  it("says when a declared dependency is not used and when a used one is not declared", async () => {
+    const link = analysis.links[0];
+    open({ analysis: { ...analysis, links: [{ ...link, declared: 1, strong: 0, http: 0, imports: 0, declared_unused: true, undeclared: false }] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    await userEvent.click(await screen.findByRole("button", { name: /orders-svc depends on pricing-svc: 1 links/ }));
+    expect(await screen.findByText(/Declared in a manifest, but nothing was found using it/)).toBeInTheDocument();
+  });
+
+  it("flags a dependency that is used in the code but missing from the manifest", async () => {
+    const link = analysis.links[0];
+    open({ analysis: { ...analysis, links: [{ ...link, declared: 0, imports: 2, declared_unused: false, undeclared: true }] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    await userEvent.click(await screen.findByRole("button", { name: /orders-svc depends on pricing-svc: 5 links/ }));
+    expect(await screen.findByText(/Used in the code, but not declared in its manifest/)).toBeInTheDocument();
+  });
+
+  it("names who declares the package in the public surface", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    expect(await screen.findByLabelText("Public surface")).toHaveTextContent("Declared as a dependency by: shop-app (pyproject.toml:user-lib)");
+  });
+
+  it("shows which repositories are infrastructure and counts shared names as links", async () => {
+    const link = analysis.links[0];
+    open({ analysis: { ...analysis, links: [{ ...link, strong: 0, http: 0, imports: 0, infra: 2, rels: { DEPLOYS: 1, REFERENCES: 1 } }] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    expect(await screen.findByRole("button", { name: /orders-svc depends on pricing-svc: 2 links/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Repository pricing-svc" })).toHaveTextContent("infrastructure");
+    expect(screen.getByRole("button", { name: "Repository orders-svc" })).not.toHaveTextContent("infrastructure");
+  });
+
+  it("explains a link made by a shared name in words, and says a variable name is a guess", async () => {
+    const edges: GraphEdge[] = [
+      { id: "image:n1:n2", source: "n1", target: "n2", rel: "DEPLOYS", provenance: "name", trust: "fact", weight: 1, evidence: "k8s/a.yaml:3 (a manifest image) uses the image ghcr.io/acme/payments; build.yml:9 (a CI build or push step) builds that image" },
+      { id: "env:n3:n4", source: "n3", target: "n4", rel: "CONFIGURED", provenance: "name", trust: "uncertain", weight: 0.4, evidence: "app.py:2 (code that reads the variable) reads DB_URL; a.yaml:8 sets it" },
+    ];
+    open({ code: { ...codeGraph, edges: [...codeGraph.edges, ...edges] } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const card = await screen.findByLabelText("Code dependencies");
+    await userEvent.click(await within(card).findByRole("button", { name: "function checkout" }));
+    const guess = within(card).getByLabelText("Selected code");
+    expect(guess).toHaveTextContent("is configured by");
+    expect(guess).toHaveTextContent("the same variable name (a guess)");
+    expect(guess).toHaveTextContent("reads DB_URL");
+    await userEvent.click(within(card).getByRole("button", { name: "function fetch_quote" }));
+    const deploy = within(card).getByLabelText("Selected code");
+    expect(deploy).toHaveTextContent("deploys");
+    expect(deploy).toHaveTextContent("the same image name");
+    expect(deploy).toHaveTextContent("builds that image");
+  });
+
+  it("names who points at a repository by name in its public surface", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    expect(await screen.findByLabelText("Public surface")).toHaveTextContent("Pointed at by name from: platform-infra (deploys)");
   });
 
   it("keeps calls matched by name alone out of the picture until asked, and says why", async () => {

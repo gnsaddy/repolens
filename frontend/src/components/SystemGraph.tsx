@@ -38,12 +38,12 @@ export default function SystemGraph({ repos, links, metric, selected, onRepo, on
         const c = { x: (s.x + e.x) / 2 - uy * bend, y: (s.y + e.y) / 2 + ux * bend };
         const on = selected === l.src || selected === l.dst || selected === `${l.src}>${l.dst}`;
         return (
-          <g key={`${l.src}>${l.dst}`} role="button" tabIndex={0} aria-label={`${name.get(l.src)} depends on ${name.get(l.dst)}: ${l.strong + l.http + l.imports} links, ${l.weak} by name only, ${l.trust}`} className="cursor-pointer"
+          <g key={`${l.src}>${l.dst}`} role="button" tabIndex={0} aria-label={`${name.get(l.src)} depends on ${name.get(l.dst)}: ${l.strong + l.http + l.imports + l.declared + l.infra} links, ${l.weak} by name only, ${l.trust}`} className="cursor-pointer"
             onClick={() => onLink(l)} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") onLink(l); }}>
             <path d={`M${s.x},${s.y} Q${c.x},${c.y} ${e.x},${e.y}`} fill="none" stroke="transparent" strokeWidth={14} />
-            <path d={`M${s.x},${s.y} Q${c.x},${c.y} ${e.x},${e.y}`} fill="none" stroke={TRUST_COLOR[l.trust]} strokeWidth={1.2 + Math.min(5, Math.log2(l.strong + l.http + l.imports + 1))}
+            <path d={`M${s.x},${s.y} Q${c.x},${c.y} ${e.x},${e.y}`} fill="none" stroke={TRUST_COLOR[l.trust]} strokeWidth={1.2 + Math.min(5, Math.log2(l.strong + l.http + l.imports + l.declared + l.infra + 1))}
               strokeDasharray={l.trust === "fact" ? undefined : "6 4"} opacity={selected && !on ? 0.2 : 0.9} markerEnd={`url(#arrow-${l.trust})`} />
-            <text x={c.x / 2 + (s.x + e.x) / 4} y={c.y / 2 + (s.y + e.y) / 4 - 4} textAnchor="middle" fontSize="10" fill="currentColor" className="text-muted">{l.strong + l.http + l.imports > 0 ? l.strong + l.http + l.imports : `~${l.weak}`}</text>
+            <text x={c.x / 2 + (s.x + e.x) / 4} y={c.y / 2 + (s.y + e.y) / 4 - 4} textAnchor="middle" fontSize="10" fill="currentColor" className="text-muted">{l.strong + l.http + l.imports + l.declared + l.infra > 0 ? l.strong + l.http + l.imports + l.declared + l.infra : `~${l.weak}`}</text>
           </g>);
       })}
       {repos.map((r) => {
@@ -52,9 +52,10 @@ export default function SystemGraph({ repos, links, metric, selected, onRepo, on
         return (
           <g key={r.id} role="button" tabIndex={0} aria-label={`Repository ${r.name}`} aria-pressed={selected === r.id} className="cursor-pointer" opacity={selected && !linked(r.id) ? 0.35 : 1}
             onClick={() => onRepo(r.id)} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") onRepo(r.id); }}>
-            <circle cx={p.x} cy={p.y} r={NODE} fill={metric === "none" ? (r.source === "docs" ? "#e0f2fe" : "#eef2ff") : heatColor(h)} stroke={selected === r.id ? "#4f46e5" : "#94a3b8"} strokeWidth={selected === r.id ? 3 : 1.5} />
+            <circle cx={p.x} cy={p.y} r={NODE} fill={metric === "none" ? (r.source === "docs" ? "#e0f2fe" : r.role === "infrastructure" ? "#ccfbf1" : "#eef2ff") : heatColor(h)} stroke={selected === r.id ? "#4f46e5" : "#94a3b8"} strokeWidth={selected === r.id ? 3 : 1.5} />
             <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#334155">{r.name.slice(0, 2).toUpperCase()}</text>
             <text x={p.x} y={p.y + NODE + 14} textAnchor="middle" fontSize="11" fill="currentColor">{clip(r.name)}</text>
+            {r.role === "infrastructure" && <text x={p.x} y={p.y + NODE + 26} textAnchor="middle" fontSize="9" fill="#0f766e">infrastructure</text>}
           </g>);
       })}
     </svg>

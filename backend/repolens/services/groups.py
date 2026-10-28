@@ -42,6 +42,12 @@ STRONG = (
 )
 REL_WORD = {
     "USES": "uses what it imports from",
+    "DECLARES": "declares a dependency on",
+    "REFERENCES": "refers to the repository of",
+    "DEPLOYS": "deploys",
+    "CONNECTS": "connects to a service of",
+    "USES_QUEUE": "uses a queue or topic of",
+    "CONFIGURED": "is configured by",
     "HTTP": "calls over HTTP",
     "CALLS": "calls",
     "IMPORTS": "imports",
@@ -72,6 +78,8 @@ def _pair(pairs: dict, a: str, b: str) -> dict:
             "dst": b,
             "count": 0,
             "strong": 0,  # edges the code states (a call resolved through an import, a document link)
+            "declared": 0,  # a manifest that asks for a package the other repository provides
+            "infra": 0,  # a name one repository defines and the other uses: an image, a service, a queue
             "imports": 0,  # a class or function imported from the other repository's package, and used
             "http": 0,  # a URL in one repository that matches a route another repository serves
             "weak": 0,  # a call matched by name alone, which only says two repositories use the same word
@@ -144,6 +152,43 @@ def _links(db: Session, org: str, ids: list[str], names: dict[str, str]) -> list
                     "evidence": e["evidence"],
                 },
             )
+    for d in lk.rows(db, org, ids, "manifest"):
+        p = _pair(pairs, d["src_repo"], d["dst_repo"])
+        p["count"] += 1 + d["more"]
+        p["declared"] += 1 + d["more"]
+        p["rels"]["DECLARES"] = p["rels"].get("DECLARES", 0) + 1 + d["more"]
+        p["trust"] = "fact"  # the manifest states it outright
+        if len([x for x in p["examples"] if x["rel"] == "DECLARES"]) < 2:
+            p["examples"].append(
+                {
+                    "rel": "DECLARES",
+                    "from": f"{names.get(d['src_repo'], '')}: {d['from']}",
+                    "to": f"{names.get(d['dst_repo'], '')}: {d['to']}",
+                    "evidence": d["evidence"],
+                }
+            )
+    for d in lk.rows(db, org, ids, lk.IDENT_KINDS):  # names one repository defines and another refers to
+        p = _pair(pairs, d["src_repo"], d["dst_repo"])
+        p["count"] += 1 + d["more"]
+        p["rels"][d["rel"]] = p["rels"].get(d["rel"], 0) + 1 + d["more"]
+        if d["trust"] == "uncertain":  # the same variable name on both sides: counted with the name-only matches
+            p["weak"] += 1 + d["more"]
+            continue
+        p["infra"] += 1 + d["more"]
+        p["strength"] += d["weight"]
+        if d["trust"] == "fact":
+            p["trust"] = "fact"
+        elif p["trust"] == "uncertain":
+            p["trust"] = "inferred"
+        if len([x for x in p["examples"] if x["rel"] == d["rel"]]) < 2:
+            p["examples"].append(
+                {
+                    "rel": d["rel"],
+                    "from": f"{names.get(d['src_repo'], '')}: {d['from']}",
+                    "to": f"{names.get(d['dst_repo'], '')}: {d['to']}",
+                    "evidence": d["evidence"],
+                }
+            )
     http = lk.rows(db, org, ids, "http")
     for h in http:
         p = _pair(pairs, h["src_repo"], h["dst_repo"])
@@ -196,7 +241,12 @@ def _links(db: Session, org: str, ids: list[str], names: dict[str, str]) -> list
             )
     return sorted(
         pairs.values(),
-        key=lambda p: (-(p["strong"] + p["http"] + p["imports"]), -min(p["weak"], 5), p["src"], p["dst"]),
+        key=lambda p: (
+            -(p["strong"] + p["http"] + p["imports"] + p["declared"] + p["infra"]),
+            -min(p["weak"], 5),
+            p["src"],
+            p["dst"],
+        ),
     )
 
 
@@ -266,6 +316,15 @@ def _heat(risk: dict[str, dict]) -> dict[str, dict]:
     }
 
 
+def _can_declare(cover: dict, src: str, dst: str) -> bool:
+    """Saying a dependency is missing from a manifest is only fair when the first repository has a manifest we read and
+    the second offers a package that could be named in it."""
+    a, b = cover.get(src, {}), cover.get(dst, {})
+    reads = any(m["requires"] for m in a.get("manifests", []) if not m["error"])
+    offers = bool(b.get("provides")) or any(m["provides"] for m in b.get("manifests", []) if not m["error"])
+    return reads and offers
+
+
 def analyse(db: Session, org: str, ids: list[str], days: int = WINDOW_DAYS) -> dict:
     repos = {r.id: r for r in db.scalars(select(Repository).where(Repository.org_id == org, Repository.id.in_(ids)))}
     ids = [i for i in ids if i in repos]
@@ -274,6 +333,11 @@ def analyse(db: Session, org: str, ids: list[str], days: int = WINDOW_DAYS) -> d
     risk = _risk(db, ids, rows) if ids else {}
     heat = _heat(risk)
     links = _links(db, org, ids, names) if len(ids) > 1 else []
+    cover = lk.coverage(db, org, ids) if len(ids) > 1 else {}
+    for p in links:  # what the manifests say against what the code does
+        used = p["strong"] + p["http"] + p["imports"]
+        p["declared_unused"] = p["declared"] > 0 and used == 0
+        p["undeclared"] = used > 0 and p["declared"] == 0 and _can_declare(cover, p["src"], p["dst"])
     coupling = _coupling(rows) if len(ids) > 1 else []
     out = {
         "window_days": days,
@@ -284,6 +348,7 @@ def analyse(db: Session, org: str, ids: list[str], days: int = WINDOW_DAYS) -> d
                 "source": repos[i].source,
                 "status": repos[i].status,
                 "files": repos[i].file_count,
+                "role": cover.get(i, {}).get("role", ""),
                 "chunks": repos[i].chunk_count,
                 "risk": risk[i],
                 "heat": heat[i],
@@ -292,7 +357,7 @@ def analyse(db: Session, org: str, ids: list[str], days: int = WINDOW_DAYS) -> d
         ],
         "links": links,
         "coupling": coupling,
-        "coverage": lk.coverage(db, org, ids) if len(ids) > 1 else {},
+        "coverage": cover,
     }
     out["estimate_tokens"] = estimate_tokens(out)
     return out
@@ -313,7 +378,12 @@ def facts(a: dict) -> str:
         lines.append("- none found")
     for p in a["links"][:25]:
         kinds = ", ".join(f"{REL_WORD.get(k, k.lower())} {n}" for k, n in sorted(p["rels"].items()))
-        lines.append(f"- {name[p['src']]} -> {name[p['dst']]}: {p['count']} links ({kinds}); how sure: {p['trust']}")
+        flags = (" (declared but unused)" if p.get("declared_unused") else "") + (
+            " (used but not declared)" if p.get("undeclared") else ""
+        )
+        lines.append(
+            f"- {name[p['src']]} -> {name[p['dst']]}: {p['count']} links ({kinds}); how sure: {p['trust']}{flags}"
+        )
         for e in p["examples"]:
             lines.append(f"    e.g. {e['from']} -> {e['to']}" + (f" ({e['evidence']})" if e["evidence"] else ""))
     lines.append(f"\nCHANGED TOGETHER (last {a['window_days']} days)")
@@ -488,6 +558,37 @@ def code_graph(
         }
         for e in imported
     ]
+    declared = [d for d in lk.rows(db, org, ids, "manifest") if not pair or (d["src_repo"], d["dst_repo"]) == pair]
+    declares = [
+        {
+            "id": f"declares:{d['src']}:{d['dst']}",
+            "source": d["src"],
+            "target": d["dst"],
+            "rel": "DECLARES",
+            "provenance": "manifest",
+            "trust": "fact",
+            "weight": d["weight"],
+            "evidence": d["evidence"],
+        }
+        for d in declared
+    ]
+    named = [d for d in lk.rows(db, org, ids, lk.IDENT_KINDS) if not pair or (d["src_repo"], d["dst_repo"]) == pair]
+    named_n = sum(1 for d in named if d["trust"] != "uncertain")
+    guess_n = len(named) - named_n  # the same variable name on both sides: shown only when name matches are asked for
+    naming = [
+        {
+            "id": f"{d['kind']}:{d['src']}:{d['dst']}",
+            "source": d["src"],
+            "target": d["dst"],
+            "rel": d["rel"],
+            "provenance": "name",
+            "trust": d["trust"],
+            "weight": d["weight"],
+            "evidence": d["evidence"],
+        }
+        for d in named
+        if d["trust"] != "uncertain" or weak
+    ]
     strong_n, weak_n = count(KGEdge.weight >= STRONG), count(KGEdge.weight < STRONG)
     picked = edges() if weak else edges(KGEdge.weight >= STRONG)
     stated = [
@@ -509,7 +610,9 @@ def code_graph(
     ]
     proof = {(e["source"], e["target"]) for e in proven}
     stated = [e for e in stated if (e["source"], e["target"]) not in proof]  # an import already says it
-    shown = (proven + over_http + stated)[:limit]  # the proof first: imports, then URLs, then calls the graph stated
+    shown = (proven + over_http + declares + naming + stated)[
+        :limit
+    ]  # proof first: imports, URLs, manifests, names, calls
     ends = {x for e in shown for x in (e["source"], e["target"])}
     nodes = lk.nodes_by_id(db, ends)
     out_edges = {e["id"]: e for e in shown}
@@ -549,9 +652,13 @@ def code_graph(
     return {
         "nodes": [kg.node_dict(n, names) | {"community": None} for n in nodes.values()],
         "edges": list(out_edges.values()),
-        "available": {"strong": strong_n + len(http) + len(imported), "weak": weak_n},
+        "available": {
+            "strong": strong_n + len(http) + len(imported) + len(declared) + named_n,
+            "weak": weak_n + guess_n,
+        },
         "shown_weak": weak,
-        "truncated": len(proven) + len(over_http) + (strong_n + (weak_n if weak else 0)) > limit,
+        "truncated": len(proven) + len(over_http) + len(declares) + len(naming) + (strong_n + (weak_n if weak else 0))
+        > limit,
     }
 
 
@@ -617,9 +724,13 @@ def system_facts(
     if not a["links"]:
         overview.append("- none found in the code")
     for p in a["links"][:12]:
-        proven = p["strong"] + p["http"] + p["imports"]
+        proven = p["strong"] + p["http"] + p["imports"] + p["declared"] + p["infra"]
         kinds = ", ".join(f"{REL_WORD.get(k, k.lower())} {n}" for k, n in sorted(p["rels"].items()))
         guess = f"; plus {p['weak']} calls matched by name only, not counted" if p["weak"] else ""
+        if p.get("declared_unused"):
+            guess += "; declared in a manifest but nothing was found using it"
+        if p.get("undeclared"):
+            guess += "; used in code but not declared in its manifest"
         overview.append(
             f"- {names[p['src']]} depends on {names[p['dst']]}: {proven} proven links ({kinds}); how sure: "
             f"{p['trust']}{guess}"
@@ -631,7 +742,7 @@ def system_facts(
     facts = [_fact("How these repositories fit together", "\n".join(overview))]
 
     want = walkthrough.key_words(question)
-    rows = lk.rows(db, org, ids, "import") + lk.rows(db, org, ids, "http")
+    rows = lk.rows(db, org, ids, ("import", "http", "manifest", *lk.IDENT_KINDS))
     if src and dst:
         rows = [r for r in rows if (r["src_repo"], r["dst_repo"]) == (src, dst)]
 

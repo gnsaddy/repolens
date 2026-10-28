@@ -351,6 +351,30 @@ index, so a new dependency is noticed with nobody watching; the page also refres
   `retrieval_focus` limits retrieval to code and pull requests (documents too when the question names them) and passes `skip_paths` so a locale folder
   under a docs directory is dropped, unless the question is not ASCII. The action
   `group.ask` is open to viewers and rate limited with the other model-backed calls.
+* **Manifests** (`services/manifests.py`, `ManifestDetector`). Pure parsers, one per file type, each returning what the file provides and what it requires with the line of
+  each (`provides`, `requires`, `error`). `tomllib` reads TOML and `json` reads JSON; XML (`pom.xml`, `.csproj`) is read with patterns, never an XML library, because
+  entity expansion in a hostile file could exhaust memory (a test feeds it an entity bomb). A file that cannot be read gives an error in the coverage, never an
+  exception. `_manifest_texts` rebuilds each manifest from its chunks line by line (skipping tests, examples and vendored folders). Names are compared after
+  `manifests.norm` (for Python `User_Lib`, `user-lib` and `user.lib` are one package). A requirement that names a package another repository provides becomes a
+  `repo_links` row (`kind` `manifest`, `rel` `DECLARES`, `tier` `declared`, trust `fact`) between the two manifest files, with several requirements from one file to one
+  file counted in `more`. `analyse` compares declarations with use: `declared_unused` (declared, no import, URL or stated call) and `undeclared` (used, not declared, and
+  only when the first repository has a manifest we read and the second offers a package). `surface` lists who declares a repository's package (`declared_by`) and no
+  longer counts a manifest file as a class or function. The indexer now keeps `go.mod`, `Gemfile`, `.csproj`, `.kts` and `.gemspec` (`parsing.SPECIAL_FILES`,
+  `LANG_BY_EXT`); an existing index gains them on its next index.
+* **Shared names** (`services/identifiers.py`, `IdentifierDetector`). `identifiers.extract(path, text)` reads one file by its kind (`classify`: Dockerfile, CI,
+  Compose, YAML for Kubernetes/Helm/Argo, Terraform, shell, `.gitmodules`, example env files, other config) and returns `Ident`s (`kind`, normalised `value`,
+  `role` defines or refers, `line`). Everything is line and pattern based, never a YAML library (an anchor bomb would expand), and only names are kept, never an
+  environment variable's value or a URL's credentials. `norm_repo` makes every spelling of a repository address one `host/owner/name`, `norm_image` drops tag,
+  digest and registry alias and refuses base images and templates, `host_of` refuses `localhost` and the git hosts. The detector reads config and text chunks of
+  each repository, adds each repository's own address (`url`, `web_url`) as a definition, and reads application code (function, method and class chunks) with
+  `code_refs` only for names some repository defines (environment-variable reads, URLs to defined hosts, string literals equal to a defined queue or topic).
+  `_join` links a reference in one repository to a definition in another (never the same one), skips a name defined by more than `MAX_SHARED_DEFINERS` (3)
+  repositories, keeps `MAX_PAIRS_PER_KIND` (6) file pairs per pair of repositories and kind and counts the rest in `more`, and writes one `repo_links` row per file pair with
+  `kind` set to the kind of name (`repo_ref`, `image`, `host`, `queue`, `env`; `Detector.kinds` lists several so a failure leaves all of them alone). `IDENT_MAP`
+  gives each kind its trust and its relation: `REFERENCES` and `DEPLOYS` are fact, `CONNECTS` and `USES_QUEUE` inferred, `CONFIGURED` uncertain (counted as weak, drawn
+  only with name matches). A link to a whole repository ends at an anchor file (README, manifest, else its first file). Evidence passes through `redact_stored`.
+  `_coverage` adds each repository's `role` (`infrastructure` when five or more of its non-test files are pipelines, manifests, Terraform or scripts and at least
+  twice the code files). `surface` lists who points at a repository by name (`linked_by`).
 * **Coverage.** Each detector says which languages it reads (`languages`); `link_states.coverage` records, per repository, the languages found (function, method
   and class chunks), the ones a detector cannot read (`unread`), the packages it provides and its route files. The Graph page prints "Not read: go in
   orders-svc" so an empty graph is not mistaken for "no dependencies".

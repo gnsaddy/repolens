@@ -44,13 +44,25 @@ LANG_BY_EXT = {
     ".proto": "config",
     ".graphql": "config",
     ".tpl": "config",
+    ".csproj": "config",  # package manifests the Graph reads (.NET, Gradle Kotlin, gems)
+    ".kts": "config",
+    ".gemspec": "config",
     ".j2": "config",
     ".example": "config",  # .env.example, settings.ini.example ...
     ".sample": "config",
     ".template": "config",
 }
 # files recognised by name rather than extension
-SPECIAL_FILES = {"dockerfile", "containerfile", "makefile", "jenkinsfile", "procfile", "vagrantfile"}
+SPECIAL_FILES = {
+    "dockerfile",
+    "containerfile",
+    "makefile",
+    "jenkinsfile",
+    "procfile",
+    "vagrantfile",
+    "go.mod",
+    "gemfile",
+}
 # real environment files hold secrets; only their .example/.sample/.template variants are indexed
 SECRET_FILE_RE = re.compile(r"^\.env(\..+)?$|\.(pem|key|p12|pfx|jks|keystore)$", re.I)
 EXAMPLE_ENV_RE = re.compile(r"\.(example|sample|template|dist)$", re.I)

@@ -210,7 +210,7 @@ def test_a_new_dependency_after_a_reindex_is_reported_with_its_proof(client, aut
     reindex(client, auth, shop)
     r = client.get("/api/groups/changes", headers=auth, params={"repo_ids": ids(shop, lib)}).json()
     (pair_,) = r["new"]
-    assert (pair_["from"], pair_["to"], pair_["count"]) == ("shop-app", "users-lib", 1)
+    assert (pair_["from"], pair_["to"], pair_["count"]) == ("shop-app", "users-lib", 1), r
     ex = pair_["examples"][0]
     assert ex["from"] == "shop/reports.py:report" and "from userlib import unused_helper" in ex["evidence"]
     assert r["removed"] == []
@@ -229,3 +229,26 @@ def test_a_dependency_that_goes_away_is_reported_as_removed(client, auth, libs, 
     r = client.get("/api/groups/changes", headers=auth, params={"repo_ids": ids(shop, lib)}).json()
     assert r["new"] == [] and [(p["from"], p["to"]) for p in r["removed"]] == [("shop-app", "users-lib")]
     assert r["removed"][0]["examples"][0]["from"] == "shop/admin.py:lookup"
+
+
+def test_a_caller_is_the_function_never_the_file_that_shares_its_chunk(client, auth, libs, session):  # noqa: F811
+    """A file's node takes the id of the file's first chunk, so that chunk belongs to two nodes. Which one a lookup
+    returned depended on the order the database gave its rows: SQLite gave the function, PostgreSQL on CI the file."""
+    from repolens.models import CodeChunk, KGNode
+
+    shop, lib = libs
+    first = (
+        session.query(CodeChunk)
+        .filter_by(repo_id=shop["id"], file_path="shop/checkout.py", symbol_name="checkout")
+        .one()
+    )
+    owners = session.query(KGNode).filter_by(chunk_id=first.id).all()
+    assert {n.type for n in owners} >= {"function"}  # the function opens the file, so the file node shares its chunk
+    mapped = rl._symbol_nodes(session, [first.id])
+    assert session.get(KGNode, mapped[first.id]).type == "function"
+    g = client.get(
+        "/api/groups/code-graph", headers=auth, params={"repo_ids": ",".join([shop["id"], lib["id"]])}
+    ).json()
+    by_id = {n["id"]: n for n in g["nodes"]}
+    sources = {by_id[e["source"]]["name"] for e in g["edges"] if e["rel"] == "USES"}
+    assert {"checkout", "audit"} <= sources and "checkout.py" not in sources

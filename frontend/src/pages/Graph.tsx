@@ -13,10 +13,11 @@ import { timeAgo } from "@/lib/utils";
 import Markdown from "./wiki/Markdown";
 
 const METRICS: [HeatMetric, string][] = [["none", "No colour"], ["commits", "Commits"], ["lines", "Lines changed"], ["fixes", "Fix commits"], ["drift_open", "Docs out of date"]];
-const REL: Record<string, string> = { USES: "uses (imported from)", HTTP: "calls over HTTP", CALLS: "calls", IMPORTS: "imports", MENTIONS: "documents", RELATED_TO: "resembles", TESTS: "tests" };
+const REL: Record<string, string> = { REFERENCES: "refers to the repository of", DEPLOYS: "deploys", CONNECTS: "connects to a service of", USES_QUEUE: "uses a queue or topic of", CONFIGURED: "is configured by", DECLARES: "declares a dependency on", USES: "uses (imported from)", HTTP: "calls over HTTP", CALLS: "calls", IMPORTS: "imports", MENTIONS: "documents", RELATED_TO: "resembles", TESTS: "tests" };
 /** What stands behind a link, in words: the proof, not just a colour. */
+const NAMED: Record<string, string> = { REFERENCES: "the repository address is written down", DEPLOYS: "the same image name", CONNECTS: "the same service name", USES_QUEUE: "the same queue or topic name", CONFIGURED: "the same variable name (a guess)" };
 const proof = (rel: string, trust: string) =>
-  rel === "HTTP" ? "URL matches a route" : rel === "USES" || rel === "IMPORTS" ? (trust === "fact" ? "proved by an import" : "import found, name matched inside the package")
+  NAMED[rel] ? NAMED[rel] : rel === "DECLARES" ? "declared in a manifest" : rel === "HTTP" ? "URL matches a route" : rel === "USES" || rel === "IMPORTS" ? (trust === "fact" ? "proved by an import" : "import found, name matched inside the package")
     : trust === "fact" ? "found in the code" : "name match only";
 const TRUST: Record<string, string> = { fact: "found in the code", inferred: "inferred", uncertain: "uncertain" };
 const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
@@ -112,7 +113,7 @@ export default function GraphPage() {
               <SystemGraph repos={a.repos} links={a.links} metric={metric} selected={selected} onRepo={(id) => { setSelected(selected === id ? null : id); setLink(null); }} onLink={(l) => { setLink(l); setSelected(`${l.src}>${l.dst}`); }} />
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                 {(["fact", "inferred", "uncertain"] as const).map((t) => <span key={t} className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: TRUST_COLOR[t] }} />{TRUST[t]}</span>)}
-                <span>Arrow: depends on. Number: links the code proves, by an import or a URL (~ = matched by name only).</span>
+                <span>Arrow: depends on. Number: links the code proves, by an import, a URL or a manifest (~ = matched by name only).</span>
                 {metric !== "none" && <span className="flex items-center gap-1">less<i className="inline-block h-2.5 w-16 rounded" style={{ background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(1)})` }} />more, over the last {a.window_days} days</span>}
               </div>
               {picked.length > 1 && !a.links.length && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-muted">No links between these repositories were found in the code or documents. They may still be related through something this analysis cannot see, such as a shared database or a message queue.</p>}
@@ -121,6 +122,8 @@ export default function GraphPage() {
                   <Button size="sm" variant="outline" className="float-right" onClick={() => explain({ src: shownLink.src, dst: shownLink.dst })}><Sparkles className="h-4 w-4" />Explain this link</Button>
                   <div className="font-medium">{pairs.get(shownLink.src)} → {pairs.get(shownLink.dst)} <Badge tone={shownLink.trust === "fact" ? "green" : "amber"}>{TRUST[shownLink.trust]}</Badge></div>
                   <div className="text-xs text-muted">{Object.entries(shownLink.rels).map(([k, n]) => `${REL[k] ?? k.toLowerCase()} ${n}`).join(", ")}{shownLink.weak > 0 && ` · ${shownLink.weak} matched by name only`}</div>
+                  {shownLink.declared_unused && <p role="note" className="mt-1 rounded bg-amber-50 p-1.5 text-xs text-amber-800">Declared in a manifest, but nothing was found using it. It may be unused, or used in a way this graph cannot see.</p>}
+                  {shownLink.undeclared && <p role="note" className="mt-1 rounded bg-amber-50 p-1.5 text-xs text-amber-800">Used in the code, but not declared in its manifest. It may be missing from the dependencies.</p>}
                   <ul className="mt-2 space-y-1 text-xs">{shownLink.examples.map((e, i) => <li key={i}><code>{e.from}</code> → <code>{e.to}</code>{e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>)}</ul>
                 </div>)}
             </Card>
@@ -220,6 +223,8 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
           {cg.nodes.length > 0 && <span>{crossing} link{crossing === 1 ? "" : "s"} across repositories, drawn amber and dashed between each repository's area.</span>}
           <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.HTTP }} />calls over HTTP (URL matches a route)</span>
           <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.USES }} />uses a class or function it imports (the import line is the proof)</span>
+          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.DECLARES }} />declared in a manifest (pyproject, package.json, go.mod…)</span>
+          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.DEPLOYS }} />shared names: an image deployed, a service called, a queue used, a repository referenced</span>
           <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.CALLS }} />calls the code states</span>
           {(["function", "class", "file"] as const).map((t) => <span key={t} className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full" style={{ background: NODE_COLORS[t] }} />{t}</span>)}
         </div>
@@ -304,6 +309,8 @@ function PublicSurface({ repos }: { repos: { id: string; name: string }[] }) {
                 <td className="pr-2">{x.uses}×</td><td className="text-xs text-muted">{x.repos.join(", ")}</td></tr>))}</tbody></table>)}
         {s.exports > 0 && <p className="mt-3 text-xs text-muted">{s.exports} names exported by its package{s.unused_exports.length ? `; not used by any repository here: ${s.unused_exports.map((e) => e.name).join(", ")}` : "; all of them are used"}.</p>}
         {s.hidden > 0 && <p className="mt-1 text-xs text-muted">{s.hidden} more use it in repositories you cannot access.</p>}
+        {s.declared_by.length > 0 && <p className="mt-2 text-xs text-muted">Declared as a dependency by: {s.declared_by.map((d) => `${d.repo} (${d.file})`).join(", ")}.</p>}
+        {s.linked_by.length > 0 && <p className="mt-2 text-xs text-muted">Pointed at by name from: {s.linked_by.map((d) => `${d.repo} (${REL[d.rel] ?? d.rel.toLowerCase()})`).join(", ")}.</p>}
         <p className="mt-2 text-xs text-muted">{s.note}</p>
       </>)}
     </Card>
