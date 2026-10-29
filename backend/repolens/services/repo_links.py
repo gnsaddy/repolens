@@ -1,10 +1,11 @@
 """Dependencies between repositories: found by independent detectors, kept with when they first appeared.
 
 A detector looks at the indexed repositories of a workspace and reports links, each from a function, class or file in
-one repository to one in another, with the text that proves it. Today's detectors read imports (Python, JavaScript
-and TypeScript) and match URLs against the routes another repository serves. The links are stored, so a page does not
-search the code again each time it is opened, and so the store can say what is new since last week. Each detector also
-reports what it could and could not read, because an empty result must never be mistaken for "no dependencies"."""
+one repository to one in another, with the text that proves it. Today's detectors read imports (Python, JavaScript,
+TypeScript, Go, Java, Kotlin, C#, Rust, C and C++), match URLs against the routes another repository serves, compare
+manifests and join shared names. The links are stored, so a page does not search the code again each time it is opened,
+and so the store can say what is new since last week. Each detector also reports what it could and could not read,
+because an empty result must never be mistaken for "no dependencies"."""
 
 import hashlib
 import json
@@ -25,7 +26,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import Change, CodeChunk, KGEdge, KGNode, LinkState, RepoLink, Repository
 from ..security import redact_stored
-from . import identifiers, manifests
+from . import identifiers, lang_imports, manifests
 from . import routes as routes_svc
 from .access import Scope
 
@@ -55,6 +56,11 @@ def _symbol_nodes(db: Session, chunk_ids: list[str]) -> dict[str, str]:
             if chunk:
                 out[chunk] = node
     return out
+
+
+def _skip_path(path: str) -> bool:
+    """Paths no dependency is read from: examples, documentation, scripts, vendored code and tests."""
+    return bool(_EXAMPLE.search(path) or routes_svc.TESTISH.search(path))
 
 
 def _norm(path: str) -> str:
@@ -142,6 +148,7 @@ def _http_links(db: Session, ids: list[str]) -> list[dict]:
 # --- dependencies proved by imports ------------------------------------------------------------------------------
 
 IMPORT_LANGS = ("python", "javascript", "typescript", "tsx")
+READ_LANGS = (*IMPORT_LANGS, *lang_imports.LANGS)  # every language whose imports are read
 MAX_IMPORT_EDGES = 600
 CALLERS_SHOWN = 4  # functions drawn per imported class or function; the rest are counted
 _PY_FROM = re.compile(r"^\s*from\s+([\w.]+)\s+import\s+(.+)$", re.S)
@@ -504,7 +511,7 @@ CODE_EXT = {  # by file extension, because the parser files most languages under
 }
 # Change this whenever a detector finds links differently or coverage changes shape: stored links are then worked out
 # again even though no repository was indexed (the same idea as `answer_memory.PIPELINE`).
-DETECTION_VERSION = "d4"
+DETECTION_VERSION = "d5"
 KEEP_GONE_DAYS = 180  # a link that disappeared stays listed as removed this long
 SYMBOLS = ("function", "method", "class")
 
@@ -542,11 +549,13 @@ class Detector:
 class ImportDetector(Detector):
     name = "imports"
     kind = "import"
-    languages = IMPORT_LANGS
+    languages = READ_LANGS
 
     def detect(self, db: Session, ids: list[str]) -> tuple[list[Link], dict[str, dict]]:
         pkgs = _packages(db, ids)
         found = _scan_imports(db, ids, pkgs)[:MAX_IMPORT_EDGES] if len(ids) > 1 and pkgs else []
+        more, offered = lang_imports.scan(db, ids, _skip_path)
+        found = [*found, *more][:MAX_IMPORT_EDGES]
         links = [
             Link(
                 "import",
@@ -569,6 +578,10 @@ class ImportDetector(Detector):
         for name, where in pkgs.items():
             for repo, _root in where:
                 info.setdefault(repo, {}).setdefault("provides", []).append(name)
+        for repo, names in offered.items():
+            info.setdefault(repo, {}).setdefault("provides", []).extend(
+                n for n in names if n not in info[repo].get("provides", [])
+            )
         return links, info
 
 

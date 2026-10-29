@@ -216,7 +216,7 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
           <div className="rounded-lg bg-slate-50 p-4 text-sm text-muted">
             <p>No code-level link was found between these repositories{focus ? " in this direction" : ""}.</p>
             {cg.available.weak > 0 && !weak && <p className="mt-2">{cg.available.weak} calls match a name that exists in the other repository. Between unrelated projects these are usually coincidences, so they are hidden.</p>}
-            <p className="mt-2">Imports are read for Python and JavaScript/TypeScript, and URLs are matched against the routes another repository serves. Dependencies through a shared database, a message queue or a URL held in configuration cannot be seen from the code.</p>
+            <p className="mt-2">Imports are read for Python, JavaScript/TypeScript, Go, Java, Kotlin, C#, Rust, C and C++, and URLs are matched against the routes another repository serves. Dependencies through a shared database, a message queue or a URL held in configuration cannot be seen from the code.</p>
           </div>) : (
           <ForceGraph nodes={cg.nodes} edges={cg.edges} selectedId={node} onSelect={(id) => onNode(node === id ? null : id)} />)}
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">

@@ -375,6 +375,10 @@ index, so a new dependency is noticed with nobody watching; the page also refres
   only with name matches). A link to a whole repository ends at an anchor file (README, manifest, else its first file). Evidence passes through `redact_stored`.
   `_coverage` adds each repository's `role` (`infrastructure` when five or more of its non-test files are pipelines, manifests, Terraform or scripts and at least
   twice the code files). `surface` lists who points at a repository by name (`linked_by`).
+* **Imports in other languages** (`services/lang_imports.py`): `ImportDetector` also calls `lang_imports.scan`. It reads each Go, Java, Kotlin, C#, Rust, C and C++ file's import lines from its chunks
+  (`CodeChunk.imports` plus the text, because the parser keeps definitions only for Go and Java), works out what each repository offers (`go.mod` module, `Cargo.toml` crate, JVM class by `package`
+  line or by path, C# namespace and declared types, header files by basename) and links file to symbol (`IMPORTS`, trust `fact`) or file to file. A name that could be in several other repositories,
+  a header matched by basename only, or a JVM package guessed from the path is `inferred` (weight 0.7). A repository that has the name itself never links. `DETECTION_VERSION` is `d5`.
 * **Coverage.** Each detector says which languages it reads (`languages`); `link_states.coverage` records, per repository, the languages found (function, method
   and class chunks), the ones a detector cannot read (`unread`), the packages it provides and its route files. The Graph page prints "Not read: go in
   orders-svc" so an empty graph is not mistaken for "no dependencies".

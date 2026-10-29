@@ -75,14 +75,14 @@ def test_a_detector_that_fails_does_not_wipe_what_it_found_before(client, auth, 
 def test_coverage_says_which_languages_a_detector_cannot_read(client, auth, libs, session):  # noqa: F811
     shop, lib = libs
     path = session.get(Repository, shop["id"]).url
-    with open(f"{path}/shop/main.go", "w") as f:
+    with open(f"{path}/shop/main.rb", "w") as f:
         f.write("package main\n\nfunc main() {\n}\n")
-    commit_all(path, "add go")
+    commit_all(path, "add ruby")
     reindex(client, auth, shop)
     a = client.get("/api/groups/analysis", headers=auth, params={"repo_ids": ids(shop, lib)}).json()
     cov = a["coverage"]
     assert cov[lib["id"]]["provides"] == ["userlib"] and "python" in cov[lib["id"]]["languages"]
-    assert {"detector": "imports", "language": "go", "files": 1} in cov[shop["id"]]["unread"]
+    assert {"detector": "imports", "language": "ruby", "files": 1} in cov[shop["id"]]["unread"]
     assert not any(u["language"] == "python" for u in cov[shop["id"]]["unread"])
 
 
