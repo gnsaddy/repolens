@@ -907,3 +907,18 @@ class LinkState(Base):
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     seconds: Mapped[float] = mapped_column(Float, default=0.0)
     coverage: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class ArchRule(Base):
+    """An architecture rule of a saved system: one repository must not depend on another."""
+
+    __tablename__ = "arch_rules"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    group_id: Mapped[str] = mapped_column(ForeignKey("repo_groups.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16), default="forbid")
+    src_repo: Mapped[str] = mapped_column(String(32))
+    dst_repo: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

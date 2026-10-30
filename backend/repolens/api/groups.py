@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import Principal, current_principal
-from ..models import GroupOverview, RepoGroup, User
+from ..models import ArchRule, GroupOverview, RepoGroup, User
 from ..security import redact_stored
+from ..services import architecture as arch
 from ..services import groups as svc
 from ..services import repo_links as lk
 from ..services.access import Scope, scope_for
@@ -128,6 +129,19 @@ def analyse_selection(
     """The same picture for repositories picked on the page and not saved (comma-separated ids)."""
     ids = svc.clean_ids(db, p.org_id, scope_for(db, p), [x for x in repo_ids.split(",") if x])
     return svc.analyse(db, p.org_id, ids, days)
+
+
+@router.get("/export")
+def export_selection(
+    repo_ids: str = Query(min_length=1, max_length=1200),
+    format: str = Query("mermaid", pattern="^(mermaid|json)$"),
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """The dependencies between the chosen repositories as Mermaid or JSON (repositories the reader cannot open are
+    left out, as everywhere else)."""
+    ids = svc.clean_ids(db, p.org_id, scope_for(db, p), [x for x in repo_ids.split(",") if x])
+    return arch.export(svc.analyse(db, p.org_id, ids), format)
 
 
 class AskIn(BaseModel):
@@ -262,3 +276,70 @@ def write_overview(gid: str, p: Principal = Depends(current_principal), db: Sess
         raise HTTPException(404, "Repository not found")
     o = svc.generate(db, p.org_id, p.user_id, g, ids)
     return _overview_view(o, scope, g.repo_ids, _people(db, {o.created_by}))
+
+
+class RuleIn(BaseModel):
+    src: str = Field(min_length=1, max_length=32)
+    dst: str = Field(min_length=1, max_length=32)
+    note: str = Field(default="", max_length=arch.NOTE_MAX)
+
+
+@router.get("/{gid}/architecture")
+def architecture(
+    gid: str,
+    p: Principal = Depends(current_principal),
+    db: Session = Depends(get_db),
+):
+    """The rules of a system, which of them are broken (with the proof), and the repositories that depend on each other
+    in a loop. Only repositories the reader may open are named."""
+    g = _get(db, p, gid)
+    scope = scope_for(db, p)
+    shown = [i for i in g.repo_ids if scope.can(i)]
+    a = svc.analyse(db, p.org_id, shown, svc.WINDOW_DAYS) if shown else {"links": [], "repos": []}
+    names = {r["id"]: r["name"] for r in a["repos"]}
+    out = arch.report(arch.rules_of(db, p.org_id, g.id), a["links"], names, scope)
+    out["cycles"] = [{**c, "names": [names.get(r, r) for r in c["repos"]]} for c in arch.cycles(a["links"], names)]
+    out["checked"] = len(shown)
+    return out
+
+
+@router.post("/{gid}/rules", status_code=201)
+def add_rule(gid: str, body: RuleIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    g = _get(db, p, gid)
+    _may_change(g, p)
+    authorize(db, p, "group.write", g.name, change="rule")
+    scope = scope_for(db, p)
+    if body.src == body.dst:
+        raise HTTPException(422, "A rule needs two different repositories")
+    for i in (body.src, body.dst):
+        if i not in g.repo_ids or not scope.can(i):
+            raise HTTPException(404, "Repository not found in this system")
+    mine = arch.rules_of(db, p.org_id, g.id)
+    if any((r.src_repo, r.dst_repo) == (body.src, body.dst) for r in mine):
+        raise HTTPException(409, "This rule already exists")
+    if len(mine) >= arch.MAX_RULES:
+        raise HTTPException(409, f"A system can have {arch.MAX_RULES} rules")
+    row = ArchRule(
+        org_id=p.org_id,
+        group_id=g.id,
+        kind="forbid",
+        src_repo=body.src,
+        dst_repo=body.dst,
+        note=redact_stored(body.note.strip())[0],
+        created_by=p.user_id,
+    )
+    db.add(row)
+    db.commit()
+    return {"id": row.id}
+
+
+@router.delete("/{gid}/rules/{rid}", status_code=204)
+def delete_rule(gid: str, rid: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    g = _get(db, p, gid)
+    _may_change(g, p)
+    authorize(db, p, "group.write", g.name, change="rule-delete")
+    row = db.get(ArchRule, rid)
+    if row is None or row.group_id != g.id or row.org_id != p.org_id:
+        raise HTTPException(404, "Rule not found")
+    db.delete(row)
+    db.commit()

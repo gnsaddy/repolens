@@ -3,6 +3,7 @@ import { Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
+import ArchitectureCard, { ExportBar } from "@/components/Architecture";
 import Modal from "@/components/Modal";
 import ForceGraph, { NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import SystemGraph, { heatColor, TRUST_COLOR, type HeatMetric } from "@/components/SystemGraph";
@@ -105,10 +106,12 @@ export default function GraphPage() {
             {picked.length > 1 && <CodeDependencies coverage={a.coverage} names={pairs} cg={code.data} loading={code.isLoading} error={code.error} weak={weak} onWeak={setWeak} node={node} onNode={setNode}
               focus={link ? `${pairs.get(link.src)} → ${pairs.get(link.dst)}` : null} onClear={() => { setLink(null); setSelected(null); }} onAsk={(id) => explain({ node_id: id })} />}
             {picked.length > 1 && <WhatChanged ids={key} names={pairs} />}
+            {picked.length > 1 && active && !dirty && <ArchitectureCard groupId={active.id} repos={a.repos.map((r) => ({ id: r.id, name: r.name }))} write={write} />}
             <Card aria-label="Repository map">
               <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Colour repositories by
                 <select aria-label="Colour repositories by" value={metric} onChange={(e) => setMetric(e.target.value as HeatMetric)} className="h-8 rounded-md border border-line bg-white px-2 text-sm text-ink">{METRICS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}>
                 Repository map{active ? `: ${active.name}` : ""}</CardTitle>
+              {picked.length > 1 && <div className="mb-2"><ExportBar ids={key} /></div>}
               {picked.length < 2 ? <p className="mb-2 text-sm text-muted">Choose a second repository to see how they relate.</p> : <p className="mb-2 text-xs text-muted">Click an arrow to show only the code behind it in the graph above.</p>}
               <SystemGraph repos={a.repos} links={a.links} metric={metric} selected={selected} onRepo={(id) => { setSelected(selected === id ? null : id); setLink(null); }} onLink={(l) => { setLink(l); setSelected(`${l.src}>${l.dst}`); }} />
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
@@ -200,6 +203,7 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
   cg?: CodeGraph; loading: boolean; error: unknown; weak: boolean; onWeak: (v: boolean) => void;
   node: string | null; onNode: (id: string | null) => void; focus: string | null; onClear: () => void;
 }) {
+  const [hot, setHot] = useState(false);
   const byId = new Map((cg?.nodes ?? []).map((n) => [n.id, n]));
   const touching = (cg?.edges ?? []).filter((e) => node && (e.source === node || e.target === node) && e.rel !== "CONTAINS");
   const picked = node ? byId.get(node) : undefined;
@@ -218,8 +222,11 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
             {cg.available.weak > 0 && !weak && <p className="mt-2">{cg.available.weak} calls match a name that exists in the other repository. Between unrelated projects these are usually coincidences, so they are hidden.</p>}
             <p className="mt-2">Imports are read for Python, JavaScript/TypeScript, Go, Java, Kotlin, C#, Rust, C and C++, and URLs are matched against the routes another repository serves. Dependencies through a shared database, a message queue or a URL held in configuration cannot be seen from the code.</p>
           </div>) : (
-          <ForceGraph nodes={cg.nodes} edges={cg.edges} selectedId={node} onSelect={(id) => onNode(node === id ? null : id)} />)}
+          <ForceGraph nodes={cg.nodes} edges={cg.edges} selectedId={node} onSelect={(id) => onNode(node === id ? null : id)} heat={hot ? cg.heat : undefined} />)}
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          {cg.nodes.length > 0 && cg.heat && (
+            <label className="flex items-center gap-1.5"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} />Colour by recent changes
+              <span>(commits touching the file in the last {cg.heat_days} days; every function takes its file's heat)</span></label>)}
           {cg.nodes.length > 0 && <span>{crossing} link{crossing === 1 ? "" : "s"} across repositories, drawn amber and dashed between each repository's area.</span>}
           <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.HTTP }} />calls over HTTP (URL matches a route)</span>
           <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.USES }} />uses a class or function it imports (the import line is the proof)</span>

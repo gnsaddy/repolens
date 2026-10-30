@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackProvider } from "@/components/feedback";
 import { AuthProvider } from "@/lib/auth";
-import type { AskResult, ChangePair, CodeGraph, GraphEdge, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
+import type { Architecture, AskResult, ChangePair, CodeGraph, GraphEdge, GraphNode, Impact, LinkChanges, Surface, SystemAnalysis, SystemGroup, SystemOverview } from "@/lib/api";
 import GraphPage from "@/pages/Graph";
 
 const json = (b: unknown, status = 200) => Promise.resolve(new Response(b === null ? null : JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } }));
@@ -50,6 +50,13 @@ const surface: Surface = {
 const pairOf = (n: number): ChangePair => ({ src: "a", dst: "b", from: "orders-svc", to: "pricing-svc", count: n, examples: [{ from: "orders/reports.py:report", to: "userlib/core.py:unused_helper", evidence: "report calls unused_helper, imported with `from userlib import unused_helper`", at: new Date().toISOString() }] });
 const changes: LinkChanges = { days: 7, tracking_since: new Date(Date.now() - 86400000).toISOString(), new: [pairOf(2)], removed: [pairOf(1)], computed_at: new Date().toISOString() };
 
+const architecture: Architecture = {
+  checked: 2, hidden_rules: 1, broken: 1,
+  rules: [{ id: "r1", kind: "forbid", src: "a", dst: "b", src_name: "orders-svc", dst_name: "pricing-svc", note: "orders stays below pricing", created_by: "2", created_at: new Date().toISOString(), broken: true,
+    violation: { links: 2, trust: "fact", rels: { USES: 2 }, examples: [{ rel: "USES", from: "orders-svc: orders/checkout.py", to: "pricing-svc: pricing/core.py", evidence: "checkout calls quote, imported with `from pricing import quote`" }] } }],
+  cycles: [{ repos: ["a", "b"], names: ["orders-svc", "pricing-svc"], edges: [{ src: "a", dst: "b", trust: "fact", links: 2, proof: "checkout imports quote" }, { src: "b", dst: "a", trust: "fact", links: 1, proof: "quote imports Order" }] }],
+};
+
 const askResult: AskResult = {
   query: "How does orders-svc depend on pricing-svc?", answer: "orders-svc calls the pricing handler over HTTP [S1].", mode: "llm", unsupported_names: ["ghost.py"],
   sources: [
@@ -58,7 +65,7 @@ const askResult: AskResult = {
   connections: [],
 };
 
-function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges; ask?: AskResult; analysis?: SystemAnalysis } = {}) {
+function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemOverview[]; code?: CodeGraph; changes?: LinkChanges; ask?: AskResult; analysis?: SystemAnalysis; architecture?: Architecture } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -71,6 +78,10 @@ function open(opts: { role?: string; groups?: SystemGroup[]; overviews?: SystemO
     if (url.includes("/groups/surface")) return json(surface);
     if (url.includes("/groups/changes")) return json(opts.changes ?? changes);
     if (url.includes("/groups/code-graph")) return json(opts.code ?? codeGraph, 200);
+    if (url.endsWith("/architecture")) return json(opts.architecture ?? architecture);
+    if (url.includes("/groups/export")) return json({ format: "mermaid", filename: "x.mmd", content: "graph LR" });
+    if (url.includes("/rules") && method === "POST") return json({ id: "r2" }, 201);
+    if (url.includes("/rules/") && method === "DELETE") return json(null, 204);
     if (url.endsWith("/overviews")) return json({ overviews: opts.overviews ?? [], hidden: 0 });
     if (url.endsWith("/overview") && method === "POST") return json(overview, 201);
     if (url.endsWith("/groups") && method === "POST") return json({ ...group, id: "g2", name: "Mine", created_by_name: "sam" }, 201);
@@ -381,4 +392,57 @@ describe("Graph: systems", () => {
     expect(screen.queryByRole("button", { name: /Save as a system/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Create knowledge/ })).toBeNull();
   });
+  it("shows the architecture rules of a saved system with what breaks them, the loops, and the hidden ones counted", async () => {
+    open({ groups: [group] });
+    await userEvent.click(await screen.findByRole("button", { name: /Checkout/ }));
+    const card = await screen.findByLabelText("Architecture rules");
+    await waitFor(() => expect(card).toHaveTextContent("orders-svc must not depend on pricing-svc"));
+    expect(card).toHaveTextContent("broken");
+    expect(card).toHaveTextContent("checkout calls quote, imported with `from pricing import quote`");
+    expect(card).toHaveTextContent("1 broken, 1 loop");
+    expect(card).toHaveTextContent("orders-svc ⇄ pricing-svc");
+    expect(card).toHaveTextContent("1 more rule about repositories you cannot access");
+  });
+
+  it("adds and removes a rule, but only for someone who can write", async () => {
+    const calls = open({ groups: [group] });
+    await userEvent.click(await screen.findByRole("button", { name: /Checkout/ }));
+    const card = await screen.findByLabelText("Architecture rules");
+    await userEvent.selectOptions(await within(card).findByLabelText("Repository that must not depend"), "b");
+    await userEvent.selectOptions(within(card).getByLabelText("Repository it must not depend on"), "a");
+    await userEvent.click(within(card).getByRole("button", { name: /Add rule/ }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/groups/g1/rules") && c.body?.src === "b" && c.body?.dst === "a")).toBe(true));
+    await userEvent.click(within(card).getByRole("button", { name: "Remove rule orders-svc to pricing-svc" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/rules/r1"))).toBe(true));
+  });
+
+  it("offers no rule editing to a viewer", async () => {
+    open({ role: "viewer", groups: [group] });
+    await userEvent.click(await screen.findByRole("button", { name: /Checkout/ }));
+    const card = await screen.findByLabelText("Architecture rules");
+    await within(card).findByText(/must not depend on pricing-svc/);
+    expect(within(card).queryByRole("button", { name: /Add rule/ })).toBeNull();
+    expect(within(card).queryByRole("button", { name: /Remove rule/ })).toBeNull();
+  });
+
+  it("exports the map as Mermaid", async () => {
+    open();
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const create = vi.fn(() => "blob:x");
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() });
+    await userEvent.click(await screen.findByRole("button", { name: /Mermaid/ }));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+  });
+  it("colours the code graph by recent changes on request, saying every function takes its file's heat", async () => {
+    open({ code: { ...codeGraph, heat: { n1: 1, n2: 0.2, f1: 1, n3: 0, n4: 0 }, heat_days: 90 } });
+    await userEvent.click(await screen.findByLabelText("orders-svc"));
+    await userEvent.click(screen.getByLabelText("pricing-svc"));
+    const box = await screen.findByRole("checkbox", { name: /Colour by recent changes/ });
+    expect(box).not.toBeChecked();
+    expect(box.closest("label")).toHaveTextContent("last 90 days; every function takes its file's heat");
+    await userEvent.click(box);
+    expect(box).toBeChecked();
+  });
+
 });

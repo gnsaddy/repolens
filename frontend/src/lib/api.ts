@@ -334,7 +334,7 @@ export interface GoldenOverview {
 export interface SystemGroup { id: string; name: string; description: string; repo_ids: string[]; hidden: number; created_by: string; created_by_name: string; created_at: string; updated_at: string }
 export interface SystemRepo { id: string; name: string; source: string; status: string; files: number; role: string; chunks: number; risk: SystemRisk; heat: SystemRisk }
 export interface SystemRisk { commits: number; lines: number; fixes: number; drift_open: number }
-export interface CodeGraph { nodes: GraphNode[]; edges: GraphEdge[]; available: { strong: number; weak: number }; shown_weak: boolean; truncated: boolean }
+export interface CodeGraph { nodes: GraphNode[]; edges: GraphEdge[]; available: { strong: number; weak: number }; shown_weak: boolean; truncated: boolean; heat?: Record<string, number>; heat_days?: number }
 export interface SystemLink { src: string; dst: string; count: number; strong: number; http: number; imports: number; declared: number; infra: number; declared_unused?: boolean; undeclared?: boolean; weak: number; strength: number; rels: Record<string, number>; trust: "fact" | "inferred" | "uncertain"; examples: { rel: string; from: string; to: string; evidence: string }[] }
 export interface SystemCoupling { a: string; b: string; tickets: number; ticket_examples: string[]; days: number; score: number }
 export interface SystemAnalysis { window_days: number; repos: SystemRepo[]; links: SystemLink[]; coupling: SystemCoupling[]; coverage: Record<string, LinkCoverage>; estimate_tokens: number }
@@ -346,3 +346,8 @@ export interface Impact { node: { id: string; name: string; type: string; path: 
 export interface Surface { repo: { id: string; name: string }; symbols: { id: string; name: string; type: string; path: string; uses: number; repos: string[]; kinds: string[]; trust: string }[]; dependants: string[]; declared_by: { repo: string; file: string; evidence: string }[]; linked_by: { repo: string; rel: string; file: string; evidence: string }[]; hidden: number; exports: number; unused_exports: { name: string; package: string; path: string }[]; note: string }
 export interface ChangePair { src: string; dst: string; from: string; to: string; count: number; examples: { from: string; to: string; evidence: string; at: string }[] }
 export interface LinkChanges { days: number; tracking_since: string; new: ChangePair[]; removed: ChangePair[]; computed_at: string }
+export interface ArchExample { rel: string; from: string; to: string; evidence: string }
+export interface ArchRule { id: string; kind: string; src: string; dst: string; src_name: string; dst_name: string; note: string; created_by: string; created_at: string; broken: boolean; violation: { links: number; trust: string; rels: Record<string, number>; examples: ArchExample[] } | null }
+export interface ArchCycle { repos: string[]; names: string[]; edges: { src: string; dst: string; trust: string; links: number; proof: string }[] }
+export interface Architecture { rules: ArchRule[]; hidden_rules: number; broken: number; cycles: ArchCycle[]; checked: number }
+export interface ExportedGraph { format: string; filename: string; content: string }

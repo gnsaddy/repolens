@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased
 
-from ..models import Change, DriftAlert, GroupOverview, KGEdge, KGNode, RepoGroup, Repository
+from ..models import ArchRule, Change, DriftAlert, GroupOverview, KGEdge, KGNode, RepoGroup, Repository
 from . import graph as kg
 from . import knowledge as kb
 from . import repo_links as lk
@@ -494,6 +494,9 @@ def forget_repo(db: Session, org: str, repo_id: str) -> None:
     for o in db.scalars(select(GroupOverview).where(GroupOverview.org_id == org)):
         if repo_id in (o.repo_ids or []):
             db.delete(o)
+    for r in db.scalars(select(ArchRule).where(ArchRule.org_id == org)):
+        if repo_id in (r.src_repo, r.dst_repo):
+            db.delete(r)
     lk.forget_repo(db, org, repo_id)
 
 
@@ -657,9 +660,36 @@ def code_graph(
             "weak": weak_n + guess_n,
         },
         "shown_weak": weak,
+        "heat": _node_heat(db, list(nodes.values())),
+        "heat_days": WINDOW_DAYS,
         "truncated": len(proven) + len(over_http) + len(declares) + len(naming) + (strong_n + (weak_n if weak else 0))
         > limit,
     }
+
+
+def _node_heat(db: Session, nodes: Sequence[KGNode], days: int = WINDOW_DAYS) -> dict[str, float]:
+    """0..1 per node: how often the commits of the last `days` days touched the node's file, on a log scale. The history
+    is kept per file, so every function in a file shares its file's heat; the picture says so."""
+    repos = list({n.repo_id for n in nodes})
+    if not repos:
+        return {}
+    touched: dict[tuple[str, str], int] = {}
+    for repo, files in _changes_files(db, repos, days):
+        for f in files or []:
+            path = f.get("path") if isinstance(f, dict) else None
+            if path:
+                touched[(repo, path)] = touched.get((repo, path), 0) + 1
+    top = max((touched.get((n.repo_id, n.path), 0) for n in nodes), default=0)
+    if not top:
+        return {n.id: 0.0 for n in nodes}
+    return {n.id: round(math.log1p(touched.get((n.repo_id, n.path), 0)) / math.log1p(top), 3) for n in nodes}
+
+
+def _changes_files(db: Session, repos: list[str], days: int) -> Sequence:
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    return db.execute(
+        select(Change.repo_id, Change.files).where(Change.repo_id.in_(repos), Change.committed_at >= cutoff)
+    ).all()
 
 
 # --- asking about a system ---------------------------------------------------------------------------------------

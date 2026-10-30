@@ -331,6 +331,8 @@ picture is stored: `analyse(db, org, ids, days)` computes it when asked, from da
   deletes overviews written from it. `POST /api/groups/{id}/overview` is in the heavy-call rate limit.
 
 ## Stored dependencies between repositories
+**Architecture** (`services/architecture.py`, table `arch_rules`, migration 0029): a rule is `forbid` from one repository to another, kept per saved system (cascade on delete; removing a repository removes its rules). `GET /api/groups/{gid}/architecture` runs `analyse` over the repositories the reader may open and returns each rule with `broken` and the proving examples, the count of rules hidden by scope, and `cycles` (strongly connected parts of the graph of pairs with at least one proven link: `strong + http + imports + declared + infra`, never weak matches). `POST /{gid}/rules` and `DELETE /{gid}/rules/{rid}` are `group.write` and need an admin or the system's author; notes pass through `redact_stored`. `GET /api/groups/export?format=mermaid|json` renders the same proven pairs (labels have bracket, quote and newline characters removed so a name cannot break out of the diagram). `code_graph` adds `heat` (0..1 per node, log scale of commits in 90 days touching the node's file) and `heat_days`.
+
 `services/repo_links.py`, tables `repo_links` and `link_states` (migration 0028). The finders that used to run each time the Graph page was opened now live here
 as **detectors** (`Detector`: `name`, `kind`, `languages`, `detect(db, ids) -> (links, coverage info)`), registered in `DETECTORS`. Today there are two,
 `ImportDetector` (imports, resolved to definitions through a package's re-exports) and `HttpDetector` (URLs matched to routes); a new kind of link is a new
