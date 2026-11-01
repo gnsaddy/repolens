@@ -1,0 +1,6 @@
+# Text files are LF in the repository and on checkout, so Windows, WSL and CI see the same bytes.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
