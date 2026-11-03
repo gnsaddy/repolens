@@ -352,5 +352,5 @@ export interface ArchCycle { repos: string[]; names: string[]; edges: { src: str
 export interface Architecture { rules: ArchRule[]; hidden_rules: number; broken: number; cycles: ArchCycle[]; checked: number }
 export interface ExportedGraph { format: string; filename: string; content: string }
 export interface FeatureTokens { calls: number; input_tokens: number; output_tokens: number; cost: number }
-export interface FeatureDraft { id: string; title: string; status: string; repo: string; repo_id: string; created_at: string; ok: boolean | null; tokens: FeatureTokens }
+export interface FeatureDraft { id: string; title: string; status: string; repo: string; repo_id: string; created_at: string; ok: boolean | null; tokens: FeatureTokens; shared: boolean; mine: boolean; author_name: string }
 export interface FeatureDraftView extends FeatureDraft { request: string; spec: string; impact: { file: string; dependants: number; repos: string[]; hidden: number; examples: string[] }[]; diff: string; new_files: { path: string; content: string; test: boolean }[]; review: { ok: boolean; errors: number; warnings: number; findings: { level: string; file: string; message: string }[]; note: string }; pr_title: string; pr_body: string; reused?: boolean; model: string; error: string; base_sha: string; note: string }

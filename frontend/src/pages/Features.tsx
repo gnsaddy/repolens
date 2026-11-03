@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Sparkles, Trash2 } from "lucide-react";
+import { Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
@@ -37,6 +37,11 @@ export default function FeaturesPage() {
     mutationFn: (id: string) => api(`/features/${id}`, { method: "DELETE" }),
     onSuccess: () => { setOpenId(null); qc.invalidateQueries({ queryKey: ["features"] }); toast("Draft deleted"); },
   });
+  const share = useMutation({
+    mutationFn: (v: { id: string; shared: boolean }) => api<FeatureDraftView>(`/features/${v.id}`, { method: "PATCH", json: { shared: v.shared } }),
+    onSuccess: (d) => { qc.setQueryData(["feature", d.id], d); qc.invalidateQueries({ queryKey: ["features"] }); toast(d.shared ? "Shared with the workspace" : "Now private to you"); },
+  });
+  const ask = async (x: FeatureDraft) => { if (await confirm({ title: "Delete this draft?", message: x.title || "Untitled", confirmLabel: "Delete", danger: true })) remove.mutate(x.id); };
   const d = one.data;
   return (
     <div>
@@ -45,7 +50,7 @@ export default function FeaturesPage() {
         <div className="space-y-4 lg:col-span-2">
           <Card aria-label="New draft">
             <CardTitle>Describe the feature</CardTitle>
-            {!write ? <p className="text-sm text-muted">Members can draft features. You can read drafts you were given access to.</p> : (
+            {!write ? <p className="text-sm text-muted">Members can draft features. You can read drafts others shared with the workspace.</p> : (
               <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); make.mutate(false); }}>
                 <Label>Repository
                   <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
@@ -62,36 +67,43 @@ export default function FeaturesPage() {
             <CardTitle>Drafts</CardTitle>
             {list.isLoading ? <Spinner /> : !list.data?.drafts.length ? <p className="text-sm text-muted">No drafts yet.</p> : (
               <ul className="divide-y divide-line text-sm">{list.data.drafts.map((x) => (
-                <li key={x.id}><button className={`w-full py-2 text-left hover:bg-slate-50 ${openId === x.id ? "font-medium" : ""}`} onClick={() => setOpenId(x.id)}>
-                  <div className="truncate">{x.title || "Untitled"}</div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted">{x.repo} · {timeAgo(x.created_at)} · {tokens(x.tokens.input_tokens + x.tokens.output_tokens)} tokens
-                    <Badge tone={x.status === "failed" ? "red" : x.ok === false ? "amber" : "green"}>{x.status === "failed" ? "failed" : x.ok === false ? "needs work" : "drafted"}</Badge></div>
-                </button></li>))}</ul>)}
+                <li key={x.id} className="flex items-start gap-1">
+                  <button className={`min-w-0 flex-1 py-2 text-left hover:bg-slate-50 ${openId === x.id ? "font-medium" : ""}`} onClick={() => setOpenId(x.id)}>
+                    <div className="truncate">{x.title || "Untitled"}</div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted">{x.repo} · {x.mine ? "you" : x.author_name} · {timeAgo(x.created_at)} · {tokens(x.tokens.input_tokens + x.tokens.output_tokens)} tokens
+                      <Badge tone={x.status === "failed" ? "red" : x.ok === false ? "amber" : "green"}>{x.status === "failed" ? "failed" : x.ok === false ? "needs work" : "drafted"}</Badge>
+                      <Badge tone={x.shared ? "blue" : "gray"}>{x.shared ? "shared" : "private"}</Badge></div>
+                  </button>
+                  {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "draft"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
+                </li>))}</ul>)}
           </Card>
         </div>
 
         <div className="space-y-4 lg:col-span-3">
-          {!openId ? <Empty>Describe a feature, or open a draft.</Empty> : one.isLoading ? <Spinner /> : !d ? <ErrorNote error={one.error} /> : <Draft d={d} reused={d.id === reusedId} write={write} again={make.isPending ? undefined : () => make.mutate(true)}
-            onDelete={async () => { if (await confirm({ title: "Delete this draft?", confirmLabel: "Delete" })) remove.mutate(d.id); }} />}
+          {!openId ? <Empty>Describe a feature, or open a draft.</Empty> : one.isLoading ? <Spinner /> : !d ? <ErrorNote error={one.error} /> : <Draft d={d} reused={d.id === reusedId} write={write} admin={user?.role === "admin"} again={make.isPending ? undefined : () => make.mutate(true)}
+            onShare={(shared) => share.mutate({ id: d.id, shared })} onDelete={() => ask(d)} />}
         </div>
       </div>
     </div>
   );
 }
 
-function Draft({ d, reused, write, again, onDelete }: { d: FeatureDraftView; reused: boolean; write: boolean; again?: () => void; onDelete: () => void }) {
+function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: FeatureDraftView; reused: boolean; write: boolean; admin: boolean; again?: () => void; onShare: (shared: boolean) => void; onDelete: () => void }) {
   const toast = useToast();
   const copy = (text: string, what: string) => navigator.clipboard?.writeText(text).then(() => toast(`${what} copied`), () => toast("Could not copy"));
   const t = d.tokens;
   return (
     <>
       <Card aria-label="Draft summary">
-        <CardTitle right={write && <Button size="sm" variant="ghost" aria-label="Delete draft" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>}>{d.title || "Draft"}</CardTitle>
+        <CardTitle right={<span className="flex items-center gap-2">
+          {d.mine && <Button size="sm" variant="outline" onClick={() => onShare(!d.shared)}>{d.shared ? <><Lock className="h-4 w-4" />Make private</> : <><Share2 className="h-4 w-4" />Share with workspace</>}</Button>}
+          {(d.mine || admin) && <Button size="sm" variant="outline" aria-label="Delete draft" onClick={onDelete}><Trash2 className="h-4 w-4" />Delete</Button>}</span>}>{d.title || "Draft"}</CardTitle>
         {reused && (
           <p role="status" className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800">This is your earlier draft for the same request on the same code, so no tokens were used.
             {write && again && <Button size="sm" variant="outline" className="ml-2" onClick={again}>Draft again anyway</Button>}</p>)}
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
           <Badge tone={d.status === "failed" ? "red" : "green"}>{d.status}</Badge>
+          <Badge tone={d.shared ? "blue" : "gray"}>{d.shared ? `shared by ${d.mine ? "you" : d.author_name}` : "private to you"}</Badge>
           <span>{d.repo} · written against {d.base_sha.slice(0, 8)} · {d.model || "no model"}</span>
           <span aria-label="Tokens used">{tokens(t.input_tokens)} in, {tokens(t.output_tokens)} out, {t.calls} call{t.calls === 1 ? "" : "s"}{t.cost ? `, about $${t.cost.toFixed(4)}` : ""}</span>
         </div>

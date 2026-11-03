@@ -15,7 +15,7 @@ afterEach(() => vi.restoreAllMocks());
 const me = (role = "member") => ({ id: "1", email: "sam@acme.io", name: "Sam", role, org_id: "o", auth_source: "password" });
 const repos = [{ id: "a", name: "shop", source: "git", status: "ready" }, { id: "h", name: "handbook", source: "docs", status: "ready" }, { id: "n", name: "new-repo", source: "git", status: "indexing" }];
 const tokens = { calls: 1, input_tokens: 2000, output_tokens: 300, cost: 0.0105 };
-const short: FeatureDraft = { id: "d1", title: "Add a discount", status: "drafted", repo: "shop", repo_id: "a", created_at: new Date().toISOString(), ok: true, tokens };
+const short: FeatureDraft = { id: "d1", title: "Add a discount", status: "drafted", repo: "shop", repo_id: "a", created_at: new Date().toISOString(), ok: true, tokens, shared: false, mine: true, author_name: "sam" };
 const full: FeatureDraftView = {
   ...short, request: "Add a discount", spec: "Add an optional percentage.", base_sha: "abcdef123456", model: "claude-sonnet-5-5", error: "",
   impact: [{ file: "app/pricing.py", dependants: 2, repos: ["billing"], hidden: 1, examples: ["billing: invoices.py:total"] }],
@@ -25,7 +25,7 @@ const full: FeatureDraftView = {
   pr_title: "Add a discount", pr_body: "Adds an optional percentage.", note: "A draft is text only. Nothing was applied, branched or pushed. Copy it where you want it and test it.",
 };
 
-function open(opts: { role?: string; drafts?: FeatureDraft[]; fail?: string; reuse?: boolean } = {}) {
+function open(opts: { role?: string; drafts?: FeatureDraft[]; fail?: string; reuse?: boolean; theirs?: boolean } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -33,9 +33,10 @@ function open(opts: { role?: string; drafts?: FeatureDraft[]; fail?: string; reu
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
     if (url.endsWith("/features") && method === "POST") return opts.fail ? json({ detail: opts.fail }, 409) : json({ ...full, reused: opts.reuse && !JSON.parse(String(init?.body)).fresh }, 201);
-    if (url.endsWith("/features")) return json({ drafts: opts.drafts ?? [short] });
+    if (url.endsWith("/features")) return json({ drafts: opts.drafts ?? [opts.theirs ? { ...short, mine: false, shared: true, author_name: "ann" } : short] });
     if (url.includes("/features/d1") && method === "DELETE") return json(null, 204);
-    if (url.includes("/features/d1")) return json(full);
+    if (url.includes("/features/d1") && method === "PATCH") return json({ ...full, shared: JSON.parse(String(init?.body)).shared });
+    if (url.includes("/features/d1")) return json(opts.theirs ? { ...full, mine: false, shared: true, author_name: "ann" } : full);
     return json({});
   });
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter><FeaturesPage /></MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
@@ -58,7 +59,7 @@ describe("Build a feature", () => {
 
   it("shows the impact, the review with its limits, the change and the pull request text", async () => {
     open();
-    await userEvent.click(await screen.findByRole("button", { name: /Add a discount/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add a discount/ }));
     const impact = await screen.findByLabelText("Impact");
     expect(impact).toHaveTextContent("app/pricing.py is used by 2 places in billing and 1 you cannot access");
     const review = screen.getByLabelText("Review");
@@ -89,15 +90,46 @@ describe("Build a feature", () => {
 
   it("deletes a draft after asking", async () => {
     const calls = open();
-    await userEvent.click(await screen.findByRole("button", { name: /Add a discount/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Add a discount/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete draft" }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/features/d1"))).toBe(true));
   });
 
+  it("shares a draft with the workspace and makes it private again", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByRole("button", { name: /^Add a discount/ }));
+    expect(await screen.findByText("private to you")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Share with workspace/ }));
+    await waitFor(() => expect(calls.some((c) => c.method === "PATCH" && c.url.endsWith("/features/d1") && c.body?.shared === true)).toBe(true));
+    expect(await screen.findByText("shared by you")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Make private/ }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "PATCH").map((c) => c.body?.shared)).toEqual([true, false]));
+  });
+
+  it("deletes a draft from the list too, after asking", async () => {
+    const calls = open();
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Add a discount" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url.endsWith("/features/d1"))).toBe(true));
+  });
+
+  it("shows who shared a draft and offers the reader no share or delete", async () => {
+    open({ theirs: true });
+    const item = await screen.findByRole("button", { name: /^Add a discount/ });
+    expect(item).toHaveTextContent("ann");
+    expect(item).toHaveTextContent("shared");
+    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+    await userEvent.click(item);
+    await screen.findByLabelText("Impact");
+    expect(screen.getByText("shared by ann")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Share with workspace|Make private/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete draft" })).toBeNull();
+  });
+
   it("lets a viewer read drafts but not make or delete them", async () => {
-    open({ role: "viewer" });
-    await userEvent.click(await screen.findByRole("button", { name: /Add a discount/ }));
+    open({ role: "viewer", theirs: true });
+    await userEvent.click(await screen.findByRole("button", { name: /^Add a discount/ }));
     await screen.findByLabelText("Impact");
     expect(screen.queryByRole("button", { name: /Draft the feature/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete draft" })).toBeNull();

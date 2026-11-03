@@ -88,7 +88,7 @@ once your workspace exists; a generated-code execution sandbox is not implemente
 
 ## Feature drafts
 
-Build a feature sends the request and the text of up to five matching files to the configured language model, like Ask does. Its output is stored as text and never applied, branched, pushed or run. Edits cannot touch build, deployment, CI, dependency or secrets files; secrets are redacted from what is stored; drafts are visible only to their author and admins, and only for repositories the reader can open.
+Build a feature sends the request and the text of up to five matching files to the configured language model, like Ask does. Its output is stored as text and never applied, branched, pushed or run. Edits cannot touch build, deployment, CI, dependency or secrets files; secrets are redacted from what is stored; drafts are private to their author (admins cannot read them) until the author shares one with the workspace, and a shared draft is shown only to people who can open its repository.
 
 ## What the sign-in page claims, and what backs it
 

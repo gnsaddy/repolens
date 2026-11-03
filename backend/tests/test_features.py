@@ -163,18 +163,41 @@ def test_a_request_with_no_matching_code_is_refused_before_the_model_is_asked(cl
     assert r.status_code == 409 and model.calls == 0
 
 
-def test_drafts_are_private_to_their_author_and_admins_and_only_members_write(client, auth, repo, model):
+def test_a_draft_is_private_to_its_author_even_from_admins_until_it_is_shared(client, auth, repo, model):
     ann = make_user(client, auth, "ann@acme.io", "member")
     bob = make_user(client, auth, "bob@acme.io", "member")
     viewer = make_user(client, auth, "v@acme.io", "viewer")
     assert ask(client, viewer, repo).status_code == 403
     mine = ask(client, ann, repo).json()
-    assert client.get(f"/api/features/{mine['id']}", headers=bob).status_code == 404
-    assert client.delete(f"/api/features/{mine['id']}", headers=bob).status_code == 404
+    assert mine["shared"] is False and mine["mine"] is True
+    for other in (bob, auth):  # a private draft is not found, whoever asks, an admin included
+        assert client.get(f"/api/features/{mine['id']}", headers=other).status_code == 404
+        assert client.delete(f"/api/features/{mine['id']}", headers=other).status_code == 404
+        assert client.get("/api/features", headers=other).json()["drafts"] == []
     assert [d["id"] for d in client.get("/api/features", headers=ann).json()["drafts"]] == [mine["id"]]
-    assert client.get("/api/features", headers=bob).json()["drafts"] == []
-    assert len(client.get("/api/features", headers=auth).json()["drafts"]) == 1  # an admin sees every draft
     assert client.delete(f"/api/features/{mine['id']}", headers=ann).status_code == 204
+    assert client.get("/api/features", headers=ann).json()["drafts"] == []
+
+
+def test_sharing_lets_the_workspace_read_but_only_the_author_changes_and_an_admin_removes(client, auth, repo, model):
+    ann = make_user(client, auth, "ann@acme.io", "member")
+    bob = make_user(client, auth, "bob@acme.io", "member")
+    viewer = make_user(client, auth, "v@acme.io", "viewer")
+    mine = ask(client, ann, repo).json()
+    url = f"/api/features/{mine['id']}"
+    assert client.patch(url, headers=bob, json={"shared": True}).status_code == 404  # not even visible to bob
+    shared = client.patch(url, headers=ann, json={"shared": True}).json()
+    assert shared["shared"] is True and shared["author_name"] == "ann"
+    for reader in (bob, viewer, auth):
+        seen = client.get(url, headers=reader).json()
+        assert seen["id"] == mine["id"] and seen["mine"] is False and seen["author_name"] == "ann"
+        assert [d["id"] for d in client.get("/api/features", headers=reader).json()["drafts"]] == [mine["id"]]
+    assert client.patch(url, headers=bob, json={"shared": False}).status_code == 403
+    assert client.delete(url, headers=bob).status_code == 403 and client.delete(url, headers=viewer).status_code == 403
+    assert client.patch(url, headers=ann, json={"shared": False}).json()["shared"] is False
+    assert client.get(url, headers=bob).status_code == 404  # private again
+    client.patch(url, headers=ann, json={"shared": True})
+    assert client.delete(url, headers=auth).status_code == 204  # an admin can remove one that was shared
 
 
 def test_a_draft_for_a_repository_someone_cannot_open_is_not_found(client, auth, repo, model):
@@ -182,6 +205,18 @@ def test_a_draft_for_a_repository_someone_cannot_open_is_not_found(client, auth,
     body = {"visibility": "restricted", "user_ids": []}
     client.put(f"/api/repositories/{repo['id']}/access", headers=auth, json=body)
     assert ask(client, ann, repo).status_code == 404
+
+
+def test_a_shared_draft_of_a_repository_someone_cannot_open_is_not_found(client, auth, repo, model):
+    ann = make_user(client, auth, "ann@acme.io", "member")
+    bob = make_user(client, auth, "bob@acme.io", "member")
+    made = ask(client, ann, repo).json()
+    client.patch(f"/api/features/{made['id']}", headers=ann, json={"shared": True})
+    body = {"visibility": "restricted", "user_ids": [client.get("/api/auth/me", headers=ann).json()["id"]]}
+    client.put(f"/api/repositories/{repo['id']}/access", headers=auth, json=body)
+    assert client.get(f"/api/features/{made['id']}", headers=bob).status_code == 404
+    assert client.get("/api/features", headers=bob).json()["drafts"] == []
+    assert client.get(f"/api/features/{made['id']}", headers=ann).status_code == 200
 
 
 def test_deleting_a_repository_removes_its_drafts(client, auth, repo, model, session):
