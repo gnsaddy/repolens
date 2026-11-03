@@ -104,6 +104,11 @@ def run(client, h, repo, persona="security-auditor", request=REQUEST, **extra):
     return client.post("/api/personas/runs", headers=h, json=body)
 
 
+def test_nothing_about_personas_is_available_without_signing_in(client):
+    for method, url in (("get", "/api/personas"), ("get", "/api/personas/runs"), ("post", "/api/personas/runs")):
+        assert getattr(client, method)(url).status_code == 401
+
+
 def test_the_personas_are_listed_with_what_each_one_does(client, auth):
     got = client.get("/api/personas", headers=auth).json()["personas"]
     assert [p["key"] for p in got] == ["security-auditor", "test-engineer"]

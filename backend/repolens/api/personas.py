@@ -76,7 +76,7 @@ def _view(db: Session, row: PersonaRun, p: Principal) -> dict:
 
 
 @router.get("")
-def personas():
+def personas(p: Principal = Depends(current_principal)):
     return {"personas": svc.listing()}
 
 
