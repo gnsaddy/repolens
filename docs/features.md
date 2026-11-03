@@ -337,6 +337,9 @@ Beside the sign-in form, a panel says what RepoLens does (ask with citations, ca
 
 ## Graph trust, areas and Start here
 
+**Dependencies between repositories on the Knowledge graph.** When the graph shows more than one repository, the proven links between them (imports, URLs, manifests, shared image and service names, with their trust and proof) are drawn as the same amber dashed bridges as on the Graph page, and the nodes at their ends are added even when they are not among the most connected. URL calls therefore show a JavaScript front end connected to the services it calls. **Facts only** hides the inferred ones (URL matches and name matches). A call matched by a name alone is no longer labelled a fact: code analysis counts as a fact only at weight 0.8 or more, as *inferred* from 0.5, and *uncertain* below that.
+
+
 Every connection in the graph says how far it can be trusted: **fact** (found directly in the code, a document link, git or GitHub), **inferred** (guessed from shared words or meaning) or **uncertain** (a weak guess). The graph draws facts solid, inferred links dashed and uncertain ones dotted, and **Facts only** hides the rest. **Colour by → Area** groups nodes into communities, the parts of a repository that hang together (found from the connections themselves, without a model).
 
 **Start here** appears on the graph page and at the top of the wiki's Code atlas once a repository is chosen: the areas, the **hubs** (most connected, so a change there reaches the most other things), **surprising connections** between areas, and good first questions. Editors get the same through three MCP tools: `graph_overview`, `graph_neighbors` and `graph_path`.

@@ -24,6 +24,8 @@ _cache: dict[tuple, dict] = {}
 def trust(provenance: str, weight: float = 1.0) -> str:
     """fact: found directly (code analysis, document links, git, GitHub). inferred: guessed from words or meaning, with a
     similarity that is high enough to show. uncertain: the same, but weak."""
+    if provenance == "static_analysis":  # a call matched by a name alone is a guess, not a fact
+        return "fact" if weight >= 0.8 else "inferred" if weight >= 0.5 else "uncertain"
     if provenance in FACT:
         return "fact"
     return "inferred" if weight >= 0.5 else "uncertain"

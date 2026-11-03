@@ -17,6 +17,7 @@ from ..services import answer_memory, importers
 from ..services import graph as g
 from ..services import graph_insights as gi
 from ..services import knowledge as kb
+from ..services import repo_links as lk
 from ..services.access import scope_for
 from ..services.policy import authorize
 from .repos import _get_repo, schedule_index
@@ -337,10 +338,52 @@ def graph_overview(
     if rels:
         eq = eq.where(KGEdge.rel.in_(rels.split(",")))
     names = _names(db, p)
+    edges = [g.edge_dict(e) for e in db.scalars(eq)]
+    if not repo_id:  # the dependencies between repositories, which a graph built one repository at a time cannot hold
+        more_nodes, link_edges = _repo_links(db, p.org_id, visible_ids, {n.id for n in nodes}, wanted)
+        nodes += more_nodes
+        edges += link_edges
     return {
         "nodes": _with_community(db, [g.node_dict(n, names) for n in nodes]),
-        "edges": [g.edge_dict(e) for e in db.scalars(eq)],
+        "edges": edges,
     }
+
+
+LINKS_SHOWN = 80  # stored cross-repository links drawn at once, strongest first
+LINK_KINDS = ("import", "http", "manifest", *lk.IDENT_KINDS)
+
+
+def _repo_links(
+    db: Session, org: str, visible: list[str] | None, have: set[str], wanted: set[str]
+) -> tuple[list[KGNode], list[dict]]:
+    """The proven links between repositories (imports, URLs, manifests, shared names) as graph edges, with the nodes at
+    their ends added when the overview did not already pick them. Only links between repositories the reader may open;
+    a guess at a variable name (uncertain) is left out."""
+    ids = visible if visible is not None else list(db.scalars(select(Repository.id).where(Repository.org_id == org)))
+    rows = [r for r in lk.rows(db, org, ids, LINK_KINDS) if r["trust"] != "uncertain"][:LINKS_SHOWN]
+    ends = {r["src"] for r in rows} | {r["dst"] for r in rows}
+    found = {n.id: n for n in db.scalars(select(KGNode).where(KGNode.id.in_(ends)))} if ends else {}
+    edges, added = [], {}
+    for r in rows:
+        a, b = found.get(r["src"]), found.get(r["dst"])
+        if a is None or b is None or a.type not in wanted or b.type not in wanted:
+            continue
+        for n in (a, b):
+            if n.id not in have:
+                added[n.id] = n
+        edges.append(
+            {
+                "id": f"link:{r['src']}:{r['dst']}:{r['rel']}",
+                "source": r["src"],
+                "target": r["dst"],
+                "rel": r["rel"],
+                "provenance": "repo_link",
+                "trust": r["trust"],
+                "weight": r["weight"],
+                "evidence": r["evidence"],
+            }
+        )
+    return list(added.values()), edges
 
 
 @router.get("/graph/nodes")
