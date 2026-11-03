@@ -20,6 +20,18 @@ from .graph_insights import trust
 
 SYMBOL_TYPES = {"function": "function", "method": "function", "class": "class", "interface": "class", "type": "class"}
 CODE_LANGS = {"python", "javascript", "typescript", "tsx", "go", "java"}
+
+
+def method_calls_only(code: str, name: str) -> bool:
+    """Whether `name` is only ever called on an object here (`conn.execute(...)`, `obj->run()`, `Type::make()`), never
+    as a plain call. A method of that name in another repository is then no evidence of a dependency: the receiver is
+    a different thing. (An import of the other repository's own function is a different, stronger kind of link.)"""
+    word = re.escape(name)
+    on_object = re.search(rf"(\.|->|::)\s*{word}\s*\(", code)
+    plain = re.search(rf"(?<![\w.>:]){word}\s*\(", code)
+    return bool(on_object and not plain)
+
+
 TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*$|_test\.[a-z]+$|\.(test|spec)\.[a-z]+$")
 COMMON_CALLS = {
     "get",
@@ -385,7 +397,7 @@ def build_repo_graph(db: Session, repo: Repository) -> dict:
                     )
                     if TEST_PATH.search(n.path) and tn.path != n.path:
                         tested[n.path].add(tn.path)
-            elif len(foreign.get(name, [])) == 1:
+            elif len(foreign.get(name, [])) == 1 and not method_calls_only(c.content or "", name):
                 add_edge(
                     n.id, foreign[name][0], "CALLS", "static_analysis", 0.4, f"{n.name} calls {name}() (cross-repo)"
                 )
