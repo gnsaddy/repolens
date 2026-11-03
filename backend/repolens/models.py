@@ -922,3 +922,29 @@ class ArchRule(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class FeatureDraft(Base):
+    """A feature drafted by the language model for review: a spec, the change as a diff, tests, a static review and a
+    pull request text. Nothing is applied, branched or pushed anywhere."""
+
+    __tablename__ = "feature_drafts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    base_sha: Mapped[str] = mapped_column(String(64), default="")  # the indexed commit the change was written against
+    title: Mapped[str] = mapped_column(String(300), default="")
+    request: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), default="drafting", index=True)  # drafting | drafted | failed
+    spec: Mapped[str] = mapped_column(Text, default="")
+    impact: Mapped[list] = mapped_column(JSON, default=list)  # what depends on the files that change
+    edits: Mapped[list] = mapped_column(JSON, default=list)  # [{path, old, new}] on existing files
+    new_files: Mapped[list] = mapped_column(JSON, default=list)  # [{path, content, test}]
+    diff: Mapped[str] = mapped_column(Text, default="")
+    review: Mapped[dict] = mapped_column(JSON, default=dict)  # {ok, findings: [{level, file, message}]}
+    pr_title: Mapped[str] = mapped_column(String(300), default="")
+    pr_body: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str] = mapped_column(String(100), default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

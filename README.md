@@ -16,7 +16,7 @@ from it with citations while keeping model cost low: several models are routed b
 answered from a local memory, and retrieved context is condensed before it reaches a model. Nothing needs a model to work;
 connecting one only improves the wording.
 
-**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **Graph** (how repositories depend on each other, with the proof), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
+**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **Graph** (how repositories depend on each other, with the proof), **Build a feature** (the model drafts a change, tests and a pull request text for you to review; nothing is applied), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
 Investigation View (root cause, confidence, timeline, code/commit/doc/test/PR evidence, report, human review), **Change
 Risk** (score a commit, branch or PR with signals, blast radius and tests to run), Token Usage & Cost, Jira, Settings (LLM
 provider + key, GitHub sign-in).

@@ -312,6 +312,8 @@ VIEWER_READS = """
     /api/dashboard
     /api/dashboard/calibration
     /api/dashboard/insights
+    /api/features
+    /api/features/{fid}
     /api/feedback/summary
     /api/fix-proposals/{fix_id}
     /api/fix-proposals/{fix_id}/patch

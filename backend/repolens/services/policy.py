@@ -36,6 +36,7 @@ ACTION_MIN_ROLE = {
     "token.create": "viewer",
     "fix.propose": "member",
     "fix.decide": "member",
+    "feature.draft": "member",  # a feature written by the model for review; nothing is applied
     "risk.preview": "viewer",
     "mcp.read": "viewer",
     "mcp.investigate": "member",

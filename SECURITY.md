@@ -86,6 +86,10 @@ of CSRF handling); tokens issued before server-side sessions existed cannot be r
 access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
 once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).
 
+## Feature drafts
+
+Build a feature sends the request and the text of up to five matching files to the configured language model, like Ask does. Its output is stored as text and never applied, branched, pushed or run. Edits cannot touch build, deployment, CI, dependency or secrets files; secrets are redacted from what is stored; drafts are visible only to their author and admins, and only for repositories the reader can open.
+
 ## What the sign-in page claims, and what backs it
 
 The sign-in page tells people why they can trust the product. Each statement there must stay true; change the page and this table together.

@@ -90,6 +90,17 @@ Reports follow the debugging practice described in Addy Osmani's [agent-skills](
 * **Who can see what:** a repository you cannot access is counted ("1 more") but never named, left out of the picture, and an overview built from it is hidden from you. Viewers can look; members can save and write overviews.
 * **What it does not see:** links that go through something outside the code, such as a shared database, a message queue or a call made from a configuration value. The page says so when it finds no links.
 
+## Build a feature: a draft the model writes, that you review
+
+**Build a feature** (its own entry in the sidebar). Pick an indexed code repository, describe the feature, and the model drafts it as a change to review. A draft is **text only**: nothing is applied, branched, pushed or run.
+
+* **What you get:** a spec (behaviour and edge cases), a unified diff of edits to existing files and any new files, tests, a pull request title and body to paste, and the model it used.
+* **What depends on it:** for each existing file the change touches, the places in other repositories that depend on it, from the stored dependency links (the same data as the Graph page). Repositories you cannot open are only counted.
+* **Review, by reading:** the change is not run, because the services it belongs to are not reachable from RepoLens. It is read instead: Python syntax, I/O calls with no try/except, swallowed errors (bare except, or Exception with pass), a changed signature or removed function with the callers found in the index, new public functions that no new test mentions, a missing test file, commands or evaluated text added to the code, and size. Other languages are checked for size, risky calls and tests only, and the review says which files it could not read. A clean review is not a proof that the code works.
+* **Tokens:** the draft shows the tokens in and out, the number of model calls and the estimated cost, taken from the same ledger as the Token Usage page. A failed draft keeps its tokens.
+* **Limits:** the model sees the files that best match the request (up to 5) and a list of paths, and works from the indexed commit. At most 12 edits and 8 new files; never build, deployment, CI, dependency or secrets files; a new file never overwrites an existing one; a draft over 700 changed lines is refused. If the model fails, the page says what failed. With no model configured it says so; there is no fake draft.
+* **Who:** members and admins draft. A draft is private to its author (admins can read all). A draft for a repository you cannot open is not found. Deleting a repository deletes its drafts.
+
 ## RepoLens health: is it doing its own housekeeping?
 
 **Insights → RepoLens health** (admins). It lists each background job (daily re-index, old-record clean-up, connected sources, stuck investigations, server readings, unused clones) as *ok*, *waiting*, *late* or *failing*, with when it last ran and the last error. Beside it: how many repositories are pending, indexing, ready or in error, and what the last saved-question run found. A banner names anything that needs attention in plain words ("The retention loop is late", "1 repository failed to index"). The same facts are in `GET /api/metrics/health` and, for dashboards and alerts, at `/metrics` (see Watching RepoLens itself in `docs/architecture.md`).
