@@ -55,14 +55,14 @@ def model(monkeypatch):
     """A fake hosted model; `model.reply` is what it answers, `model.calls` how often it was asked."""
     monkeypatch.setenv("REPOLENS_LLM_PROVIDER", "anthropic")
     get_settings.cache_clear()
-    state = type("M", (), {"reply": GOOD, "calls": 0, "fail": None})()
+    state = type("M", (), {"reply": GOOD, "calls": 0, "fail": None, "queue": []})()
 
     def fake(system, prompt, max_tokens, cfg=None):
         state.calls += 1
         assert "untrusted" in system and REQUEST[:20] in prompt
         if state.fail:
             raise RuntimeError(state.fail)
-        return LLMResult(json.dumps(state.reply), 2000, 300)
+        return LLMResult(json.dumps(state.queue.pop(0) if state.queue else state.reply), 2000, 300)
 
     monkeypatch.setattr(llm, "_anthropic_call", fake)
     yield state
@@ -131,7 +131,8 @@ def test_an_edit_that_does_not_apply_fails_the_draft_and_the_tokens_are_counted(
     r = ask(client, auth, repo)
     assert r.status_code == 409 and "could not be applied" in r.json()["detail"]
     row = session.query(FeatureDraft).one()
-    assert row.status == "failed" and svc.ledger(session, row.org_id, row.id)["input_tokens"] == 2000
+    ledger = svc.ledger(session, row.org_id, row.id)
+    assert row.status == "failed" and ledger["calls"] == 2 and ledger["input_tokens"] == 4000  # one repair attempt
 
 
 def test_paths_a_feature_may_not_use_are_refused(client, auth, repo, model):
@@ -232,3 +233,47 @@ def test_a_long_file_is_shown_only_around_the_match_and_a_short_one_whole():
     assert len(shown) < len(text) / 2
     small = "\n".join(f"x{n} = {n}" for n in range(1, 40))
     assert "x39 = 39" in svc._shown(small, [(1, 1)]) and "only the lines" not in svc._shown(small, [(1, 1)])
+
+
+CODE = "def a():\n    return 1\n\n\ndef target(x):\n    y = x + 1\n    return y\n\n\ndef b():\n    return 2\n"
+
+
+def test_an_edit_still_applies_when_the_model_copied_the_code_a_little_off():
+    new = "def target(x):\n    return x + 2"
+    cases = {
+        "exact": "def target(x):\n    y = x + 1\n    return y",
+        "line numbers": "    5  def target(x):\n    6      y = x + 1\n    7      return y",
+        "trailing spaces": "def target(x):   \n    y = x + 1  \n    return y",
+        "indentation": "  def target(x):\n      y = x + 1\n      return y",
+    }
+    for name, old in cases.items():
+        out = svc.apply_edits({"m.py": CODE}, [{"path": "m.py", "old": old, "new": new}])["m.py"]
+        assert "return x + 2" in out and "y = x + 1" not in out and "def a():" in out and "def b():" in out, name
+
+
+def test_an_indented_edit_keeps_the_indentation_of_the_code_it_replaces():
+    text = "class K:\n    def go(self):\n        return 1\n"
+    out = svc.apply_edits(
+        {"k.py": text}, [{"path": "k.py", "old": "def go(self):\n    return 1", "new": "def go(self):\n    return 2"}]
+    )
+    assert out["k.py"] == "class K:\n    def go(self):\n        return 2\n"
+
+
+def test_an_edit_that_matches_nowhere_or_in_two_places_is_still_refused():
+    twice = "x = 1\ny = 2\nx = 1\n"
+    with pytest.raises(svc.fixes.FixError, match="appears 2 times"):
+        svc.apply_edits({"t.py": twice}, [{"path": "t.py", "old": "x = 1", "new": "x = 3"}])
+    with pytest.raises(svc.fixes.FixError, match="appears 0 times"):
+        svc.apply_edits({"t.py": twice}, [{"path": "t.py", "old": "z = 9", "new": "z = 3"}])
+    with pytest.raises(svc.fixes.FixError, match="appears 2 times"):  # two places that differ only in indentation
+        svc.apply_edits(
+            {"t.py": "if a:\n    go()\nif b:\n  go()\n"}, [{"path": "t.py", "old": "go()", "new": "stop()"}]
+        )
+
+
+def test_an_edit_that_does_not_match_gets_one_repair_and_the_draft_succeeds(client, auth, repo, model):
+    wrong = {**GOOD["edits"][0], "old": "def compute_total(things):\n    return add_up(things)\n"}
+    model.queue = [{**GOOD, "edits": [wrong]}, {"edits": GOOD["edits"]}]
+    r = ask(client, auth, repo)
+    assert r.status_code == 201 and r.json()["status"] == "drafted" and model.calls == 2
+    assert "+def compute_total(items, discount=0):" in r.json()["diff"] and r.json()["tokens"]["calls"] == 2
