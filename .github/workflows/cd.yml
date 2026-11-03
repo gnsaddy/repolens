@@ -41,9 +41,10 @@ jobs:
 
   deploy:
     needs: publish
-    # With Argo CD (GitOps) the cluster pulls from git, so CI needs no cluster access: set the repository variable DEPLOY_MODE=gitops
-    # and this job is skipped. Releasing is then: tag, wait for the images, change the image tag in your overlay by pull request.
-    if: ${{ vars.DEPLOY_MODE != 'gitops' }}
+    # Deploying from CI is opt-in: set the repository variable DEPLOY_MODE=kubectl (and the KUBECONFIG_B64 secret) to have a
+    # tag roll out to a cluster. Without it a tag only publishes the images, which is what you want with Argo CD (the cluster
+    # pulls from git: tag, wait for the images, change the image tag in your overlay by pull request) or with no cluster at all.
+    if: ${{ vars.DEPLOY_MODE == 'kubectl' }}
     runs-on: ubuntu-latest
     environment: production        # configure required reviewers on this environment for manual approval
     steps:

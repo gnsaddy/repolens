@@ -84,7 +84,7 @@ Steps:
 2. **Create the secret once**, outside git: copy `deploy/k8s/secret.example.yaml`, fill it in, and `kubectl apply` it, or manage it with Sealed Secrets, External Secrets or SOPS so an encrypted form can live in git. The certificate secret (`repolens-tls`) follows the same rule, unless you use cert-manager.
 3. **Point Argo CD at it.** Edit `deploy/argocd/application.yaml` (`repoURL`, `targetRevision`, `path`) and apply it: `kubectl apply -f deploy/argocd/application.yaml`. For a private repository, give Argo CD a read credential first.
 4. **Release by pull request.** Tag a version in this repository (the CD workflow then publishes the images), then change the tag in your configuration repository. Argo CD shows the diff and syncs it.
-5. **Turn off the push-style deploy.** Set the repository variable `DEPLOY_MODE` to `gitops`; the CD workflow then only publishes images and never needs a kubeconfig.
+5. **Leave the push-style deploy off.** It is off by default: the CD workflow only publishes images and never needs a kubeconfig. It deploys from CI only if you set the repository variable `DEPLOY_MODE` to `kubectl` (and the `KUBECONFIG_B64` secret).
 
 Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.2-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
 
@@ -165,6 +165,9 @@ Changing the embedding model needs `python -m repolens.devtools.reembed` (see `e
 
 ## Versions and releases
 The app is at **v0.2-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.2.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.2-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.2-beta` publishes a GitHub release without deploying anything.
+
+### What a release tag does
+Pushing a tag shaped like `v0.2.1` runs the CD workflow (`.github/workflows/cd.yml`). Its **publish** job builds `repolens-api` and `repolens-web` and pushes them to `ghcr.io/<owner>/` with the tag (without the `v`) as the version. That is all it does by default. The **deploy** job, which applies the images to a Kubernetes cluster with `kubectl`, runs only when the repository variable `DEPLOY_MODE` is set to `kubectl` (a *repository* variable under Settings, Secrets and variables, Actions, Variables; an environment variable is not visible to the job condition) and the `KUBECONFIG_B64` secret holds a kubeconfig. Without a cluster, or with Argo CD, leave it unset. Releases before this change deployed unless `DEPLOY_MODE` was `gitops`; anyone relying on that must now set `kubectl`.
 
 ### What publishing images costs
 Release images go to GitHub's container registry, `ghcr.io`. **It is free for public packages and public images**: anyone can pull them, and storage and transfer are not billed. Private images count against the storage and transfer allowance of your GitHub plan (pulls from GitHub Actions are free), and GitHub changes those limits, so check your account's billing page before publishing a private image. A new package may start private: check its visibility under the package's settings on GitHub, and make it public if you want others to pull it without signing in.
