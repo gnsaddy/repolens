@@ -9,6 +9,7 @@ import { timeAgo } from "@/lib/utils";
 import Markdown from "./wiki/Markdown";
 
 const LEVEL: Record<string, "red" | "amber" | "gray"> = { error: "red", warn: "amber", info: "gray" };
+const RELATED_MAX = 4;
 const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
 /** Ask the model to draft a feature in one repository. The result is text to review: a spec, what depends on the files
@@ -21,15 +22,18 @@ export default function FeaturesPage() {
   const confirm = useConfirm();
   const [repoId, setRepoId] = useState("");
   const [request, setRequest] = useState("");
+  const [related, setRelated] = useState<string[]>([]);  // other repositories whose code is shown to the model, read-only
   const [openId, setOpenId] = useState<string | null>(null);
   const [reusedId, setReusedId] = useState<string | null>(null);  // the page was opened by reusing this draft
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
   const list = useQuery({ queryKey: ["features"], queryFn: () => api<{ drafts: FeatureDraft[] }>("/features") });
   const ready = (repos.data ?? []).filter((r) => r.source !== "docs" && r.status === "ready");
   const repo = repoId || ready[0]?.id || "";
+  const others = ready.filter((r) => r.id !== repo);
+  const chosen = related.filter((id) => others.some((o) => o.id === id));
   const one = useQuery({ queryKey: ["feature", openId], enabled: !!openId, queryFn: () => api<FeatureDraftView>(`/features/${openId}`), retry: false });
   const make = useMutation({
-    mutationFn: (fresh: boolean) => api<FeatureDraftView>("/features", { method: "POST", json: { repo_id: repo, request, fresh } }),
+    mutationFn: (fresh: boolean) => api<FeatureDraftView>("/features", { method: "POST", json: { repo_id: repo, request, fresh, related_repo_ids: chosen } }),
     onSuccess: (d) => { setOpenId(d.id); setReusedId(d.reused ? d.id : null); qc.invalidateQueries({ queryKey: ["features"] }); qc.setQueryData(["feature", d.id], d); toast(d.reused ? "Same as your earlier draft, no tokens used" : "Draft ready"); },
     onError: () => qc.invalidateQueries({ queryKey: ["features"] }),
   });
@@ -55,6 +59,24 @@ export default function FeaturesPage() {
                 <Label>Repository
                   <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
+                {others.length > 0 && (
+                  <fieldset className="space-y-1" aria-label="Other repositories">
+                    <legend className="text-sm font-medium">Also show code from <span className="font-normal text-muted">(read-only, optional)</span></legend>
+                    <details className="group rounded-md border border-line bg-white text-sm text-ink">
+                      <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 px-2" aria-label="Choose other repositories">
+                        <span className="truncate">{chosen.length ? others.filter((o) => chosen.includes(o.id)).map((o) => o.name).join(", ") : "None"}</span>
+                        <span className="shrink-0 text-xs text-muted">{chosen.length ? `${chosen.length} of ${RELATED_MAX} max` : "choose"} ▾</span>
+                      </summary>
+                      <div className="max-h-48 space-y-1 overflow-auto border-t border-line p-2">
+                        {others.map((o) => (
+                          <label key={o.id} className="flex items-center gap-2">
+                            <input type="checkbox" checked={chosen.includes(o.id)} disabled={!chosen.includes(o.id) && chosen.length >= RELATED_MAX}
+                              onChange={(e) => setRelated(e.target.checked ? [...chosen, o.id] : chosen.filter((x) => x !== o.id))} />{o.name}
+                          </label>))}
+                      </div>
+                    </details>
+                    <p className="text-xs text-muted">The model is always told which other repositories use the files it is likely to change. Ticking one also shows it a couple of that repository&apos;s files, which adds up to about 3k tokens each. It can read them but never change them; the draft says what must change there.</p>
+                  </fieldset>)}
                 <Label>What should it do?
                   <Textarea aria-label="What should it do?" rows={6} maxLength={4000} value={request} onChange={(e) => setRequest(e.target.value)}
                     placeholder="Add a percentage discount to the order total, with validation and tests." /></Label>
@@ -111,6 +133,19 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
         <p className="mt-3 text-xs text-muted">{d.note}</p>
       </Card>
       {d.status === "drafted" && (<>
+        <Card aria-label="Context">
+          <CardTitle>What the model knew about other repositories</CardTitle>
+          {d.related.length > 0 && <p className="text-sm">Code shown read-only from: {d.related.map((r) => r.name).join(", ")}.</p>}
+          {d.related_hidden > 0 && <p className="text-xs text-muted">{d.related_hidden} more repositor{d.related_hidden === 1 ? "y was" : "ies were"} used that you cannot access.</p>}
+          {d.context.files.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-xs">{d.context.files.map((f) => <li key={`${f.repo_id}${f.path}`}><code>{f.repo}: {f.path}</code> <span className="text-muted">{f.why}</span></li>)}</ul>)}
+          {d.context.facts.length > 0 ? (
+            <ul className="mt-2 space-y-1.5 text-sm">{d.context.facts.map((f, i) => (
+              <li key={i}><code>{f.path}</code> {f.direction === "used_by" ? "is used by" : "depends on"} <strong>{f.repo}</strong>
+                <span className="block text-xs text-muted"><code>{f.from}</code> → <code>{f.to}</code>{f.evidence && ` — ${f.evidence}`}</span></li>))}</ul>
+          ) : !d.related.length && !d.context.hidden ? <p className="text-sm text-muted">The model saw only this repository&apos;s code. No other repository was found to depend on the files it read, or to be depended on by them.</p> : null}
+          {d.context.hidden > 0 && <p className="mt-2 text-xs text-muted">{d.context.hidden} more link{d.context.hidden === 1 ? "" : "s"} involve repositories you cannot access; they are not described.</p>}
+        </Card>
         <Card aria-label="Impact">
           <CardTitle>What depends on the files this changes</CardTitle>
           {!d.impact.length ? <p className="text-sm text-muted">The change touches no existing file, so nothing depends on it yet.</p> : (

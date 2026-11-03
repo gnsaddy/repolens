@@ -17,6 +17,7 @@ class DraftIn(BaseModel):
     repo_id: str = Field(min_length=1, max_length=32)
     request: str = Field(min_length=svc.REQUEST_MIN, max_length=svc.REQUEST_MAX)
     fresh: bool = False  # ask the model again even when an earlier draft says the same thing
+    related_repo_ids: list[str] = Field(default_factory=list, max_length=svc.RELATED_MAX)  # code shown read-only
 
 
 def _readable(db: Session, p: Principal, fid: str) -> FeatureDraft:
@@ -58,9 +59,27 @@ def _people(db: Session, ids: set[str]) -> dict[str, str]:
     return {uid: name or email.split("@")[0] for uid, name, email in rows}
 
 
+def _context(db: Session, row: FeatureDraft, p: Principal) -> dict:
+    """What the model was told about other repositories, as this reader may see it: anything about a repository they
+    cannot open is counted, never named."""
+    scope = scope_for(db, p)
+    ctx = row.context or {}
+    facts = [f for f in ctx.get("facts", []) if scope.can(f.get("repo_id", ""))]
+    files = [f for f in ctx.get("files", []) if scope.can(f.get("repo_id", ""))]
+    shown = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.id.in_(row.related_ids or [])))}
+    related = [{"id": i, "name": shown[i]} for i in row.related_ids or [] if i in shown and scope.can(i)]
+    dropped = (len(ctx.get("facts", [])) - len(facts)) + (len(ctx.get("files", [])) - len(files))
+    return {
+        "related": related,
+        "related_hidden": len(row.related_ids or []) - len(related),
+        "context": {"facts": facts, "files": files, "hidden": int(ctx.get("hidden", 0)) + dropped},
+    }
+
+
 def _view(db: Session, row: FeatureDraft, p: Principal) -> dict:
     repo = db.get(Repository, row.repo_id)
     return {
+        **_context(db, row, p),
         **_short(db, row, {row.repo_id: repo.name} if repo else {}, p, _people(db, {row.created_by})),
         "request": row.request,
         "spec": row.spec,
@@ -103,8 +122,14 @@ def create_draft(body: DraftIn, p: Principal = Depends(current_principal), db: S
     if repo is None or repo.org_id != p.org_id or not scope.can(repo.id):
         raise HTTPException(404, "Repository not found")
     authorize(db, p, "feature.draft", repo.name)
+    related = []
+    for rid in dict.fromkeys(body.related_repo_ids):
+        other = db.get(Repository, rid)
+        if other is None or other.org_id != p.org_id or not scope.can(other.id) or other.id == repo.id:
+            raise HTTPException(404, "Repository not found")  # one you cannot open is not found, like anywhere else
+        related.append(other)
     try:
-        row, reused = svc.draft(db, p.org_id, p.user_id, scope, repo, body.request, body.fresh)
+        row, reused = svc.draft(db, p.org_id, p.user_id, scope, repo, body.request, body.fresh, related)
     except svc.FeatureError as e:
         raise HTTPException(409, str(e)) from e
     return {**_view(db, row, p), "reused": reused}

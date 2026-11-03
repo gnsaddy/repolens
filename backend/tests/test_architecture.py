@@ -25,6 +25,12 @@ def test_a_loop_of_repositories_is_found_with_the_proof_of_each_step():
     assert all(e["proof"] for e in loop["edges"])
 
 
+def test_a_shared_name_or_a_deployment_does_not_make_a_loop_only_code_does():
+    links = [link("a", "b", imports=1), link("b", "a", infra=3), link("b", "c", http=1), link("c", "a", infra=1)]
+    assert arch.cycles(links, NAMES) == []
+    assert [c["repos"] for c in arch.cycles([*links, link("c", "a", http=1)], NAMES)] == [["a", "b", "c"]]
+
+
 def test_a_chain_is_not_a_loop_and_name_only_matches_do_not_make_one():
     chain = [link("a", "b", imports=1), link("b", "c", imports=1)]
     assert arch.cycles(chain, NAMES) == []

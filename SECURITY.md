@@ -92,6 +92,8 @@ A persona review sends the request and the text of up to five matching files to 
 
 ## Feature drafts
 
+When other repositories are involved, the draft stores what the model was shown about them (dependency facts and file names, not their code) and which repositories were used. Every read filters that by what the reader may open: a repository they cannot open is counted, never named, and its facts and files are left out. Their code is only ever shown to the model, read-only, and an edit to it is refused.
+
 Build a feature sends the request and the text of up to five matching files to the configured language model, like Ask does. Its output is stored as text and never applied, branched, pushed or run. Edits cannot touch build, deployment, CI, dependency or secrets files; secrets are redacted from what is stored; drafts are private to their author (admins cannot read them) until the author shares one with the workspace, and a shared draft is shown only to people who can open its repository.
 
 ## What the sign-in page claims, and what backs it

@@ -2,8 +2,9 @@
 
 A rule says one repository must not depend on another (`forbid`). It is checked against the dependencies that are
 already proven (imports, URLs, manifests, shared names), so a violation always comes with the line that proves it.
-Cycles are repositories that depend on each other through a chain of such links. Name-only matches never count here:
-a rule must not fail because two repositories happen to use the same word."""
+Cycles are repositories whose code depends on each other through a chain of links (imports, URLs, manifests; a
+deployment or shared-name link does not count). Name-only matches never count here: a rule must not fail because two
+repositories happen to use the same word."""
 
 from collections.abc import Sequence
 
@@ -22,10 +23,17 @@ def proven(link: dict) -> int:
     return link["strong"] + link["http"] + link["imports"] + link["declared"] + link["infra"]
 
 
-def edges(links: Sequence[dict]) -> dict[str, dict[str, dict]]:
+def code_dependencies(link: dict) -> int:
+    """Links that say one repository's code needs the other's: not those that only say they are deployed together or
+    share a name, which are real but do not make a loop of dependencies."""
+    return link["strong"] + link["http"] + link["imports"] + link["declared"]
+
+
+def edges(links: Sequence[dict], code_only: bool = False) -> dict[str, dict[str, dict]]:
     out: dict[str, dict[str, dict]] = {}
+    count = code_dependencies if code_only else proven
     for link in links:
-        if proven(link) > 0:
+        if count(link) > 0:
             out.setdefault(link["src"], {})[link["dst"]] = link
     return out
 
@@ -33,7 +41,7 @@ def edges(links: Sequence[dict]) -> dict[str, dict[str, dict]]:
 def cycles(links: Sequence[dict], names: dict[str, str]) -> list[dict]:
     """Groups of repositories that depend on each other, directly or through others (strongly connected parts), each
     with every dependency inside the loop and its proof. Smallest first."""
-    graph = edges(links)
+    graph = edges(links, code_only=True)
     index: dict[str, int] = {}
     low: dict[str, int] = {}
     stack: list[str] = []
@@ -74,7 +82,7 @@ def cycles(links: Sequence[dict], names: dict[str, str]) -> list[dict]:
                 "src": a,
                 "dst": b,
                 "trust": graph[a][b]["trust"],
-                "links": proven(graph[a][b]),
+                "links": code_dependencies(graph[a][b]),
                 "proof": (graph[a][b]["examples"] or [{}])[0].get("evidence", ""),
             }
             for a in part

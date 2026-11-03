@@ -946,6 +946,8 @@ class FeatureDraft(Base):
     pr_body: Mapped[str] = mapped_column(Text, default="")
     model: Mapped[str] = mapped_column(String(100), default="")
     error: Mapped[str] = mapped_column(Text, default="")
+    related_ids: Mapped[list] = mapped_column(JSON, default=list)  # other repositories whose code the model saw
+    context: Mapped[dict] = mapped_column(JSON, default=dict)  # {facts, hidden, files}: what it was told about them
     shared: Mapped[bool] = mapped_column(Boolean, default=False)  # private to its author unless shared
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
