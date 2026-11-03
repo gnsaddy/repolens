@@ -1,6 +1,10 @@
+import pytest
+
 from repolens.models import DriftAlert
+from repolens.services import drift as drift_svc
 from tests.conftest import register
 from tests.test_api import add_repo
+from tests.test_chat import make_user
 from tests.test_knowledge import make_collection, upload
 from tests.test_risk import ORDERS, commit, shop  # noqa: F401  (fixture)
 
@@ -108,3 +112,122 @@ def test_unreachable_previous_revision_is_ignored(client, auth, shop, session): 
     r = session.get(Repository, repo["id"])
     assert d.detect(session, r, str(path), "deadbeef" * 5, "cafebabe" * 5) == 0
     assert d.detect(session, r, str(path), "", "abc") == 0
+
+
+@pytest.mark.parametrize(
+    ("name", "qualname", "expected"),
+    [
+        ("compute_total", "compute_total", True),
+        ("graph_overview", "graph_overview", True),
+        ("makeInvoice", "makeInvoice", True),
+        ("Repository", "Repository", True),
+        ("add_item", "Orders.add_item", True),
+        ("text", "_Resolver.text", True),  # the class is a specific name, so a page naming the method means it
+        ("repo", "repo", False),
+        ("ask", "ask", False),
+        ("execute", "execute", False),
+        ("snapshot", "snapshot", False),
+        ("run", "Job.run", False),
+    ],
+)
+def test_a_plain_word_is_not_evidence_that_a_page_describes_a_function(name, qualname, expected):
+    assert drift_svc.specific(name, qualname) is expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("CHANGELOG.md", True),
+        ("changelog/v0.1-beta.md", True),
+        ("docs/release-notes.md", True),
+        ("docs/RELEASE_NOTES.md", True),
+        ("docs/archive/old-design.md", True),
+        ("history.md", True),
+        ("docs/architecture.md", False),
+        ("docs/features.md", False),
+        ("docs/changes-to-the-api.md", False),
+        ("README.md", False),
+    ],
+)
+def test_pages_that_record_history_are_told_from_pages_that_describe_the_code(path, expected):
+    assert drift_svc.is_history(path) is expected
+
+
+def test_a_changelog_is_not_flagged_when_the_code_it_names_changes(client, auth, shop, session):  # noqa: F811
+    path, _ = shop
+    repo = add_repo(client, auth, path, name="shop")
+    col = make_collection(client, auth, "handbook")
+    upload(
+        client,
+        auth,
+        col["id"],
+        {
+            "billing.md": "# Billing\nTotals come from `compute_total`.",
+            "CHANGELOG.md": "# Changes\n- `compute_total` now adds tax.",
+            "docs/release-notes.md": "# Notes\n`compute_total` was added.",
+        },
+    )
+    new = ORDERS.replace("round(subtotal * (1 + tax_rate), 2)", "round(subtotal * (1 + tax_rate) + 1, 2)")
+    commit(path, {"shop/orders.py": new}, "change total", "2026-09-01T10:00:00Z")
+    reindex(client, auth, repo["id"])
+    pages = {a["doc_path"] for a in drift(client, auth) if a["doc_repo"] == "handbook"}
+    assert pages == {"billing.md"}
+
+
+def test_alerts_that_should_never_have_been_raised_are_dropped_and_weak_names_trimmed(client, auth, shop, session):  # noqa: F811
+    path, _ = shop
+    repo = add_repo(client, auth, path, name="shop")
+    org = session.query(DriftAlert).count() and None  # no alerts yet
+    from repolens.models import Repository
+
+    org = session.get(Repository, repo["id"]).org_id
+
+    def alert(doc, names):
+        syms = [{"id": n, "name": n.split(".")[-1], "qualname": n, "path": "a.py", "type": "function"} for n in names]
+        session.add(DriftAlert(org_id=org, repo_id=repo["id"], doc_repo_id=repo["id"], doc_path=doc, symbols=syms))
+
+    alert("changelog/v0.1-beta.md", ["compute_total"])
+    alert("docs/a.md", ["repo", "ask"])
+    alert("docs/b.md", ["repo", "compute_total"])
+    alert("docs/c.md", ["compute_total"])
+    session.commit()
+    assert drift_svc.prune(session, org) == 2
+    session.commit()
+    left = {a.doc_path: [s["qualname"] for s in a.symbols] for a in session.query(DriftAlert)}
+    assert left == {"docs/b.md": ["compute_total"], "docs/c.md": ["compute_total"]}
+
+
+def test_an_alert_says_why_it_was_raised_the_line_that_mentions_the_code_and_what_changed(client, auth, shop, session):  # noqa: F811
+    path, _ = shop
+    repo = add_repo(client, auth, path, name="shop")
+    col = make_collection(client, auth, "handbook")
+    upload(
+        client, auth, col["id"], {"billing.md": "# Billing\n\nSome words.\nTotals come from `compute_total` and tax.\n"}
+    )
+    new = ORDERS.replace("round(subtotal * (1 + tax_rate), 2)", "round(subtotal * (1 + tax_rate) + 1, 2)")
+    commit(path, {"shop/orders.py": new}, "change total", "2026-09-01T10:00:00Z")
+    reindex(client, auth, repo["id"])
+    a = next(x for x in drift(client, auth) if x["doc_path"] == "billing.md")
+    (sym,) = a["symbols"]
+    assert sym["name"] == "compute_total" and sym["lines"] >= 1
+    assert sym["mention"] == "Totals come from `compute_total` and tax."
+    assert any(c["subject"] == "change total" for c in sym["changes"]) and sym["changes"][0]["sha"]
+
+
+def test_several_alerts_can_be_marked_reviewed_at_once_but_only_by_someone_who_may_edit(client, auth, shop, session):  # noqa: F811
+    path, _ = shop
+    repo = add_repo(client, auth, path, name="shop")
+    col = make_collection(client, auth, "handbook")
+    upload(client, auth, col["id"], {"a.md": "# A\n`compute_total` here.", "b.md": "# B\n`compute_total` there."})
+    new = ORDERS.replace("round(subtotal * (1 + tax_rate), 2)", "round(subtotal * (1 + tax_rate) + 1, 2)")
+    commit(path, {"shop/orders.py": new}, "change total", "2026-09-01T10:00:00Z")
+    reindex(client, auth, repo["id"])
+    ids = [a["id"] for a in drift(client, auth) if a["doc_repo"] == "handbook"]
+    assert len(ids) == 2
+    viewer = make_user(client, auth, "v@acme.io", "viewer")
+    assert client.post("/api/wiki/drift/dismiss-all", headers=viewer, json={"ids": ids}).status_code == 403
+    r = client.post("/api/wiki/drift/dismiss-all", headers=auth, json={"ids": [*ids, "nope"]})
+    assert r.status_code == 200 and r.json() == {"dismissed": 2}
+    assert [a for a in drift(client, auth) if a["doc_repo"] == "handbook"] == []
+    assert len(drift(client, auth, "dismissed")) == 2
+    assert client.post("/api/wiki/drift/dismiss-all", headers=auth, json={"ids": []}).status_code == 422

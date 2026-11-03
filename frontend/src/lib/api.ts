@@ -192,7 +192,7 @@ export interface CiFailure { index: number; name: string; kind: string; message:
 export interface CiPreview { format: string; failures: CiFailure[] }
 export interface ConnectorField { key: string; label: string; type?: string; required: boolean; secret: boolean; placeholder?: string; help?: string; options?: string[] }
 export interface ConnectorInfo { kind: string; label: string; description: string; needs_secret: boolean; fields: ConnectorField[] }
-export interface DriftSymbol { id: string; name: string; qualname: string; path: string; type: string }
+export interface DriftSymbol { id: string; name: string; qualname: string; path: string; type: string; lines?: number; mention?: string; changes?: { sha: string; subject: string; author: string }[] }
 export interface DriftAlertRow { id: string; status: string; repo_id: string; repo: string; doc_repo_id: string; doc_repo: string; doc_path: string; doc_title: string; symbols: DriftSymbol[]; from_sha: string; to_sha: string; created_at: string; updated_at: string }
 export interface ProposalRow { id: string; kind: "update" | "new"; source: string; source_ref: string; doc_repo_id: string; doc_repo: string; doc_path: string; title: string; rationale: string; drafted_by: string; status: string; result: string; created_at: string; decided_at: string | null }
 export interface ProposalDetail extends ProposalRow { original: string; proposed: string; diff: string; apply_options: string[] }

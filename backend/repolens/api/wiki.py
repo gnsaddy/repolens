@@ -3,6 +3,7 @@ import posixpath
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -281,6 +282,7 @@ def _drift_rows(db: Session, p: Principal, status: str) -> list[dict]:
     if status != "all":
         q = q.where(DriftAlert.status == status)
     names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == p.org_id))}
+    rows = [a for a in db.scalars(q.limit(300)) if scope.can(a.repo_id) and scope.can(a.doc_repo_id)]
     return [
         {
             "id": a.id,
@@ -291,15 +293,29 @@ def _drift_rows(db: Session, p: Principal, status: str) -> list[dict]:
             "doc_repo": names.get(a.doc_repo_id, ""),
             "doc_path": a.doc_path,
             "doc_title": a.doc_title,
-            "symbols": a.symbols,
+            "symbols": _why(db, a) if n < DRIFT_EXPLAINED else a.symbols,
             "from_sha": a.from_sha[:10],
             "to_sha": a.to_sha[:10],
             "created_at": a.created_at,
             "updated_at": a.updated_at,
         }
-        for a in db.scalars(q.limit(300))
-        if scope.can(a.repo_id) and scope.can(a.doc_repo_id)
+        for n, a in enumerate(rows)
     ]
+
+
+DRIFT_EXPLAINED = 60  # alerts that get the page's mention line and the commits (the rest keep to the plain list)
+DRIFT_SYMBOLS_EXPLAINED = 6
+
+
+def _why(db: Session, a: DriftAlert) -> list[dict]:
+    """The changed symbols with why each was flagged: the line of the page that mentions it, and the commits
+    that changed its file."""
+    shown = a.symbols[:DRIFT_SYMBOLS_EXPLAINED]
+    lines = drift.mention_lines(db, a.doc_repo_id, a.doc_path, [s.get("name", "") for s in shown if s.get("name")])
+    changes = drift.recent_changes(db, a, sorted({s.get("path", "") for s in shown if s.get("path")}))
+    return [
+        {**s, "mention": lines.get(s.get("name", ""), ""), "changes": changes.get(s.get("path", ""), [])} for s in shown
+    ] + a.symbols[DRIFT_SYMBOLS_EXPLAINED:]
 
 
 @router.get("/drift")
@@ -315,6 +331,24 @@ def list_drift(
 @router.get("/drift/count")
 def drift_count(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     return {"open": len(_drift_rows(db, p, "open"))}
+
+
+class DismissAll(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=300)
+
+
+@router.post("/drift/dismiss-all")
+def dismiss_many(body: DismissAll, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Mark several alerts reviewed at once. Alerts the caller cannot see are skipped, never named."""
+    scope = scope_for(db, p)
+    authorize(db, p, "document.write", "drift", op="dismiss-drift-many")
+    done = 0
+    for a in db.scalars(select(DriftAlert).where(DriftAlert.org_id == p.org_id, DriftAlert.id.in_(body.ids))):
+        if a.status == "open" and scope.can(a.repo_id) and scope.can(a.doc_repo_id):
+            a.status, a.resolved_at, a.resolved_by = "dismissed", datetime.now(UTC), p.user_id
+            done += 1
+    db.commit()
+    return {"dismissed": done}
 
 
 @router.post("/drift/{alert_id}/dismiss")

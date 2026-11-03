@@ -314,6 +314,10 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
     mutationFn: (id: string) => api(`/wiki/drift/${id}/dismiss`, { method: "POST" }),
     onSuccess: () => { toast("Marked as reviewed"); qc.invalidateQueries({ queryKey: ["drift"] }); qc.invalidateQueries({ queryKey: ["drift-count"] }); },
   });
+  const dismissAll = useMutation({
+    mutationFn: (ids: string[]) => api<{ dismissed: number }>("/wiki/drift/dismiss-all", { method: "POST", json: { ids } }),
+    onSuccess: (r) => { toast(`${r.dismissed} marked as reviewed`); qc.invalidateQueries({ queryKey: ["drift"] }); qc.invalidateQueries({ queryKey: ["drift-count"] }); },
+  });
   const draft = useMutation({
     mutationFn: (id: string) => api<ProposalDetail>(`/wiki/proposals/from-drift/${id}`, { method: "POST" }),
     onSuccess: (p) => { qc.invalidateQueries({ queryKey: ["proposals"] }); review(p.id); },
@@ -326,6 +330,13 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
         <select aria-label="Show" className="ml-auto h-8 rounded-md border border-line bg-white px-2" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="open">Needs review</option><option value="dismissed">Reviewed, no change needed</option><option value="resolved">Updated</option></select>
       </div>
+      {status === "open" && (list.data?.length ?? 0) > 1 && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" disabled={dismissAll.isPending} onClick={async () => {
+            const ids = (list.data ?? []).map((a) => a.id);
+            if (await ask({ title: `Mark all ${ids.length} as reviewed?`, message: "Every alert listed here is closed with no update. Each comes back only if the same code changes again.", confirmLabel: "Mark all reviewed" })) dismissAll.mutate(ids);
+          }}>Mark all {list.data?.length} reviewed</Button>
+        </div>)}
       {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "open" ? "Nothing to review. When a re-index finds changed code that a page mentions, it appears here." : "Nothing here."}</Empty> : (
         <ul className="space-y-3">{list.data.map((a) => (
           <li key={a.id}><Card className="p-4">
@@ -334,8 +345,14 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
               <span className="text-xs text-muted">{a.doc_repo} · {a.doc_path}</span>
               <span className="ml-auto text-xs text-muted">{a.repo} {a.from_sha}…{a.to_sha} · {timeAgo(a.updated_at)}</span>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs"><span className="text-muted">Changed code it mentions:</span>
-              {a.symbols.map((s) => <Link key={s.id} to={`/knowledge?tab=graph&node=${s.id}`} className="rounded border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>)}</div>
+            <div className="mt-2 text-xs"><span className="text-muted">Changed code the page mentions:</span>
+              <ul className="mt-1 space-y-1.5">{a.symbols.map((s) => (
+                <li key={s.id}>
+                  <Link to={`/knowledge?tab=graph&node=${s.id}`} className="rounded border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>
+                  {!!s.lines && <span className="ml-2 text-muted">{s.lines} line{s.lines === 1 ? "" : "s"} changed in <code>{s.path}</code></span>}
+                  {s.mention && <blockquote className="mt-1 border-l-2 border-line pl-2 text-muted" aria-label={`Where the page mentions ${s.name}`}>{s.mention}</blockquote>}
+                  {!!s.changes?.length && <div className="mt-0.5 text-muted">{s.changes.map((c) => `${c.subject || c.sha} (${c.author || "unknown"})`).join("; ")}</div>}
+                </li>))}</ul></div>
             {a.status === "open" && (
               <div className="mt-3 flex gap-2">
                 <Button size="sm" disabled={draft.isPending} onClick={() => draft.mutate(a.id)}><FileEdit className="h-3.5 w-3.5" />Draft an update</Button>
