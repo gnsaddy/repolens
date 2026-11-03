@@ -12,6 +12,7 @@ export const PAGES = [
   { label: "Knowledge: graph", to: "/knowledge?tab=graph", hint: "explore connections and heat map" },
   { label: "Graph: systems", to: "/graph", hint: "how repositories depend on each other, change together, overview" },
   { label: "Build a feature", to: "/features", hint: "the model drafts a change, tests and a pull request text to review" },
+  { label: "Agent personas", to: "/personas", hint: "a security auditor or test engineer reviews code and quotes what it found" },
   { label: "DeepMind Wiki: browse", to: "/wiki", hint: "documentation" },
   { label: "DeepMind Wiki: add content", to: "/wiki?tab=sources", hint: "README, text, URL, Confluence" },
   { label: "DeepMind Wiki: health", to: "/wiki?tab=health", hint: "orphans, broken links, stale pages" },

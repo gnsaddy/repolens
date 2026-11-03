@@ -389,8 +389,8 @@ def impact_of(db: Session, org: str, scope: Scope, repo_id: str, paths: Sequence
     return out
 
 
-def ledger(db: Session, org: str, draft_id: str) -> dict:
-    """What the model calls of one draft used."""
+def ledger(db: Session, org: str, draft_id: str, workflow: str = "feature-draft") -> dict:
+    """What the model calls of one draft (or one persona run) used."""
     calls, tin, tout, cost = db.execute(
         select(
             func.count(),
@@ -399,7 +399,7 @@ def ledger(db: Session, org: str, draft_id: str) -> dict:
             func.coalesce(func.sum(LLMCallEvent.estimated_cost), 0.0),
         ).where(
             LLMCallEvent.org_id == org,
-            LLMCallEvent.workflow == "feature-draft",
+            LLMCallEvent.workflow == workflow,
             LLMCallEvent.workflow_id == draft_id,
             LLMCallEvent.kind == "chat",
         )

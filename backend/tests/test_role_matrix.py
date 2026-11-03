@@ -312,6 +312,9 @@ VIEWER_READS = """
     /api/dashboard
     /api/dashboard/calibration
     /api/dashboard/insights
+    /api/personas
+    /api/personas/runs
+    /api/personas/runs/{rid}
     /api/features
     /api/features/{fid}
     /api/feedback/summary

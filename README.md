@@ -16,7 +16,7 @@ from it with citations while keeping model cost low: several models are routed b
 answered from a local memory, and retrieved context is condensed before it reaches a model. Nothing needs a model to work;
 connecting one only improves the wording.
 
-**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **Graph** (how repositories depend on each other, with the proof), **Build a feature** (the model drafts a change, tests and a pull request text for you to review; nothing is applied), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
+**Screens:** Dashboard (with a getting-started checklist and Ctrl+K jump-to), **Graph** (how repositories depend on each other, with the proof), **Build a feature** (the model drafts a change, tests and a pull request text for you to review; nothing is applied), **Agent personas** (a security auditor or test engineer reviews code and quotes what it found), **DeepMind Wiki** (browse, ask, concepts, health, drift, proposals, sources), **Ownership**, Investigations (from a bug report or a CI log), **Knowledge** (Ask with citations, interactive graph, document upload), Repository Explorer,
 Investigation View (root cause, confidence, timeline, code/commit/doc/test/PR evidence, report, human review), **Change
 Risk** (score a commit, branch or PR with signals, blast radius and tests to run), Token Usage & Cost, Jira, Settings (LLM
 provider + key, GitHub sign-in).
@@ -101,7 +101,7 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
 * HTTPS and GitOps: `docs/operations.md` explains how to attach a certificate (your own, or automatic with cert-manager or Caddy) and how to deploy with Argo CD (`deploy/argocd`, `deploy/overlays`).
 * Backups: a nightly `CronJob` dumps PostgreSQL to its own volume; `docs/operations.md` has the restore steps, the secrets you must keep, and `make backup` / `make restore` for Compose.
 * CI (`.github/workflows/ci.yml`): lint, mypy, tests on SQLite and pgvector, migrations, frontend lint/type/test/build,
-  image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR and rolls out (approval via the
+  image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR (free for public images; see `docs/operations.md`) and rolls out (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).
 
 ## License

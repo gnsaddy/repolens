@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-rou
 import Logo from "@/components/Logo";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useTheme } from "@/lib/theme";
-import { MessageSquare, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Moon, Sun, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Share2, Ticket, Hammer } from "lucide-react";
+import { MessageSquare, BarChart3, Library, FolderGit2, LayoutDashboard, Gauge, LogOut, Moon, Sun, ScrollText,  Network, Users, GitFork, GitMerge, Search, Settings, ShieldAlert, Share2, Ticket, Hammer, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -22,6 +22,7 @@ const Repositories = lazy(() => import("./pages/Repositories"));
 const Knowledge = lazy(() => import("./pages/Knowledge"));
 const GraphPage = lazy(() => import("./pages/Graph"));
 const FeaturesPage = lazy(() => import("./pages/Features"));
+const PersonasPage = lazy(() => import("./pages/Personas"));
 const Risk = lazy(() => import("./pages/Risk"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Investigations = lazy(() => import("./pages/Investigations"));
@@ -44,6 +45,7 @@ const nav = [
   { to: "/knowledge", label: "Knowledge", icon: Network },
   { to: "/graph", label: "Graph", icon: Share2 },
   { to: "/features", label: "Build a feature", icon: Hammer },
+  { to: "/personas", label: "Agent personas", icon: ShieldCheck },
   { to: "/wiki", label: "DeepMind Wiki", icon: Library },
   { to: "/risk", label: "Change Risk", icon: ShieldAlert },
   { to: "/ownership", label: "Ownership", icon: Users },
@@ -135,6 +137,7 @@ export default function App() {
         <Route path="knowledge" element={<Knowledge />} />
         <Route path="graph" element={<GraphPage />} />
         <Route path="features" element={<FeaturesPage />} />
+        <Route path="personas" element={<PersonasPage />} />
         <Route path="wiki" element={<Wiki />} />
         <Route path="risk" element={<Risk />} />
         <Route path="ownership" element={<Ownership />} />

@@ -36,6 +36,7 @@ ACTION_MIN_ROLE = {
     "token.create": "viewer",
     "fix.propose": "member",
     "fix.decide": "member",
+    "persona.run": "member",  # a review of code by a named specialist; spends tokens
     "feature.draft": "member",  # a feature written by the model for review; nothing is applied
     "risk.preview": "viewer",
     "mcp.read": "viewer",

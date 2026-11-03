@@ -86,6 +86,10 @@ of CSRF handling); tokens issued before server-side sessions existed cannot be r
 access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
 once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).
 
+## Agent personas
+
+A persona review sends the request and the text of up to five matching files to the configured language model, like Ask does, and stores the findings as text. A finding is kept only if it quotes code that is really in a file it was shown, which also stops the model inventing a file or a line. Reviews are never run or applied, secrets are redacted from what is stored, and a review is private to its author (admins cannot read it) until shared, and then only for people who can open its repository. A finding is a lead for a person to check, not a verified vulnerability.
+
 ## Feature drafts
 
 Build a feature sends the request and the text of up to five matching files to the configured language model, like Ask does. Its output is stored as text and never applied, branched, pushed or run. Edits cannot touch build, deployment, CI, dependency or secrets files; secrets are redacted from what is stored; drafts are private to their author (admins cannot read them) until the author shares one with the workspace, and a shared draft is shown only to people who can open its repository.

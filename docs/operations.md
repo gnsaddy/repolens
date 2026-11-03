@@ -165,3 +165,6 @@ Changing the embedding model needs `python -m repolens.devtools.reembed` (see `e
 
 ## Versions and releases
 The app is at **v0.2-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.2.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.2-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.2-beta` publishes a GitHub release without deploying anything.
+
+### What publishing images costs
+Release images go to GitHub's container registry, `ghcr.io`. **It is free for public packages and public images**: anyone can pull them, and storage and transfer are not billed. Private images count against the storage and transfer allowance of your GitHub plan (pulls from GitHub Actions are free), and GitHub changes those limits, so check your account's billing page before publishing a private image. A new package may start private: check its visibility under the package's settings on GitHub, and make it public if you want others to pull it without signing in.

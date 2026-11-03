@@ -17,7 +17,18 @@ from fastapi import HTTPException
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased
 
-from ..models import ArchRule, Change, DriftAlert, FeatureDraft, GroupOverview, KGEdge, KGNode, RepoGroup, Repository
+from ..models import (
+    ArchRule,
+    Change,
+    DriftAlert,
+    FeatureDraft,
+    GroupOverview,
+    KGEdge,
+    KGNode,
+    PersonaRun,
+    RepoGroup,
+    Repository,
+)
 from . import graph as kg
 from . import knowledge as kb
 from . import repo_links as lk
@@ -499,6 +510,8 @@ def forget_repo(db: Session, org: str, repo_id: str) -> None:
             db.delete(r)
     for d in db.scalars(select(FeatureDraft).where(FeatureDraft.org_id == org, FeatureDraft.repo_id == repo_id)):
         db.delete(d)
+    for run_row in db.scalars(select(PersonaRun).where(PersonaRun.org_id == org, PersonaRun.repo_id == repo_id)):
+        db.delete(run_row)
     lk.forget_repo(db, org, repo_id)
 
 

@@ -26,6 +26,7 @@ KIND_TIER = {
     "doc-updater": "standard",
     "runbook-writer": "standard",
     "feature-writer": "strong",  # a whole feature a person will review
+    "persona-reviewer": "strong",  # a specialist review whose findings people act on
     "fix-writer": "strong",  # writing code that a person will review: use the best model available
 }
 KIND_LABEL = {
@@ -36,6 +37,7 @@ KIND_LABEL = {
     "runbook-writer": "Runbook drafts",
     "fix-writer": "Suggested code fixes",
     "feature-writer": "Feature drafts",
+    "persona-reviewer": "Persona reviews",
 }
 
 

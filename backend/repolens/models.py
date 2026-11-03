@@ -949,3 +949,26 @@ class FeatureDraft(Base):
     shared: Mapped[bool] = mapped_column(Boolean, default=False)  # private to its author unless shared
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class PersonaRun(Base):
+    """A review of some code by a named specialist (security auditor, test engineer). Findings are kept only when they
+    quote code that is really in the file. Private to its author unless shared."""
+
+    __tablename__ = "persona_runs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), index=True)
+    persona: Mapped[str] = mapped_column(String(30))
+    base_sha: Mapped[str] = mapped_column(String(64), default="")
+    request: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(300), default="")
+    status: Mapped[str] = mapped_column(String(10), default="running", index=True)  # running | done | failed
+    summary: Mapped[str] = mapped_column(Text, default="")
+    findings: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[dict] = mapped_column(JSON, default=dict)  # {coverage, dropped, reasons}
+    model: Mapped[str] = mapped_column(String(100), default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    shared: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(32), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

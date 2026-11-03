@@ -21,7 +21,7 @@ _HEAVY = re.compile(
     r"^/api/(mcp|knowledge/(ask|search|similar)|wiki/(ask|similar|search|import-url|confluence/import|connectors/[^/]+/import)"
     r"|investigations(/ci/start|/[^/]+/rerun)?|jira/(investigate|issues/[^/]+/analyze)|repositories(/[^/]+/(index|reindex))?"
     r"|risk/assess|wiki/proposals/from-(drift|incident)[^ ]*|chats/[^/]+/messages(/[^/]+)?"
-    r"|groups/[^/]+/overview|groups/ask|features)$"
+    r"|groups/[^/]+/overview|groups/ask|features|personas/runs)$"
 )
 
 HEADERS = [
