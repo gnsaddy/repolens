@@ -26,12 +26,14 @@ from ..security import redact_stored
 from . import fixes
 from . import repo_links as lk
 from .access import Scope
+from .answer_memory import _words
 from .knowledge import retrieve
 from .llm import LLMClient, LLMUnavailable, describe_failure
 from .llm_router import Task
 
 MAX_CONTEXT_FILES = 5
-MAX_FILE_LINES = 400
+SMALL_FILE_LINES = 150  # a file this short is shown whole
+MAX_WINDOWS = 3  # excerpts shown of a longer one
 MAX_EDITS = 12
 MAX_NEW_FILES = 8
 MAX_FILE_CHARS = 30000
@@ -106,28 +108,38 @@ def _layout(db: Session, repo: Repository, near: Sequence[str]) -> list[str]:
     return paths[:LAYOUT_PATHS]
 
 
-def gather(db: Session, org: str, scope: Scope, repo: Repository, request: str) -> dict[str, str]:
-    """The text of the files that best match the request, read at the indexed commit."""
+def gather(
+    db: Session, org: str, scope: Scope, repo: Repository, request: str
+) -> tuple[dict[str, str], dict[str, list[tuple[int, int]]]]:
+    """The text of the files that best match the request, read at the indexed commit, and the lines that matched."""
     hits = retrieve(db, org, request, [repo.id], k=14, scope=scope, kinds=["code"])
     texts: dict[str, str] = {}
+    spans: dict[str, list[tuple[int, int]]] = {}
     for h in hits:
         path = h.get("file", "")
-        if not path or path in texts or len(texts) >= MAX_CONTEXT_FILES or fixes.forbidden(path):
+        if not path or fixes.forbidden(path) or (path not in texts and len(texts) >= MAX_CONTEXT_FILES):
             continue
-        text = fixes._read(repo, repo.indexed_sha or "", path)
-        if text is None:
-            continue
-        texts[path] = text
-    return texts
+        if path not in texts:
+            text = fixes._read(repo, repo.indexed_sha or "", path)
+            if text is None:
+                continue
+            texts[path] = text
+        start = int(h.get("start_line") or 1)
+        spans.setdefault(path, []).append((start, int(h.get("end_line") or start)))
+    return texts, spans
 
 
-def _prompt(request: str, texts: dict[str, str], layout: list[str]) -> str:
-    files = "\n\n".join(
-        f"FILE {p}\n"
-        + "\n".join(f"{i + 1:5d}  {ln}" for i, ln in enumerate(t.splitlines()[:MAX_FILE_LINES]))
-        + ("\n... (file continues; do not edit past this point)" if len(t.splitlines()) > MAX_FILE_LINES else "")
-        for p, t in texts.items()
-    )
+def _shown(text: str, spans: list[tuple[int, int]]) -> str:
+    """A small file whole; a large one only around the lines that matched, so the prompt stays short."""
+    lines = text.splitlines()
+    if len(lines) <= SMALL_FILE_LINES:
+        return "\n".join(f"{i + 1:5d}  {ln}" for i, ln in enumerate(lines))
+    windows = "\n...\n".join(fixes._excerpt(text, lo, hi) for lo, hi in sorted(spans or [(1, 1)])[:MAX_WINDOWS])
+    return windows + "\n... (only the lines around the match are shown; copy `old` from them)"
+
+
+def _prompt(request: str, texts: dict[str, str], spans: dict[str, list[tuple[int, int]]], layout: list[str]) -> str:
+    files = "\n\n".join(f"FILE {p}\n{_shown(t, spans.get(p, []))}" for p, t in texts.items())
     return f"REQUEST:\n{request}\n\nREPOSITORY LAYOUT (some paths):\n" + "\n".join(layout) + f"\n\nCODE:\n{files}"
 
 
@@ -341,7 +353,45 @@ def _clean_files(items: object, kind: str, existing: set[str], seen: set[str]) -
     return out
 
 
-def draft(db: Session, org: str, user_id: str, scope: Scope, repo: Repository, request: str) -> FeatureDraft:
+REUSE_OVERLAP = 0.6  # share of content words two requests must have in common to count as the same ask
+
+
+def earlier(db: Session, org: str, user_id: str, repo: Repository, request: str) -> FeatureDraft | None:
+    """The person's own finished draft for the same repository at the same indexed commit whose request says the same
+    thing in other words. The code and the index are unchanged, so asking the model again would cost tokens for the
+    same answer."""
+    mine = _words(request)
+    best: tuple[float, FeatureDraft] | None = None
+    for row in db.scalars(
+        select(FeatureDraft)
+        .where(
+            FeatureDraft.org_id == org,
+            FeatureDraft.created_by == user_id,
+            FeatureDraft.repo_id == repo.id,
+            FeatureDraft.base_sha == (repo.indexed_sha or ""),
+            FeatureDraft.status == "drafted",
+        )
+        .order_by(FeatureDraft.created_at.desc())
+        .limit(50)
+    ):
+        theirs = _words(row.request)
+        score = len(mine & theirs) / len(mine | theirs) if mine and theirs else 0.0
+        if score >= REUSE_OVERLAP and (best is None or score > best[0]):
+            best = (score, row)
+    return best[1] if best else None
+
+
+def draft(
+    db: Session, org: str, user_id: str, scope: Scope, repo: Repository, request: str, fresh: bool = False
+) -> tuple[FeatureDraft, bool]:
+    """(the draft, whether it is an earlier one reused at no cost). `fresh` asks the model again."""
+    request = request.strip()
+    if not fresh and (len(request) >= REQUEST_MIN) and (old := earlier(db, org, user_id, repo, request)):
+        return old, True
+    return _draft(db, org, user_id, scope, repo, request), False
+
+
+def _draft(db: Session, org: str, user_id: str, scope: Scope, repo: Repository, request: str) -> FeatureDraft:
     request = request.strip()
     if not (REQUEST_MIN <= len(request) <= REQUEST_MAX):
         raise FeatureError(f"Describe the feature in {REQUEST_MIN} to {REQUEST_MAX} characters")
@@ -363,12 +413,12 @@ def draft(db: Session, org: str, user_id: str, scope: Scope, repo: Repository, r
     db.add(row)
     db.flush()
     llm = LLMClient(db, org, workflow="feature-draft", workflow_id=row.id)
-    texts = gather(db, org, scope, repo, request)
+    texts, spans = gather(db, org, scope, repo, request)
     if not texts:
         row.status, row.error = "failed", "No code in this repository matched the request closely enough to build on."
         db.commit()
         raise FeatureError(row.error)
-    prompt = _prompt(request, texts, _layout(db, repo, list(texts)))
+    prompt = _prompt(request, texts, spans, _layout(db, repo, list(texts)))
     task = Task("feature-writer", prompt_chars=len(prompt), evidence=len(texts), prefer="strong")
 
     def valid(t: str) -> bool:

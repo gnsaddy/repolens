@@ -188,3 +188,47 @@ def test_deleting_a_repository_removes_its_drafts(client, auth, repo, model, ses
     assert client.delete(f"/api/repositories/{repo['id']}", headers=auth).status_code in (200, 204)
     session.expire_all()
     assert session.query(FeatureDraft).count() == 0
+
+
+REWORDED = "Add a discount to compute_total in pricing, so a percentage can be taken off the order total."
+
+
+def test_the_same_ask_in_other_words_reuses_the_earlier_draft_and_costs_nothing(client, auth, repo, model):
+    first = ask(client, auth, repo).json()
+    again = ask(client, auth, repo, REWORDED).json()
+    assert model.calls == 1 and again["id"] == first["id"] and again["reused"] and not first["reused"]
+    assert again["tokens"]["calls"] == 1  # the one call that made it
+
+
+def test_asking_fresh_calls_the_model_again(client, auth, repo, model):
+    first = ask(client, auth, repo).json()
+    r = client.post("/api/features", headers=auth, json={"repo_id": repo["id"], "request": REWORDED, "fresh": True})
+    assert model.calls == 2 and r.json()["id"] != first["id"] and not r.json()["reused"]
+
+
+def test_a_different_ask_or_another_person_does_not_reuse_a_draft(client, auth, repo, model):
+    ask(client, auth, repo)
+    other = "Add a discount to compute_total in pricing for gold customers only, with an audit entry for each use"
+    assert not ask(client, auth, repo, other).json()["reused"]
+    ann = make_user(client, auth, "ann@acme.io", "member")
+    assert not ask(client, ann, repo).json()["reused"] and model.calls == 3
+
+
+def test_a_changed_index_does_not_reuse_a_draft(client, auth, repo, model, session):
+    from repolens.models import Repository
+
+    made = ask(client, auth, repo).json()
+    row = session.get(Repository, repo["id"])
+    user = session.get(FeatureDraft, made["id"]).created_by
+    assert svc.earlier(session, row.org_id, user, row, REWORDED).id == made["id"]
+    row.indexed_sha = "f" * 40  # the repository was indexed again: the code the draft was written against is gone
+    assert svc.earlier(session, row.org_id, user, row, REWORDED) is None
+
+
+def test_a_long_file_is_shown_only_around_the_match_and_a_short_one_whole():
+    text = "\n".join(f"line_{n} = {n}" for n in range(1, 401))
+    shown = svc._shown(text, [(200, 210)])
+    assert "line_205 = 205" in shown and "line_5 = 5" not in shown and "only the lines around the match" in shown
+    assert len(shown) < len(text) / 2
+    small = "\n".join(f"x{n} = {n}" for n in range(1, 40))
+    assert "x39 = 39" in svc._shown(small, [(1, 1)]) and "only the lines" not in svc._shown(small, [(1, 1)])

@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/features", tags=["features"])
 class DraftIn(BaseModel):
     repo_id: str = Field(min_length=1, max_length=32)
     request: str = Field(min_length=svc.REQUEST_MIN, max_length=svc.REQUEST_MAX)
+    fresh: bool = False  # ask the model again even when an earlier draft says the same thing
 
 
 def _own(db: Session, p: Principal, fid: str) -> FeatureDraft:
@@ -76,10 +77,10 @@ def create_draft(body: DraftIn, p: Principal = Depends(current_principal), db: S
         raise HTTPException(404, "Repository not found")
     authorize(db, p, "feature.draft", repo.name)
     try:
-        row = svc.draft(db, p.org_id, p.user_id, scope, repo, body.request)
+        row, reused = svc.draft(db, p.org_id, p.user_id, scope, repo, body.request, body.fresh)
     except svc.FeatureError as e:
         raise HTTPException(409, str(e)) from e
-    return _view(db, row)
+    return {**_view(db, row), "reused": reused}
 
 
 @router.get("/{fid}")

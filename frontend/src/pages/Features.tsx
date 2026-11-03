@@ -22,14 +22,15 @@ export default function FeaturesPage() {
   const [repoId, setRepoId] = useState("");
   const [request, setRequest] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [reusedId, setReusedId] = useState<string | null>(null);  // the page was opened by reusing this draft
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
   const list = useQuery({ queryKey: ["features"], queryFn: () => api<{ drafts: FeatureDraft[] }>("/features") });
   const ready = (repos.data ?? []).filter((r) => r.source !== "docs" && r.status === "ready");
   const repo = repoId || ready[0]?.id || "";
   const one = useQuery({ queryKey: ["feature", openId], enabled: !!openId, queryFn: () => api<FeatureDraftView>(`/features/${openId}`), retry: false });
   const make = useMutation({
-    mutationFn: () => api<FeatureDraftView>("/features", { method: "POST", json: { repo_id: repo, request } }),
-    onSuccess: (d) => { setOpenId(d.id); qc.invalidateQueries({ queryKey: ["features"] }); qc.setQueryData(["feature", d.id], d); toast("Draft ready"); },
+    mutationFn: (fresh: boolean) => api<FeatureDraftView>("/features", { method: "POST", json: { repo_id: repo, request, fresh } }),
+    onSuccess: (d) => { setOpenId(d.id); setReusedId(d.reused ? d.id : null); qc.invalidateQueries({ queryKey: ["features"] }); qc.setQueryData(["feature", d.id], d); toast(d.reused ? "Same as your earlier draft, no tokens used" : "Draft ready"); },
     onError: () => qc.invalidateQueries({ queryKey: ["features"] }),
   });
   const remove = useMutation({
@@ -45,7 +46,7 @@ export default function FeaturesPage() {
           <Card aria-label="New draft">
             <CardTitle>Describe the feature</CardTitle>
             {!write ? <p className="text-sm text-muted">Members can draft features. You can read drafts you were given access to.</p> : (
-              <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); make.mutate(); }}>
+              <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); make.mutate(false); }}>
                 <Label>Repository
                   <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
@@ -70,7 +71,7 @@ export default function FeaturesPage() {
         </div>
 
         <div className="space-y-4 lg:col-span-3">
-          {!openId ? <Empty>Describe a feature, or open a draft.</Empty> : one.isLoading ? <Spinner /> : !d ? <ErrorNote error={one.error} /> : <Draft d={d} write={write}
+          {!openId ? <Empty>Describe a feature, or open a draft.</Empty> : one.isLoading ? <Spinner /> : !d ? <ErrorNote error={one.error} /> : <Draft d={d} reused={d.id === reusedId} write={write} again={make.isPending ? undefined : () => make.mutate(true)}
             onDelete={async () => { if (await confirm({ title: "Delete this draft?", confirmLabel: "Delete" })) remove.mutate(d.id); }} />}
         </div>
       </div>
@@ -78,7 +79,7 @@ export default function FeaturesPage() {
   );
 }
 
-function Draft({ d, write, onDelete }: { d: FeatureDraftView; write: boolean; onDelete: () => void }) {
+function Draft({ d, reused, write, again, onDelete }: { d: FeatureDraftView; reused: boolean; write: boolean; again?: () => void; onDelete: () => void }) {
   const toast = useToast();
   const copy = (text: string, what: string) => navigator.clipboard?.writeText(text).then(() => toast(`${what} copied`), () => toast("Could not copy"));
   const t = d.tokens;
@@ -86,6 +87,9 @@ function Draft({ d, write, onDelete }: { d: FeatureDraftView; write: boolean; on
     <>
       <Card aria-label="Draft summary">
         <CardTitle right={write && <Button size="sm" variant="ghost" aria-label="Delete draft" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>}>{d.title || "Draft"}</CardTitle>
+        {reused && (
+          <p role="status" className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800">This is your earlier draft for the same request on the same code, so no tokens were used.
+            {write && again && <Button size="sm" variant="outline" className="ml-2" onClick={again}>Draft again anyway</Button>}</p>)}
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
           <Badge tone={d.status === "failed" ? "red" : "green"}>{d.status}</Badge>
           <span>{d.repo} · written against {d.base_sha.slice(0, 8)} · {d.model || "no model"}</span>

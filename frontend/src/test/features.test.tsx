@@ -25,14 +25,14 @@ const full: FeatureDraftView = {
   pr_title: "Add a discount", pr_body: "Adds an optional percentage.", note: "A draft is text only. Nothing was applied, branched or pushed. Copy it where you want it and test it.",
 };
 
-function open(opts: { role?: string; drafts?: FeatureDraft[]; fail?: string } = {}) {
+function open(opts: { role?: string; drafts?: FeatureDraft[]; fail?: string; reuse?: boolean } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
     if (method !== "GET") calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
-    if (url.endsWith("/features") && method === "POST") return opts.fail ? json({ detail: opts.fail }, 409) : json(full, 201);
+    if (url.endsWith("/features") && method === "POST") return opts.fail ? json({ detail: opts.fail }, 409) : json({ ...full, reused: opts.reuse && !JSON.parse(String(init?.body)).fresh }, 201);
     if (url.endsWith("/features")) return json({ drafts: opts.drafts ?? [short] });
     if (url.includes("/features/d1") && method === "DELETE") return json(null, 204);
     if (url.includes("/features/d1")) return json(full);
@@ -69,6 +69,15 @@ describe("Build a feature", () => {
     expect(screen.getByLabelText("Change")).toHaveTextContent("tests/test_discount.py (test)");
     expect(screen.getByLabelText("Pull request text")).toHaveTextContent("Adds an optional percentage.");
     expect(screen.getByLabelText("Draft summary")).toHaveTextContent("Nothing was applied, branched or pushed");
+  });
+
+  it("says when an earlier draft was reused at no cost, and can ask the model again", async () => {
+    const calls = open({ reuse: true });
+    await userEvent.type(await screen.findByLabelText("What should it do?"), "Add a discount to the order total");
+    await userEvent.click(screen.getByRole("button", { name: /Draft the feature/ }));
+    expect(await screen.findByText(/no tokens were used/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Draft again anyway" }));
+    await waitFor(() => expect(calls.filter((c) => c.url.endsWith("/features")).map((c) => c.body?.fresh)).toEqual([false, true]));
   });
 
   it("says why a draft could not be made", async () => {
