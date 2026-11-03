@@ -1,6 +1,6 @@
 # Changelog
 
-One file per release, named after the version (for example `v0.2-beta.md`). Inside, entries are grouped by date, newest first,
+One file per release, named after the version (for example `v0.2.1.md`). Inside, entries are grouped by date, newest first,
 and each entry lists what changed under **Added**, **Changed**, **Fixed**, **Security** and **Upgrade notes**. Write for the person
 who runs or uses RepoLens, not for the person who wrote the code: what changed, why it matters, and anything they must do.
 
@@ -12,6 +12,6 @@ when behaviour, design or protections move. Entries are added in the same commit
 ## Versions
 
 <!-- versions:start -->
-- [v0.2-beta](v0.2-beta.md) · 24 entries · 2026-10-27 to 2026-11-03
+- [v0.2.1](v0.2.1.md) · 25 entries · 2026-10-27 to 2026-11-03
 - [v0.1-beta](v0.1-beta.md) · 55 entries · 2026-10-20 to 2026-10-27
 <!-- versions:end -->

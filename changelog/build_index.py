@@ -17,7 +17,7 @@ ENTRY = re.compile(r"^### (.+?)\s*$")
 
 INTRO = """# Changelog
 
-One file per release, named after the version (for example `v0.2-beta.md`). Inside, entries are grouped by date, newest first,
+One file per release, named after the version (for example `v0.2.1.md`). Inside, entries are grouped by date, newest first,
 and each entry lists what changed under **Added**, **Changed**, **Fixed**, **Security** and **Upgrade notes**. Write for the person
 who runs or uses RepoLens, not for the person who wrote the code: what changed, why it matters, and anything they must do.
 

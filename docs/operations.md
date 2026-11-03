@@ -86,7 +86,7 @@ Steps:
 4. **Release by pull request.** Tag a version in this repository (the CD workflow then publishes the images), then change the tag in your configuration repository. Argo CD shows the diff and syncs it.
 5. **Leave the push-style deploy off.** It is off by default: the CD workflow only publishes images and never needs a kubeconfig. It deploys from CI only if you set the repository variable `DEPLOY_MODE` to `kubectl` (and the `KUBECONFIG_B64` secret).
 
-Things to know: images exist only for tags shaped like `v0.1.0` (the app's label `v0.2-beta` does not build any); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
+Things to know: images exist only for tags shaped like `v0.1.0` (a label such as `v0.2-beta` does not build any; the app's own label, `v0.2.1`, now matches the release tag); `selfHeal` undoes edits made by hand with `kubectl`, which is the point; replica counts are left to the autoscaler; and Argo CD does not manage the ingress controller, cert-manager, the cluster issuer or the secrets above.
 
 ## Upload size limits
 
@@ -164,7 +164,7 @@ Images run `alembic upgrade head` on start, so deploying a new image migrates th
 Changing the embedding model needs `python -m repolens.devtools.reembed` (see `evals/README.md`).
 
 ## Versions and releases
-The app is at **v0.2-beta**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the PEP 440 spelling `0.2.0b0` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.2-beta"}`), which is the quickest way to see what a server runs. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH` (for example `v0.1.0`), so a beta tag such as `v0.2-beta` publishes a GitHub release without deploying anything.
+The app is at **v0.2.1**. The number lives in `backend/repolens/__init__.py` (`VERSION_LABEL`, with the same number as `__version__` for packaging), `frontend/src/lib/version.ts` and `frontend/package.json`; `tests/test_version.py` fails if they disagree. `GET /healthz` returns it (`{"status": "ok", "version": "v0.2.1"}`), which is the quickest way to see what a server runs. To release: change the number in those places (and the changelog file, which is named after it), commit, then push a tag with the same number, for example `v0.2.2`. The deploy workflow (`cd.yml`) only starts on tags shaped like `vMAJOR.MINOR.PATCH`, so a tag such as `v0.2-beta` publishes nothing.
 
 ### What a release tag does
 Pushing a tag shaped like `v0.2.1` runs the CD workflow (`.github/workflows/cd.yml`). Its **publish** job builds `repolens-api` and `repolens-web` and pushes them to `ghcr.io/<owner>/` with the tag (without the `v`) as the version. That is all it does by default. The **deploy** job, which applies the images to a Kubernetes cluster with `kubectl`, runs only when the repository variable `DEPLOY_MODE` is set to `kubectl` (a *repository* variable under Settings, Secrets and variables, Actions, Variables; an environment variable is not visible to the job condition) and the `KUBECONFIG_B64` secret holds a kubeconfig. Without a cluster, or with Argo CD, leave it unset. Releases before this change deployed unless `DEPLOY_MODE` was `gitops`; anyone relying on that must now set `kubectl`.
