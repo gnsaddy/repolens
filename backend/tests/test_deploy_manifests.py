@@ -92,6 +92,9 @@ def test_compose_https_hides_plain_http_and_never_has_a_default_domain():
     assert "reverse_proxy web:8080" in caddy and "Strict-Transport-Security" in caddy
 
 
-def test_cd_skips_cluster_access_in_gitops_mode():
+def test_cd_deploys_only_when_asked_to_and_publishing_never_needs_the_cluster():
     cd = yaml.safe_load((ROOT / ".github" / "workflows" / "cd.yml").read_text())
-    assert "gitops" in cd["jobs"]["deploy"]["if"]
+    deploy = cd["jobs"]["deploy"]
+    assert "DEPLOY_MODE" in deploy["if"] and "== 'kubectl'" in deploy["if"]  # off unless DEPLOY_MODE=kubectl
+    assert deploy["needs"] == "publish"  # an image exists before anything is rolled out
+    assert "KUBECONFIG" not in str(cd["jobs"]["publish"])  # a release with no cluster still publishes the images
