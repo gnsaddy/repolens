@@ -13,8 +13,10 @@ from ..models import (
     AuditEvent,
     AuthToken,
     CacheEntry,
+    FeatureDraft,
     FeedbackEvent,
     Investigation,
+    PersonaRun,
     UserSession,
     _now,
 )
@@ -82,6 +84,10 @@ def sweep(db: Session, org_id: str | None = None) -> dict[str, int]:
         for inv in db.scalars(select(Investigation).where(Investigation.id.in_(ids or ["-"]))):
             db.delete(inv)
         out["investigations"] = len(ids)
+    if s.retention_drafts_days:  # drafts and reviews are working copies: old ones only take space
+        cut = now - timedelta(days=s.retention_drafts_days)
+        run("feature_drafts", scoped(delete(FeatureDraft).where(FeatureDraft.created_at < cut), FeatureDraft.org_id))
+        run("persona_runs", scoped(delete(PersonaRun).where(PersonaRun.created_at < cut), PersonaRun.org_id))
     db.commit()
     return out
 
@@ -94,4 +100,5 @@ def policy() -> dict:
         "audit_days": s.retention_audit_days,
         "sessions_days": s.retention_sessions_days,
         "investigation_days": s.retention_investigation_days,
+        "drafts_days": s.retention_drafts_days,
     }

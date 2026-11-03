@@ -48,6 +48,7 @@ class Persona:
     summary: str
     placeholder: str
     system: str
+    uses_dependencies: bool = False  # also told which other repositories use or are used by the code
 
 
 PERSONAS: dict[str, Persona] = {
@@ -77,6 +78,39 @@ PERSONAS: dict[str, Persona] = {
         "needs. Severity is how costly a bug there would be. Do not ask for tests of trivial getters. " + _SCHEMA,
     ),
 }
+
+PERSONAS["architect"] = Persona(
+    "architect",
+    "Architect",
+    "Reads how the code is structured: dependencies pointing the wrong way, cycles, modules doing unrelated jobs, "
+    "internals leaking across boundaries, and how much depends on what. Is told which other repositories use the "
+    "code, and proposes the smallest change that helps.",
+    "The orders module and how it depends on the catalog and the storefront.",
+    "You are a pragmatic software architect. Review how the code shown is structured and how it depends on other "
+    "code: dependencies that point the wrong way (a low-level module using a high-level one, a front end reaching"
+    " into a data layer), cycles, a module that does unrelated jobs, internals leaking across a boundary, hard-"
+    "wired external services or global state that block change or testing, logic duplicated where it should live "
+    "once, public interfaces that will be hard to change, and code many other things depend on. A section "
+    "DEPENDENCIES, when present, lists links proven by the code between this repository and others: use it to "
+    "judge coupling across services (who depends on whom, shared libraries, calls in both directions). Report a "
+    "concern only when you can point at code that shows it, say what it will cost when the system changes, and "
+    "propose a small, concrete change, not a rewrite. Rate severity by how much it will hurt change. " + _SCHEMA,
+    uses_dependencies=True,
+)
+PERSONAS["developer"] = Persona(
+    "developer",
+    "Developer",
+    "Reviews the code as a careful colleague would: logic errors, unhandled errors and edge cases, wrong assumptions "
+    "about other services, resource leaks, races and anything that will break its callers. Few findings, each real, "
+    "with the smallest fix.",
+    "The create_order function and what happens when the catalog is down.",
+    "You are a careful senior developer doing a code review. Find real defects and maintainability problems in the "
+    "code shown: logic errors, errors and edge cases that are not handled (nothing, empty, the wrong type, a timeout, "
+    "a partial failure), wrong assumptions about what another service returns, resource leaks, races, misleading "
+    "names, dead or duplicated code, and changes that would break callers. Prefer a few real findings to many "
+    "nitpicks. For each, say what goes wrong and when, and give the smallest fix, with code when you are confident of "
+    "the names it needs. Severity is how likely and how costly the failure is. " + _SCHEMA,
+)
 
 
 class PersonaError(Exception):
@@ -237,6 +271,11 @@ def run(
         raise fail("No code in this repository matched the request closely enough to review.")
     shown = "\n\n".join(f"FILE {p}\n{features._shown(t, spans.get(p, []))}" for p, t in texts.items())
     prompt = f"WHAT TO LOOK AT:\n{request}\n\nCODE:\n{shown}"
+    facts: list[dict] = []
+    hidden = 0
+    if persona.uses_dependencies:
+        facts, hidden = features.dependency_facts(db, org, scope, repo, list(texts))
+        prompt += features.context_prompt(facts, hidden, [])
     task = Task("persona-reviewer", prompt_chars=len(prompt), evidence=len(texts), prefer="strong")
 
     def valid(t: str) -> bool:
@@ -262,6 +301,8 @@ def run(
         "reasons": dropped[:5],
         "limit": "Read by a model, not run. A finding quotes real code, but that does not make it correct; check it.",
     }
+    if persona.uses_dependencies:
+        row.notes["dependencies"] = {"facts": facts, "hidden": hidden}
     row.status = "done"
     db.commit()
     return row, False

@@ -75,10 +75,31 @@ def _specific(path: str) -> bool:
     return path not in GENERIC_PATHS and (len(fixed) >= 2 or (len(segs) == 1 and bool(fixed) and len(fixed[0]) >= 8))
 
 
+_STRING = r"""(?:"(?:[^"\\\n]|\\.){1,240}"|'(?:[^'\\\n]|\\.){1,240}'|`[^`\n]{1,240}`)"""
+_OPERAND = r"[\w$.\[\]]+(?:\([^()\n]*\))?"
+_CONCAT = re.compile(rf"{_STRING}(?:\s*\+\s*(?:{_STRING}|{_OPERAND}))+")
+_TOKEN = re.compile(rf"({_STRING})|({_OPERAND})")
+
+
+def joined_urls(code: str) -> list[str]:
+    """URLs a caller builds by adding pieces (`"/api/orders/" + id + "/status"`), with each variable part as `{}`, so
+    they can be matched to a route like `/api/orders/{order_id}/status`. The same idea as a template string."""
+    out = []
+    for m in _CONCAT.finditer(code):
+        parts = []
+        for string, _operand in _TOKEN.findall(m.group(0)):
+            parts.append(string[1:-1] if string else "{}")
+        text = re.sub(r"(\{\}){2,}", "{}", "".join(parts))
+        if "/" in text:
+            out.append(text)
+    return out
+
+
 def _http_links(db: Session, ids: list[str]) -> list[dict]:
     """Places where one repository writes a URL path that another serves: `payments` building `/users/{id}` while
     `users` declares `GET /users/{user_id}`. Read from the stored route inventory and the code that was indexed, so
-    nothing is re-indexed. Pattern based: a URL assembled from pieces, or called through a name, is missed."""
+    nothing is re-indexed. Pattern based: a URL added together from literal pieces is read (variable parts count as
+    any value), but one built at run time from data, or called through a name, is missed."""
     if len(ids) < 2:
         return []
     served: dict[str, list[tuple[str, str, routes_svc.Route]]] = defaultdict(
@@ -109,7 +130,8 @@ def _http_links(db: Session, ids: list[str]) -> list[dict]:
         for cid, repo_id, file, sym, content in rows:
             if "/" not in content or routes_svc.TESTISH.search(file) or _EXAMPLE.search(file):
                 continue
-            for _, lit in _QUOTED.findall(content):
+            pieces = _CONCAT.sub(" ", content)  # a piece of a longer URL says nothing on its own
+            for lit in [*(lit for _, lit in _QUOTED.findall(pieces)), *joined_urls(content)]:
                 for run in _PATHRUN.findall(lit):
                     segs = _norm(run).split("/")[1:]
                     for i in range(len(segs)):  # the literal may start with a base URL: try each shorter tail
@@ -499,6 +521,10 @@ CODE_EXT = {  # by file extension, because the parser files most languages under
     ".kt": "kotlin",
     ".cs": "csharp",
     ".rb": "ruby",
+    ".lua": "lua",
+    ".ex": "elixir",
+    ".exs": "elixir",
+    ".dart": "dart",
     ".rs": "rust",
     ".php": "php",
     ".swift": "swift",
@@ -511,7 +537,7 @@ CODE_EXT = {  # by file extension, because the parser files most languages under
 }
 # Change this whenever a detector finds links differently or coverage changes shape: stored links are then worked out
 # again even though no repository was indexed (the same idea as `answer_memory.PIPELINE`).
-DETECTION_VERSION = "d5"
+DETECTION_VERSION = "d7"
 KEEP_GONE_DAYS = 180  # a link that disappeared stays listed as removed this long
 SYMBOLS = ("function", "method", "class")
 

@@ -17,6 +17,8 @@ const repos = [{ id: "a", name: "shop", source: "git", status: "ready" }, { id: 
 const personas: Persona[] = [
   { key: "security-auditor", name: "Security auditor", summary: "Reads code for ways it could be attacked.", placeholder: "The login endpoint." },
   { key: "test-engineer", name: "Test engineer", summary: "Reads code for behaviour that has no test.", placeholder: "The order total." },
+  { key: "architect", name: "Architect", summary: "Reads how the code is structured.", placeholder: "The orders module." },
+  { key: "developer", name: "Developer", summary: "Reviews the code like a colleague.", placeholder: "create_order." },
 ];
 const tokens = { calls: 1, input_tokens: 1500, output_tokens: 400, cost: 0.0105 };
 const short: PersonaRunShort = { id: "r1", persona: "security-auditor", persona_name: "Security auditor", title: "the user lookup", status: "done", repo: "shop", repo_id: "a", created_at: new Date().toISOString(), found: 1, high: 1, tokens, shared: false, mine: true, author_name: "sam" };
@@ -26,7 +28,7 @@ const full: PersonaRunView = {
   notes: { coverage: [{ file: "app/auth.py", whole: true }, { file: "app/big.py", whole: false }], dropped: 2, reasons: ["a", "b"], limit: "Read by a model, not run. A finding quotes real code, but that does not make it correct; check it." },
 };
 
-function open(opts: { role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean } = {}) {
+function open(opts: { role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean; architectNotes?: boolean } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -38,6 +40,7 @@ function open(opts: { role?: string; fail?: string; reuse?: boolean; theirs?: bo
     if (url.endsWith("/personas/runs")) return json({ runs: [opts.theirs ? { ...short, mine: false, shared: true, author_name: "ann" } : short] });
     if (url.includes("/personas/runs/r1") && method === "DELETE") return json(null, 204);
     if (url.includes("/personas/runs/r1") && method === "PATCH") return json({ ...full, shared: JSON.parse(String(init?.body)).shared });
+    if (url.includes("/personas/runs/r1") && opts.architectNotes) return json({ ...full, notes: { ...full.notes, dependencies: { hidden: 2, facts: [{ direction: "used_by", path: "app/auth.py", repo: "billing", repo_id: "b", from: "billing/invoice.py:total", to: "app/auth.py:find_user", kind: "import", trust: "fact", evidence: "total calls find_user" }] } } });
     if (url.includes("/personas/runs/r1")) return json(opts.empty ? { ...full, findings: [], notes: { ...full.notes, dropped: 0 } } : opts.theirs ? { ...full, mine: false, shared: true, author_name: "ann" } : full);
     return json({});
   });
@@ -49,7 +52,7 @@ describe("Agent personas", () => {
   it("offers each persona, only indexed code repositories, and sends the chosen persona with the request", async () => {
     const calls = open();
     const group = await screen.findByRole("group", { name: "Persona" });
-    expect(within(group).getAllByRole("radio")).toHaveLength(2);
+    expect(within(group).getAllByRole("radio")).toHaveLength(4);
     expect(within(await screen.findByLabelText("Repository")).getAllByRole("option")).toHaveLength(1);
     await userEvent.click(within(group).getByRole("radio", { name: /Test engineer/ }));
     const go = screen.getByRole("button", { name: /Ask the test engineer/ });
@@ -121,5 +124,24 @@ describe("Agent personas", () => {
     expect(screen.getByText("shared by ann")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Share with workspace|Make private/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete review" })).toBeNull();
+  });
+
+  it("shows an architect what it was told about other repositories, and counts what it cannot show", async () => {
+    open({ architectNotes: true });
+    await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
+    const card = await screen.findByLabelText("Dependencies");
+    expect(card).toHaveTextContent("app/auth.py is used by billing");
+    expect(card).toHaveTextContent("billing/invoice.py:total");
+    expect(card).toHaveTextContent("2 more links involve repositories you cannot access; they are not described.");
+  });
+
+  it("offers the architect and the developer as personas to choose", async () => {
+    const calls = open();
+    const group = await screen.findByRole("group", { name: "Persona" });
+    await userEvent.click(within(group).getByRole("radio", { name: /Architect/ }));
+    await userEvent.type(screen.getByLabelText("What should it look at?"), "the orders module");
+    await userEvent.click(screen.getByRole("button", { name: /Ask the architect/ }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/personas/runs") && c.body?.persona === "architect")).toBe(true));
+    expect(within(group).getByRole("radio", { name: /Developer/ })).toBeInTheDocument();
   });
 });

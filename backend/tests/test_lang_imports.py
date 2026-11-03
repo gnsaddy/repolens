@@ -192,14 +192,14 @@ def test_the_new_languages_are_read_and_the_coverage_says_so(client, auth, tmp_p
     provider = {"go.mod": "module github.com/acme/pay\n", "client/client.go": "package client\n\nfunc Charge() {}\n"}
     consumer = {
         "cmd/main.go": 'package main\n\nimport "github.com/acme/pay/client"\n\nfunc main() {\n\tclient.Charge()\n}\n',
-        "tool.rb": "puts 1\n",
+        "tool.lua": "print(1)\n",
     }
     repos = two(client, auth, tmp_path, provider, consumer)
     a = client.get("/api/groups/analysis", headers=auth, params={"repo_ids": ids(*repos)}).json()
     cov = a["coverage"]
     assert "github.com/acme/pay" in cov[repos[0]["id"]]["provides"]
     unread = {(u["detector"], u["language"]) for u in cov[repos[1]["id"]]["unread"]}
-    assert ("imports", "ruby") in unread and ("imports", "go") not in unread
+    assert ("imports", "lua") in unread and ("imports", "go") not in unread and ("imports", "ruby") not in unread
     link = next(x for x in a["links"] if x["src"] == repos[1]["id"])
     assert link["imports"] >= 1
 
@@ -211,3 +211,98 @@ def test_examples_vendored_code_and_tests_are_left_out(path):
 
 def test_the_detection_version_changed_so_old_links_are_worked_out_again():
     assert rl.DETECTION_VERSION >= "d5"
+
+
+# --- Ruby, PHP, Swift and Scala --------------------------------------------------------------------------------------
+
+
+def test_ruby_php_swift_and_scala_import_lines_are_read():
+    assert li.parse_ruby(
+        "require 'json'\nrequire \"catalog/client\"\nrequire_relative 'local'\n  require('x/y')\n"
+    ) == [
+        "json",
+        "catalog/client",
+        "x/y",
+    ]
+    php = "<?php\nuse Acme\\Billing\\Invoice;\nuse Acme\\Util\\{Money, Tax as T};\nuse function Acme\\helper;\nuse App\\Own as Mine;\n"
+    assert li.parse_php(php) == ["Acme\\Billing\\Invoice", "App\\Own", "Acme\\Util\\Money", "Acme\\Util\\Tax"]
+    assert li.parse_swift("import Foundation\n@testable import CatalogKit\nimport struct Billing.Invoice\n") == [
+        "Foundation",
+        "CatalogKit",
+        "Billing",
+    ]
+    scala = "package app\nimport com.acme.user.UserService\nimport com.acme.model.{User, Order => O, _}\nimport com.acme.util._\n"
+    assert li.parse_scala(scala) == [
+        ("com.acme.model.User", False, False),
+        ("com.acme.model.Order", False, False),
+        ("com.acme.user.UserService", False, False),
+        ("com.acme.util", False, True),
+    ]
+
+
+def test_a_ruby_require_links_the_file_of_the_gem_another_repository_offers(client, auth, tmp_path, session):
+    provider = {
+        "catalog-client.gemspec": "Gem::Specification.new do |s|\n  s.name = 'catalog-client'\n  s.version = '0.1'\nend\n",
+        "lib/catalog/client.rb": "module Catalog\n  class Client\n    def get(id); end\n  end\nend\n",
+        "lib/catalog-client.rb": "require 'catalog/client'\n",
+    }
+    consumer = {
+        "app/orders.rb": "require 'json'\nrequire 'catalog/client'\nrequire_relative 'helpers'\n\nclass Orders\nend\n",
+        "app/helpers.rb": "module Helpers\nend\n",
+    }
+    rows = links(client, auth, session, two(client, auth, tmp_path, provider, consumer))
+    assert [(r.src_label, r.dst_label, r.trust) for r in rows] == [("app/orders.rb", "lib/catalog/client.rb", "fact")]
+    assert 'require "catalog/client"' in rows[0].evidence
+
+
+def test_a_ruby_gem_the_repository_has_itself_makes_no_link(client, auth, tmp_path, session):
+    both = {
+        "x.gemspec": "Gem::Specification.new { |s| s.name = 'shared-kit' }\n",
+        "lib/shared/kit.rb": "module Shared; end\n",
+    }
+    provider = {**both}
+    consumer = {**both, "app/a.rb": "require 'shared/kit'\n"}
+    assert links(client, auth, session, two(client, auth, tmp_path, provider, consumer)) == []
+
+
+def test_a_php_use_links_the_class_file_and_names_the_namespace(client, auth, tmp_path, session):
+    provider = {
+        "src/Billing/Invoice.php": "<?php\nnamespace Acme\\Billing;\n\nclass Invoice\n{\n}\n",
+        "src/Billing/Tax.php": "<?php\nnamespace Acme\\Billing;\n\nclass Tax\n{\n}\n",
+    }
+    consumer = {
+        "app/Cart.php": "<?php\nnamespace App;\n\nuse Acme\\Billing\\Invoice;\nuse Monolog\\Logger;\n\nclass Cart\n{\n}\n",
+    }
+    rows = links(client, auth, session, two(client, auth, tmp_path, provider, consumer))
+    assert [(r.src_label, r.dst_label, r.trust) for r in rows] == [("app/Cart.php", "src/Billing/Invoice.php", "fact")]
+
+
+def test_a_swift_import_links_the_module_another_repository_declares(client, auth, tmp_path, session):
+    provider = {
+        "Package.swift": (
+            "// swift-tools-version:5.9\nimport PackageDescription\n\n"
+            'let package = Package(name: "CatalogKit", targets: [.target(name: "CatalogKit")])\n'
+        ),
+        "Sources/CatalogKit/Client.swift": "public struct Client {}\n",
+    }
+    consumer = {
+        "Sources/Shop/Cart.swift": "import Foundation\nimport CatalogKit\n\nstruct Cart {}\n",
+        "Package.swift": 'import PackageDescription\nlet package = Package(name: "Shop", targets: [.target(name: "Shop")])\n',
+    }
+    rows = links(client, auth, session, two(client, auth, tmp_path, provider, consumer))
+    assert [(r.src_label, r.dst_label, r.trust) for r in rows] == [
+        ("Sources/Shop/Cart.swift", "Sources/CatalogKit/Client.swift", "fact")
+    ]
+
+
+def test_a_scala_import_links_the_class_and_a_name_nobody_declares_makes_no_link(client, auth, tmp_path, session):
+    provider = {
+        "src/main/scala/com/acme/user/UserService.scala": "package com.acme.user\n\nclass UserService {\n  def find(id: String) = id\n}\n",
+    }
+    consumer = {
+        "src/main/scala/app/Main.scala": "package app\n\nimport com.acme.user.UserService\nimport com.acme.user.Missing\nimport scala.util.Try\n\nobject Main\n",
+    }
+    rows = links(client, auth, session, two(client, auth, tmp_path, provider, consumer))
+    assert [(r.src_label, r.dst_label.split("/")[-1]) for r in rows] == [
+        ("src/main/scala/app/Main.scala", "UserService.scala")
+    ]

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     retention_audit_days: int = 730
     retention_sessions_days: int = 30  # ended or expired sign-ins and used or expired invitation links
     retention_investigation_days: int = 0  # reports are kept until deleted, unless set
+    retention_drafts_days: int = 180  # feature drafts and persona reviews; 0 keeps them until deleted
     log_level: str = "INFO"
     log_file: str = ""  # also write logs to this file, rotated (empty = standard output only)
     log_max_mb: int = 10  # size of one log file before it is rotated

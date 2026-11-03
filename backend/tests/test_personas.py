@@ -11,7 +11,10 @@ from repolens.services import personas as svc
 from repolens.services.llm import LLMResult
 from tests.test_api import add_repo
 from tests.test_chat import make_user
-from tests.test_groups import days_ago
+from tests.test_groups import (
+    days_ago,
+    libs,  # noqa: F401  (fixture: the shop and the library it imports)
+)
 from tests.test_risk import commit, git
 
 AUTH = (
@@ -111,7 +114,7 @@ def test_nothing_about_personas_is_available_without_signing_in(client):
 
 def test_the_personas_are_listed_with_what_each_one_does(client, auth):
     got = client.get("/api/personas", headers=auth).json()["personas"]
-    assert [p["key"] for p in got] == ["security-auditor", "test-engineer"]
+    assert [p["key"] for p in got] == ["security-auditor", "test-engineer", "architect", "developer"]
     assert all(p["summary"] and p["placeholder"] for p in got)
 
 
@@ -245,3 +248,76 @@ def test_verify_forgives_whitespace_reads_several_lines_and_ranks_by_severity():
     assert len(why) == 1 and "none: the quoted code is not in m.py" in why[0]
     assert len(svc.verify([f(str(i), "return x") for i in range(40)], texts)[0]) == svc.MAX_FINDINGS
     assert svc.verify("not a list", texts) == ([], [])
+
+
+REVIEW = {
+    "summary": "get_user is used by another service.",
+    "findings": [
+        {
+            "title": "A shared function with no contract",
+            "severity": "medium",
+            "file": "userlib/core.py",
+            "evidence": "def get_user(user_id):",
+            "explanation": "shop-app calls it, so changing the arguments breaks that service.",
+            "suggestion": "Version the function or accept the new argument as optional.",
+        }
+    ],
+}
+
+
+@pytest.fixture
+def model_for_libs(monkeypatch):
+    monkeypatch.setenv("REPOLENS_LLM_PROVIDER", "anthropic")
+    get_settings.cache_clear()
+    state = type("M", (), {"calls": 0, "prompts": [], "systems": []})()
+
+    def fake(system, prompt, max_tokens, cfg=None):
+        state.calls += 1
+        state.prompts.append(prompt)
+        state.systems.append(system)
+        return LLMResult(json.dumps(REVIEW), 1000, 200)
+
+    monkeypatch.setattr(llm, "_anthropic_call", fake)
+    yield state
+    get_settings.cache_clear()
+
+
+LIB_REQUEST = "the get_user function in the userlib core and who relies on it"
+
+
+def test_the_architect_is_told_which_other_repositories_use_the_code_and_says_so(client, auth, libs, model_for_libs):  # noqa: F811
+    shop, lib = libs
+    r = run(client, auth, lib, "architect", LIB_REQUEST)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    prompt = model_for_libs.prompts[0]
+    assert "DEPENDENCIES (proven by the code):" in prompt and "userlib/core.py is used by shop-app" in prompt
+    assert "software architect" in model_for_libs.systems[0]
+    facts = d["notes"]["dependencies"]["facts"]
+    assert facts and all(f["repo"] == "shop-app" and f["direction"] == "used_by" for f in facts)
+    assert d["findings"][0]["file"] == "userlib/core.py" and d["findings"][0]["line"] == 1
+
+
+def test_the_other_personas_are_not_given_dependencies_they_do_not_need(client, auth, libs, model_for_libs):  # noqa: F811
+    shop, lib = libs
+    d = run(client, auth, lib, "developer", LIB_REQUEST).json()
+    assert "DEPENDENCIES" not in model_for_libs.prompts[0] and "senior developer" in model_for_libs.systems[0]
+    assert "dependencies" not in d["notes"] and d["persona_name"] == "Developer"
+
+
+def test_a_shared_architect_review_does_not_name_a_repository_the_reader_cannot_open(
+    client, auth, libs, model_for_libs
+):  # noqa: F811
+    shop, lib = libs
+    ann = make_user(client, auth, "ann@acme.io", "member")
+    bob = make_user(client, auth, "bob@acme.io", "member")
+    made = run(client, ann, lib, "architect", LIB_REQUEST).json()
+    url = f"/api/personas/runs/{made['id']}"
+    client.patch(url, headers=ann, json={"shared": True})
+    ann_id = client.get("/api/auth/me", headers=ann).json()["id"]
+    body = {"visibility": "restricted", "user_ids": [ann_id]}
+    client.put(f"/api/repositories/{shop['id']}/access", headers=auth, json=body)
+    seen = client.get(url, headers=bob).json()
+    assert seen["notes"]["dependencies"]["facts"] == [] and seen["notes"]["dependencies"]["hidden"] >= 1
+    assert "shop-app" not in json.dumps({k: v for k, v in seen["notes"].items()})
+    assert client.get(url, headers=ann).json()["notes"]["dependencies"]["facts"]  # the author can still see them

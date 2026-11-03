@@ -133,3 +133,24 @@ def test_a_dev_database_from_before_a_json_column_existed_is_upgraded_on_start(t
     assert {"totp_enabled", "totp_secret_encrypted", "totp_last_step", "recovery_codes"} <= cols
     with eng.begin() as c:
         assert c.exec_driver_sql("SELECT recovery_codes, totp_enabled FROM users").fetchone() == ("[]", 0)
+
+
+def test_old_feature_drafts_and_persona_reviews_are_swept_and_recent_ones_are_kept(client, auth, session, monkeypatch):
+    from repolens.models import FeatureDraft, PersonaRun
+
+    org = org_of(client, auth)
+    old, new = _now() - timedelta(days=400), _now() - timedelta(days=3)
+    for when in (old, new):
+        session.add(FeatureDraft(org_id=org, repo_id="r", request="x", created_at=when))
+        session.add(PersonaRun(org_id=org, repo_id="r", persona="architect", request="x", created_at=when))
+    session.commit()
+    removed = client.post("/api/settings/retention/run", headers=auth).json()["removed"]
+    assert removed["feature_drafts"] == 1 and removed["persona_runs"] == 1
+    assert session.query(FeatureDraft).count() == 1 and session.query(PersonaRun).count() == 1
+    assert client.get("/api/settings/retention", headers=auth).json()["drafts_days"] == 180
+    monkeypatch.setenv("REPOLENS_RETENTION_DRAFTS_DAYS", "0")  # 0 keeps them for ever
+    config.get_settings.cache_clear()
+    session.add(FeatureDraft(org_id=org, repo_id="r", request="y", created_at=old))
+    session.commit()
+    client.post("/api/settings/retention/run", headers=auth)
+    assert session.query(FeatureDraft).count() == 2

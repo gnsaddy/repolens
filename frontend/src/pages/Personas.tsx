@@ -140,6 +140,15 @@ function Review({ d, reused, admin, write, again, onShare, onDelete }: { d: Pers
                   <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs">{f.code}</pre></div>)}
               </li>))}</ul>)}
         </Card>
+        {d.notes.dependencies && (
+          <Card aria-label="Dependencies">
+            <CardTitle>What it was told about other repositories</CardTitle>
+            {!d.notes.dependencies.facts.length && !d.notes.dependencies.hidden ? <p className="text-sm text-muted">No other repository was found to use, or be used by, the code it read.</p> : (
+              <ul className="space-y-1.5 text-sm">{d.notes.dependencies.facts.map((f, i) => (
+                <li key={i}><code>{f.path}</code> {f.direction === "used_by" ? "is used by" : "depends on"} <strong>{f.repo}</strong>
+                  <span className="block text-xs text-muted"><code>{f.from}</code> → <code>{f.to}</code>{f.evidence && ` — ${f.evidence}`}</span></li>))}</ul>)}
+            {d.notes.dependencies.hidden > 0 && <p className="mt-2 text-xs text-muted">{d.notes.dependencies.hidden} more link{d.notes.dependencies.hidden === 1 ? "" : "s"} involve repositories you cannot access; they are not described.</p>}
+          </Card>)}
         <Card aria-label="Coverage">
           <CardTitle>What it saw</CardTitle>
           <ul className="space-y-0.5 text-xs">{d.notes.coverage.map((c) => <li key={c.file}><code>{c.file}</code> <span className="text-muted">{c.whole ? "whole file" : "only the parts around the match"}</span></li>)}</ul>

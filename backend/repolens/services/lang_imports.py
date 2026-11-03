@@ -33,6 +33,10 @@ LANG_EXT = {
     ".cxx": "cpp",
     ".hpp": "cpp",
     ".hh": "cpp",
+    ".rb": "ruby",
+    ".php": "php",
+    ".swift": "swift",
+    ".scala": "scala",
 }
 LANGS = tuple(dict.fromkeys(LANG_EXT.values()))
 HEADER_EXT = (".h", ".hpp", ".hh", ".hxx", ".inc")
@@ -57,6 +61,57 @@ _RS_USE = re.compile(r"^[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?use[ \t]+([^;]+);", re
 _QUALIFIED = re.compile(r"\b([A-Za-z_]\w*)\.([A-Za-z_]\w*)\b")
 _WORD = re.compile(r"\b[A-Z]\w{2,}\b")
 _VERSION = re.compile(r"^v\d+$")
+
+
+_RB_REQUIRE = re.compile(r"""^[ \t]*require(?:[ \t]+|[ \t]*\()['"]([^'"\n]+)['"]""", re.M)
+_PHP_USE = re.compile(r"^[ \t]*use[ \t]+(?!function\b|const\b)([\\\w]+)(?:[ \t]+as[ \t]+\w+)?[ \t]*;", re.M)
+_PHP_GROUP = re.compile(r"^[ \t]*use[ \t]+([\\\w]+)\\\{([^}]*)\}[ \t]*;", re.M)
+_PHP_NS = re.compile(r"^[ \t]*namespace[ \t]+([\\\w]+)[ \t]*;", re.M)
+_PHP_TYPE = re.compile(r"^[ \t]*(?:final[ \t]+|abstract[ \t]+)?(?:class|interface|trait|enum)[ \t]+(\w+)", re.M)
+_SWIFT_IMPORT = re.compile(
+    r"^[ \t]*(?:@testable[ \t]+)?import[ \t]+(?:(?:struct|class|enum|protocol|func|var|let|typealias)[ \t]+)?(\w+)",
+    re.M,
+)
+_SWIFT_TARGET = re.compile(r'\.(?:target|library|executableTarget)\(\s*name:\s*"(\w+)"')
+_SCALA_PACKAGE = re.compile(r"^[ \t]*package[ \t]+([\w.]+)", re.M)
+_SCALA_GROUP = re.compile(r"^[ \t]*import[ \t]+([\w.]+)\.\{([^}]*)\}", re.M)
+_SCALA_IMPORT = re.compile(r"^[ \t]*import[ \t]+([\w.]+?)(\.(?:_|\*))?[ \t]*$", re.M)
+_SCALA_TYPE = re.compile(
+    r"^[ \t]*(?:(?:final|sealed|abstract|case|private|protected)[ \t]+)*(?:class|object|trait)[ \t]+(\w+)", re.M
+)
+
+
+def parse_ruby(text: str) -> list[str]:
+    """The names a Ruby file `require`s (`require_relative` stays inside the repository and is not read)."""
+    return [m.group(1) for m in _RB_REQUIRE.finditer(text)]
+
+
+def parse_php(text: str) -> list[str]:
+    """The fully qualified names a PHP file imports with `use` (a `use A\\B\\{C, D}` group is expanded)."""
+    out = [m.group(1).lstrip("\\") for m in _PHP_USE.finditer(text)]
+    for m in _PHP_GROUP.finditer(text):
+        for part in m.group(2).split(","):
+            name = part.strip().split(" as ")[0].strip()
+            if name:
+                out.append(f"{m.group(1).lstrip(chr(92))}\\{name}")
+    return out
+
+
+def parse_swift(text: str) -> list[str]:
+    return [m.group(1) for m in _SWIFT_IMPORT.finditer(text)]
+
+
+def parse_scala(text: str) -> list[tuple[str, bool, bool]]:
+    """Scala imports in the shape `parse_jvm` returns: (dotted name, static, wildcard)."""
+    out = []
+    for m in _SCALA_GROUP.finditer(text):
+        for part in m.group(2).split(","):
+            name = part.strip().split("=>")[0].strip()
+            if name and name not in ("_", "*"):
+                out.append((f"{m.group(1)}.{name}", False, False))
+    for m in _SCALA_IMPORT.finditer(text):
+        out.append((m.group(1), False, bool(m.group(2))))
+    return out
 
 
 def _stmt(text: str) -> str:
@@ -151,6 +206,9 @@ class FileFacts:
     types: set[str] = field(default_factory=set)
     qualified: set[tuple[str, str]] = field(default_factory=set)
     words: set[str] = field(default_factory=set)
+    requires: list[str] = field(default_factory=list)  # Ruby
+    php: list[str] = field(default_factory=list)
+    modules: list[str] = field(default_factory=list)  # Swift
 
 
 def _read(f: FileFacts, text: str) -> None:
@@ -173,6 +231,19 @@ def _read(f: FileFacts, text: str) -> None:
             f.words |= set(_WORD.findall(text))
     elif lang == "rust":
         f.uses += [u for u in parse_use(text) if u not in f.uses]
+    elif lang == "ruby":
+        f.requires += [r for r in parse_ruby(text) if r not in f.requires]
+    elif lang == "php":
+        f.php += [u for u in parse_php(text) if u not in f.php]
+        f.namespaces |= set(_PHP_NS.findall(text))
+        f.types |= set(_PHP_TYPE.findall(text))
+    elif lang == "swift":
+        f.modules += [m for m in parse_swift(text) if m not in f.modules]
+    elif lang == "scala":
+        f.jvm += [i for i in parse_scala(text) if i not in f.jvm]
+        if pkg := _SCALA_PACKAGE.search(text):
+            f.package = pkg.group(1)
+        f.types |= set(_SCALA_TYPE.findall(text))
 
 
 def _files(db: Session, ids: list[str], skip: Callable[[str], bool]) -> dict[tuple[str, str], FileFacts]:
@@ -205,6 +276,11 @@ class Offers:
     # class -> (repo, path, whether the file says its package itself)
     jvm: dict[str, list[tuple[str, str, bool]]] = field(default_factory=lambda: defaultdict(list))
     csharp: dict[str, set[str]] = field(default_factory=lambda: defaultdict(set))  # namespace -> repos
+    gem: dict[str, list[tuple[str, str, str]]] = field(
+        default_factory=lambda: defaultdict(list)
+    )  # gem -> (repo, dir, name)
+    swift: dict[str, list[tuple[str, str]]] = field(default_factory=lambda: defaultdict(list))  # module -> (repo, dir)
+    php: dict[str, list[tuple[str, str]]] = field(default_factory=lambda: defaultdict(list))  # class -> (repo, path)
 
 
 def package_from_path(path: str) -> str:
@@ -222,12 +298,27 @@ def _manifest_offers(db: Session, ids: list[str], skip: Callable[[str], bool]) -
     rows = db.execute(
         select(CodeChunk.repo_id, CodeChunk.file_path, CodeChunk.content).where(
             CodeChunk.repo_id.in_(ids),
-            or_(CodeChunk.file_path.like("%go.mod"), CodeChunk.file_path.like("%Cargo.toml")),
+            or_(
+                CodeChunk.file_path.like("%go.mod"),
+                CodeChunk.file_path.like("%Cargo.toml"),
+                CodeChunk.file_path.like("%.gemspec"),
+                CodeChunk.file_path.like("%Package.swift"),
+            ),
         )
     )
     for repo, path, content in rows:
         name = posixpath.basename(path)
-        if name not in ("go.mod", "Cargo.toml") or skip(path):
+        if skip(path):
+            continue
+        if name == "Package.swift":
+            for module in _SWIFT_TARGET.findall(content or ""):
+                offers.swift[module].append((repo, posixpath.dirname(path)))
+            continue
+        if name.endswith(".gemspec"):
+            for gem, _line in manifests.parse(path, content or "").provides:
+                offers.gem[re.sub(r"[-/_.]+", "_", gem.lower())].append((repo, posixpath.dirname(path), gem))
+            continue
+        if name not in ("go.mod", "Cargo.toml"):
             continue
         m = manifests.parse(path, content or "")
         for provided, _line in m.provides:
@@ -248,6 +339,13 @@ def offers_of(
             package = f.package or package_from_path(path)
             if package:
                 offers.jvm[f"{package}.{stem}"].append((repo, path, bool(f.package)))
+        elif f.lang == "scala" and f.package:
+            for name in f.types:  # a Scala file may declare several top-level names
+                offers.jvm[f"{f.package}.{name}"].append((repo, path, True))
+        elif f.lang == "php":
+            for ns in f.namespaces:
+                for name in f.types:
+                    offers.php[ns + chr(92) + name].append((repo, path))
         elif f.lang == "csharp":
             for ns in f.namespaces:
                 offers.csharp[ns].add(repo)
@@ -264,6 +362,12 @@ def provides(offers: Offers, files: dict[tuple[str, str], FileFacts]) -> dict[st
     for ns, repos in offers.csharp.items():
         for repo in repos:
             out[repo].add(ns)
+    for gems in offers.gem.values():
+        for repo, _, original in gems:
+            out[repo].add(original)
+    for module, swift in offers.swift.items():
+        for repo, _ in swift:
+            out[repo].add(module)
     pkgs = {(f.repo, f.package) for f in files.values() if f.package}
     for repo, pkg in pkgs:
         out[repo].add(pkg)
@@ -525,6 +629,79 @@ def _rust(f: FileFacts, offers: Offers, ix: _Index, add: Callable[[dict], None])
             break
 
 
+def _norm_gem(name: str) -> str:
+    return re.sub(r"[-/_.]+", "_", name.lower())
+
+
+def _ruby(f: FileFacts, offers: Offers, ix: _Index, add: Callable[[dict], None]) -> None:
+    """`require "catalog/client"` names a gem another repository's gemspec offers: the file under that gem's `lib/`
+    that the name spells is a fact; with no such file, the gem's main file is an inference."""
+    src = ix.file[f.repo].get(f.path)
+    if not src:
+        return
+    for spec in f.requires:
+        wanted = _norm_gem(spec)
+        for gem, where in offers.gem.items():
+            if wanted != gem and not wanted.startswith(gem + "_"):
+                continue
+            if any(repo == f.repo for repo, _, _ in where):
+                continue  # the repository has that gem itself
+            for repo, base, original in where:
+                files = ix.file[repo]
+                exact = posixpath.join(base, "lib", spec + ".rb")
+                main = [posixpath.join(base, "lib", n + ".rb") for n in (original, original.replace("-", "/"))]
+                path = exact if exact in files else next((m for m in main if m in files), None)
+                if path:
+                    add(
+                        _edge(
+                            f,
+                            src,
+                            repo,
+                            files[path],
+                            path,
+                            "",
+                            f'require "{spec}"',
+                            "fact" if path == exact else "inferred",
+                        )
+                    )
+            break
+
+
+def _php(f: FileFacts, offers: Offers, ix: _Index, add: Callable[[dict], None]) -> None:
+    src = ix.file[f.repo].get(f.path)
+    for name in f.php:
+        candidates = offers.php.get(name, [])
+        if not src or any(repo == f.repo for repo, _ in candidates):
+            continue
+        others = [(r, p) for r, p in candidates if p in ix.file[r]]
+        for repo, path in others[:3]:
+            add(
+                _edge(
+                    f,
+                    src,
+                    repo,
+                    ix.file[repo][path],
+                    path,
+                    "",
+                    f"use {name};",
+                    "fact" if len(others) == 1 else "inferred",
+                )
+            )
+
+
+def _swift(f: FileFacts, offers: Offers, ix: _Index, add: Callable[[dict], None]) -> None:
+    src = ix.file[f.repo].get(f.path)
+    for module in f.modules:
+        where = offers.swift.get(module, [])
+        if not src or any(repo == f.repo for repo, _ in where):
+            continue
+        for repo, base in where:
+            folder = posixpath.join(base, "Sources", module)
+            files = sorted(p for p in ix.file[repo] if p.startswith(folder + "/") and p.endswith(".swift"))
+            if files:
+                add(_edge(f, src, repo, ix.file[repo][files[0]], files[0], "", f"import {module}", "fact"))
+
+
 def scan(db: Session, ids: Sequence[str], skip: Callable[[str], bool]) -> tuple[list[dict], dict[str, list[str]]]:
     """(edges, what each repository offers) for the languages above. `skip` says which paths to leave out (tests,
     examples, vendored code). Edges have the same shape as the Python and JavaScript ones."""
@@ -548,8 +725,14 @@ def scan(db: Session, ids: Sequence[str], skip: Callable[[str], bool]) -> tuple[
         f = files[key]
         if f.lang == "go":
             _go(f, offers, ix, add)
-        elif f.lang in ("java", "kotlin"):
+        elif f.lang in ("java", "kotlin", "scala"):
             _jvm(f, offers, ix, add)
+        elif f.lang == "ruby":
+            _ruby(f, offers, ix, add)
+        elif f.lang == "php":
+            _php(f, offers, ix, add)
+        elif f.lang == "swift":
+            _swift(f, offers, ix, add)
         elif f.lang in ("c", "cpp"):
             _c(f, ix, add)
         elif f.lang == "csharp":

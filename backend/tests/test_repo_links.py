@@ -75,14 +75,14 @@ def test_a_detector_that_fails_does_not_wipe_what_it_found_before(client, auth, 
 def test_coverage_says_which_languages_a_detector_cannot_read(client, auth, libs, session):  # noqa: F811
     shop, lib = libs
     path = session.get(Repository, shop["id"]).url
-    with open(f"{path}/shop/main.rb", "w") as f:
+    with open(f"{path}/shop/main.lua", "w") as f:
         f.write("package main\n\nfunc main() {\n}\n")
-    commit_all(path, "add ruby")
+    commit_all(path, "add lua")
     reindex(client, auth, shop)
     a = client.get("/api/groups/analysis", headers=auth, params={"repo_ids": ids(shop, lib)}).json()
     cov = a["coverage"]
     assert cov[lib["id"]]["provides"] == ["userlib"] and "python" in cov[lib["id"]]["languages"]
-    assert {"detector": "imports", "language": "ruby", "files": 1} in cov[shop["id"]]["unread"]
+    assert {"detector": "imports", "language": "lua", "files": 1} in cov[shop["id"]]["unread"]
     assert not any(u["language"] == "python" for u in cov[shop["id"]]["unread"])
 
 
@@ -252,3 +252,42 @@ def test_a_caller_is_the_function_never_the_file_that_shares_its_chunk(client, a
     by_id = {n["id"]: n for n in g["nodes"]}
     sources = {by_id[e["source"]]["name"] for e in g["edges"] if e["rel"] == "USES"}
     assert {"checkout", "audit"} <= sources and "checkout.py" not in sources
+
+
+# --- URLs added together from pieces ------------------------------------------------------------------------------
+
+
+def test_a_url_added_together_from_pieces_is_read_with_the_variable_parts_as_any_value():
+    code = (
+        'fetch("/api/orders/" + id + "/status"); '
+        "const u = '/api/products/' + p.id + '/price?percent=' + document.getElementById('sale').value; "
+        'url = base + "/inventory/items/" + str(item_id) + "/reserve"'
+    )
+    got = rl.joined_urls(code)
+    assert "/api/orders/{}/status" in got
+    assert "/api/products/{}/price?percent={}" in got
+    assert "/inventory/items/{}/reserve" in got
+    assert rl.joined_urls("x = a + b") == [] and rl.joined_urls('s = "no slash" + name') == []
+
+
+def test_a_front_end_that_adds_a_url_together_is_linked_to_the_exact_route_it_calls(client, auth, tmp_path, session):
+    from tests.test_lang_imports import two
+
+    provider = {
+        "service/api.py": (
+            "from fastapi import FastAPI\n\napp = FastAPI()\n\n\n"
+            '@app.post("/inventory/items/{item_id}/reserve")\ndef reserve(item_id: int):\n    return {"ok": True}\n\n\n'
+            '@app.get("/inventory/items")\ndef items():\n    return []\n'
+        )
+    }
+    consumer = {
+        "web/app.js": (
+            "async function reserveItem(id) {\n"
+            '  return fetch("/inventory/items/" + id + "/reserve", { method: "POST" });\n}\n'
+        )
+    }
+    repos = two(client, auth, tmp_path, provider, consumer)
+    client.get("/api/groups/analysis", headers=auth, params={"repo_ids": ids(*repos)})
+    session.expire_all()
+    rows = session.query(RepoLink).filter_by(kind="http", gone_at=None).all()
+    assert [(r.src_label, r.dst_label) for r in rows] == [("web/app.js:reserveItem", "service/api.py:reserve")]

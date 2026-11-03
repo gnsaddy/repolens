@@ -61,6 +61,21 @@ def _short(db: Session, row: PersonaRun, names: dict[str, str], p: Principal, pe
     }
 
 
+def _notes(db: Session, row: PersonaRun, p: Principal) -> dict:
+    """The review's notes, with what it was told about other repositories filtered by what this reader may open: a
+    repository they cannot open is counted, never named."""
+    notes = dict(row.notes or {})
+    deps = notes.get("dependencies")
+    if deps:
+        scope = scope_for(db, p)
+        facts = [f for f in deps.get("facts", []) if scope.can(f.get("repo_id", ""))]
+        notes["dependencies"] = {
+            "facts": facts,
+            "hidden": int(deps.get("hidden", 0)) + len(deps.get("facts", [])) - len(facts),
+        }
+    return notes
+
+
 def _view(db: Session, row: PersonaRun, p: Principal) -> dict:
     repo = db.get(Repository, row.repo_id)
     return {
@@ -68,7 +83,7 @@ def _view(db: Session, row: PersonaRun, p: Principal) -> dict:
         "request": row.request,
         "summary": row.summary,
         "findings": row.findings or [],
-        "notes": row.notes or {},
+        "notes": _notes(db, row, p),
         "model": row.model,
         "error": row.error,
         "base_sha": row.base_sha,
