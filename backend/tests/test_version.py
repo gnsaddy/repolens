@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_the_release_is_v0_2_1_and_reported_by_the_health_check(client):
-    assert VERSION_LABEL == "v0.2.1" and __version__ == "0.2.1"
-    assert client.get("/healthz").json() == {"status": "ok", "version": "v0.2.1"}
+    assert VERSION_LABEL == "v0.2.2" and __version__ == "0.2.2"
+    assert client.get("/healthz").json() == {"status": "ok", "version": "v0.2.2"}
 
 
 def test_every_place_that_names_the_version_agrees():
@@ -22,4 +22,4 @@ def test_every_place_that_names_the_version_agrees():
         pytest.skip("frontend sources not present")
     assert re.search(r'APP_VERSION = "([^"]+)"', web.read_text()).group(1) == VERSION_LABEL
     pkg = re.search(r'"version": "([^"]+)"', (ROOT / "frontend" / "package.json").read_text()).group(1)
-    assert pkg == "0.2.1"
+    assert pkg == "0.2.2"

@@ -1,6 +1,6 @@
 # Try it in five minutes
 
-You need Python 3.11+ and Node 20+. No AI model, account or key is required: search, git-history correlation and ranking run on your machine without calling any AI service.
+With only Docker, the shortest way to see the app is the README's Quick start (`docker compose -f docker-compose.release.yml up -d`, then http://localhost:8080). The steps below run it from a clone, which also lets you add the sample repository: you need Python 3.11+ and Node 20+ (`./run-local.sh` can start the API and web for you in place of the two `make dev-*` commands). No AI model, account or key is required: search, git-history correlation and ranking run on your machine without calling any AI service.
 
 ```bash
 git clone https://github.com/gnsaddy/repolens.git && cd repolens

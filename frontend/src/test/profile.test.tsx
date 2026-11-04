@@ -31,7 +31,7 @@ function renderPage(el: React.ReactNode) {
     if (u.includes("/metrics/system")) return json({ available: true, cores: 8, load_average: [0.5, 0.6, 0.7], uptime_s: 7300, threads: 24, interval_s: 5,
       current: { t: 1, host_cpu: 37.2, process_cpu: 12.5, mem_used: 5_000_000_000, mem_total: 16_000_000_000, process_rss: 120_000_000, rx_bps: 2048, tx_bps: 4096, rps: 1.4, error_rate: 0, p50_ms: 8, p95_ms: 41, container_limit: null },
       history: [{ t: 1, host_cpu: 30, process_cpu: 10, mem_used: 5e9, mem_total: 16e9, process_rss: 1e8, rx_bps: 1000, tx_bps: 2000, rps: 1, error_rate: 0, p50_ms: 8, p95_ms: 40, container_limit: null }] });
-    if (u.includes("/metrics/health")) return json({ version: "v0.2.1", ok: false, problems: ["The retention loop is late", "1 repository failed to index"],
+    if (u.includes("/metrics/health")) return json({ version: "v0.2.2", ok: false, problems: ["The retention loop is late", "1 repository failed to index"],
       jobs: [{ name: "daily-reindex", state: "ok", every_s: 86400, last_ok: Date.now() / 1000 - 3600, failures: 0, last_error: null }, { name: "retention", state: "late", every_s: 86400, last_ok: null, failures: 0, last_error: null }],
       repositories: { pending: 0, indexing: 1, ready: 3, error: 1 }, quality: { passed: 4, total: 5, trigger: "reindex", mode: "retrieval", at: new Date().toISOString() } });
     if (u.includes("/metrics/overview")) return json({ days: 30, content: { repositories: 2, doc_collections: 1, pages: 12, chunks: 340, graph_nodes: 900, graph_edges: 2100, indexing_errors: 0 },

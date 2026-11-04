@@ -9,8 +9,8 @@ sample:    ## create ./sample-repo, a small repository with a known bug, to try 
 help:      ## list the targets
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
-run:       ## whole stack on PostgreSQL (API :8000, web :5173, reachable on your network)
-	./run-local.sh up --lan --postgres
+run:       ## the whole app from this clone on SQLite (API :8000, web :5173)
+	./run-local.sh
 stop:      ## stop the local stack
 	./run-local.sh stop
 logs:      ## tail the API log

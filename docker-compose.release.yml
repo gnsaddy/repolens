@@ -1,0 +1,54 @@
+# Run RepoLens from the published images: no clone, no build.
+#
+#   curl -O https://raw.githubusercontent.com/gnsaddy/repolens/main/docker-compose.release.yml
+#   docker compose -f docker-compose.release.yml up -d      ->  http://localhost:8080
+#
+# REPOLENS_VERSION picks the release (default below); a `.env` next to this file is read if there is one (see .env.example).
+# Out of the box this is the development mode (no secrets to set, API docs on :8000/docs). For anything shared set
+# REPOLENS_ENV=prod and the secrets from .env.example first.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    logging: *logging
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: repolens
+      POSTGRES_USER: repolens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repolens}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repolens -d repolens"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    logging: *logging
+    image: ghcr.io/gnsaddy/repolens-api:${REPOLENS_VERSION:-0.2.2}
+    env_file: [{ path: .env, required: false }]
+    environment:
+      REPOLENS_ENV: ${REPOLENS_ENV:-dev}
+      REPOLENS_DATABASE_URL: postgresql+psycopg://repolens:${POSTGRES_PASSWORD:-repolens}@db:5432/repolens
+    volumes:
+      - repos:/data/repos
+      - ${REPOLENS_LOCAL_REPOS:-./data/local-repos}:/mnt/repos:ro   # mount local git repos here
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["${API_PORT:-8000}:8000"]
+    restart: unless-stopped
+
+  web:
+    logging: *logging
+    image: ghcr.io/gnsaddy/repolens-web:${REPOLENS_VERSION:-0.2.2}
+    environment:
+      API_UPSTREAM: http://api:8000
+    depends_on: [api]
+    ports: ["${WEB_PORT:-8080}:8080"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  repos:

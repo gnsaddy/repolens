@@ -404,7 +404,7 @@ def test_github_webhook_signature(client, monkeypatch):
 def test_health_and_metrics(client):
     assert client.get("/healthz").json() == {
         "status": "ok",
-        "version": "v0.2.1",
+        "version": "v0.2.2",
     }  # the version is also checked in test_version.py
     assert client.get("/readyz").json() == {"status": "ready"}
     client.get("/healthz")

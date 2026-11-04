@@ -98,3 +98,16 @@ def test_cd_deploys_only_when_asked_to_and_publishing_never_needs_the_cluster():
     assert "DEPLOY_MODE" in deploy["if"] and "== 'kubectl'" in deploy["if"]  # off unless DEPLOY_MODE=kubectl
     assert deploy["needs"] == "publish"  # an image exists before anything is rolled out
     assert "KUBECONFIG" not in str(cd["jobs"]["publish"])  # a release with no cluster still publishes the images
+
+
+def test_the_release_compose_file_runs_the_published_images_of_this_version():
+    from repolens import __version__
+
+    c = load(ROOT / "docker-compose.release.yml")[0]["services"]
+    assert all("build" not in s for s in c.values())  # nothing is built on the user's machine
+    for name in ("api", "web"):  # the images cd.yml publishes, tagged without the "v"
+        assert c[name]["image"] == f"ghcr.io/gnsaddy/repolens-{name}:${{REPOLENS_VERSION:-{__version__}}}"
+    assert c["db"]["image"] == "pgvector/pgvector:pg16"
+    assert (
+        c["web"]["ports"] == ["${WEB_PORT:-8080}:8080"] and c["web"]["environment"]["API_UPSTREAM"] == "http://api:8000"
+    )

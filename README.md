@@ -2,7 +2,7 @@
 
 # RepoLens AI
 
-**Version v0.2.1.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
+**Version v0.2.2.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
 
 **DeepMind Wiki: a living wiki for your code and docs.** Point RepoLens at your repositories, READMEs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint, and it builds a wiki you can browse and ask questions of, with a code atlas for every repository and an at-a-glance card (kind, owner, warnings, commands) for every page. Answers cite their sources. It also keeps the wiki honest: it flags pages that may be out of date when the code they describe changes, finds orphaned, duplicated and broken pages, and drafts edits that a person reviews before anything changes.
 
@@ -67,12 +67,18 @@ Everything left of the model router runs on your own machine without calling any
 
 Open **DeepMind Wiki** in the sidebar to add READMEs, text files, web URLs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint (Sources tab, optionally re-synced on a schedule), then browse, ask, explore concepts, check documentation health, review drift alerts and approve suggested edits. See [docs/features.md](docs/features.md#deepmind-wiki). To try Confluence without an instance: `python -m repolens.devtools.fake_confluence --port 8099 --token demo-token --email demo@example.com` (loopback URLs are accepted only when `REPOLENS_ENV=dev`).
 
-## Run it (Docker)
+## Quick start
+
+You need only Docker. No clone, no build:
 
 ```bash
-cp .env.example .env            # set secrets
-docker compose up --build       # web http://localhost:8080 , API http://localhost:8000/docs
+curl -O https://raw.githubusercontent.com/gnsaddy/repolens/main/docker-compose.release.yml
+docker compose -f docker-compose.release.yml up -d      # web http://localhost:8080 , API docs http://localhost:8000/docs
 ```
+
+Open http://localhost:8080 and create a workspace (the first user is the admin). It runs in development mode with nothing to configure; for anything shared, set `REPOLENS_ENV=prod` and the secrets from `.env.example` first. `REPOLENS_VERSION=0.2.2` in the environment picks another release.
+
+From a clone, without Docker (Python 3.11+ and Node 20+): `./run-local.sh` installs what it needs, starts the API and the web UI on SQLite at http://127.0.0.1:5173, and `./run-local.sh stop` ends it. To build the images yourself: `cp .env.example .env && docker compose up --build`.
 
 Create a workspace on the login page (first user is admin). Add a language-model key under **Settings** (or via `REPOLENS_LLM_*`), upload docs under **Knowledge → Documents**, and **Connect with GitHub** under Settings (device-flow sign-in; register an OAuth App with Device Flow enabled and paste its Client ID) to sync pull requests or use **GitHub Models** as the LLM. Anthropic uses an API key; Claude-subscription and Copilot sign-in are not offered by those vendors for third-party apps. Mount git repos under `./data/local-repos` (mounted at
 `/mnt/repos`) or add an https/ssh Git URL. Out of the box `LLM_PROVIDER=heuristic` and `EMBEDDING_PROVIDER=hash` call no AI service:
