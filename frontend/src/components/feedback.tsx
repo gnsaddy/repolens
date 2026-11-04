@@ -21,11 +21,13 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [dialog, setDialog] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
   const [acked, setAcked] = useState(false);
   const next = useRef(1);
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());  // cleared on unmount so none fires after the page is gone
   const toast = useCallback((text: string, tone: Tone = "success") => {
     const id = next.current++;
     setToasts((t) => [...t, { id, text, tone }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 8000 : 4000);
+    timers.current.add(setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === "error" ? 8000 : 4000));
   }, []);
+  useEffect(() => { const pending = timers.current; return () => { pending.forEach(clearTimeout); pending.clear(); }; }, []);
   const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((resolve) => { setAcked(false); setDialog({ ...o, resolve }); }), []);
   const close = (v: boolean) => { dialog?.resolve(v); setDialog(null); };
   const value = useMemo(() => ({ toast, confirm }), [toast, confirm]);
