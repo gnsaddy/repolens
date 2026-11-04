@@ -1,15 +1,20 @@
 name: CD
-# Images are published under the app's own version (backend/repolens/__init__.py), on every push to main and on a
-# version tag. Until the version number changes, each push to main replaces the images of that version.
+# Images are published under the app's own version (backend/repolens/__init__.py) and only for a commit whose CI run
+# passed: after CI succeeds on a push to main, or when a version tag (or a manual run) is on a commit that already
+# passed CI. Until the version number changes, each green commit on main replaces the images of that version.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
+  push:
     tags: ["v*.*.*"]
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
+  actions: read   # to look up the CI result of a commit
 
 env:
   REGISTRY: ghcr.io
@@ -17,11 +22,21 @@ env:
 
 jobs:
   publish:
+    # a CI run that failed, or one from a pull request, publishes nothing
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with: { ref: "${{ env.SHA }}" }
+      - name: CI must have passed for this commit
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          PASSED=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA" --status success --json databaseId --jq length)
+          [ "${PASSED:-0}" -gt 0 ] || { echo "CI has not passed for $SHA, so nothing is published"; exit 1; }
       - id: meta
         run: |
           VERSION=$(sed -n 's/^__version__ = "\(.*\)".*/\1/p' backend/repolens/__init__.py)
@@ -53,7 +68,7 @@ jobs:
     # Deploying from CI is opt-in: set the repository variable DEPLOY_MODE=kubectl (and the KUBECONFIG_B64 secret) to have a
     # tag roll out to a cluster. Without it a tag only publishes the images, which is what you want with Argo CD (the cluster
     # pulls from git: tag, wait for the images, change the image tag in your overlay by pull request) or with no cluster at all.
-    if: ${{ vars.DEPLOY_MODE == 'kubectl' && github.ref_type == 'tag' }}  # a push to main never rolls out
+    if: ${{ vars.DEPLOY_MODE == 'kubectl' && github.ref_type == 'tag' }}  # only a tag rolls out, never a green main
     runs-on: ubuntu-latest
     environment: production        # configure required reviewers on this environment for manual approval
     steps:

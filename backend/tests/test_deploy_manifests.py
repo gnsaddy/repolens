@@ -101,12 +101,18 @@ def test_cd_deploys_only_when_asked_to_and_publishing_never_needs_the_cluster():
     assert "KUBECONFIG" not in str(cd["jobs"]["publish"])  # a release with no cluster still publishes the images
 
 
-def test_images_are_published_on_every_push_to_main_under_the_app_version():
+def test_images_are_published_only_after_ci_passed_under_the_app_version():
     from repolens import __version__
 
     cd = yaml.safe_load((ROOT / ".github" / "workflows" / "cd.yml").read_text())
     trigger = cd.get("on") or cd[True]  # YAML reads a bare `on` as true
-    assert trigger["push"]["branches"] == ["main"] and trigger["push"]["tags"] == ["v*.*.*"]
+    assert trigger["workflow_run"] == {"workflows": ["CI"], "types": ["completed"], "branches": ["main"]}
+    assert trigger["push"] == {"tags": ["v*.*.*"]}  # a push to main publishes only through the CI run
+    publish = cd["jobs"]["publish"]
+    assert "conclusion == 'success'" in publish["if"] and "event == 'push'" in publish["if"]  # not failed, not a PR
+    gate = next(s for s in publish["steps"] if "CI must have passed" in s.get("name", ""))
+    assert "--workflow CI" in gate["run"] and '"$SHA"' in gate["run"]  # tags and manual runs need a green commit too
+    assert cd["permissions"]["actions"] == "read"
     meta = next(s for s in cd["jobs"]["publish"]["steps"] if s.get("id") == "meta")
     assert "backend/repolens/__init__.py" in meta["run"] and "GITHUB_REF_NAME" in meta["run"]  # version from the code
     assert "tag=$VERSION" in meta["run"] and __version__  # what is published is the version, not the branch name
