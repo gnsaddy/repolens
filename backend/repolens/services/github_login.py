@@ -3,13 +3,14 @@
 GitHub is not an OpenID Connect provider, so this is not the single sign-on of `sso.py`; it borrows its flow table and
 its one-time login code, and follows the same rules:
 
-* the OAuth app is the server's (`REPOLENS_GITHUB_LOGIN_CLIENT_ID` and `_SECRET`); each workspace only says which e-mail
-  domains may sign in, with which role, and whether new accounts are created;
+* the OAuth app is the server's (`REPOLENS_GITHUB_LOGIN_CLIENT_ID` and `_SECRET`). That is all people with an account
+  need: a verified GitHub address that matches their account signs them in. A workspace may in addition say which
+  e-mail domains get an account created for them, and with which role; it may also turn GitHub sign-in off;
 * ``state`` is random, single use and expires, and the PKCE verifier stays on the server;
 * the only addresses GitHub, never the browser, can vouch for are the person's *verified* ones; an unverified address
   is never used, because that is how accounts get taken over;
-* a person signs in to the workspace whose allowed domains contain one of their verified addresses; a domain belongs to
-  one workspace, so this is never ambiguous;
+* a person signs in to the account their verified address belongs to; a new account is created only in the workspace
+  whose domains contain one of their addresses, and a domain belongs to one workspace, so this is never ambiguous;
 * users are never moved between workspaces, an existing account is linked by verified address, and signing in with
   GitHub never grants admin;
 * the access token is used once to read the profile and addresses and is not stored.
@@ -50,10 +51,9 @@ def app_configured() -> bool:
 
 
 def available(db: Session) -> bool:
-    """Whether the sign-in page should offer GitHub: the server has an OAuth app and a workspace allows it."""
-    if not app_configured():
-        return False
-    return db.scalar(select(GithubLoginConfig.id).where(GithubLoginConfig.enabled.is_(True)).limit(1)) is not None
+    """Whether the sign-in page should offer GitHub: the server has an OAuth app. Nothing else is needed for people who
+    already have an account; a workspace only configures GitHub to create accounts for new people."""
+    return app_configured()
 
 
 def begin(db: Session, redirect_uri: str) -> str:
@@ -122,7 +122,8 @@ def _config_for(db: Session, emails: list[str]) -> tuple[GithubLoginConfig, str]
 
 
 def complete(db: Session, state: str, code: str, redirect_uri: str) -> User:
-    """Validate the callback, read who GitHub says this is and return the (possibly new) user."""
+    """Validate the callback, read who GitHub says this is and return the user: the existing account that one of their
+    verified addresses belongs to, or, where a workspace allows it for their domain, a new one."""
     flow = db.get(SsoFlow, state)
     expired = flow is None or _aware(flow.created_at) < datetime.now(UTC) - FLOW_TTL
     if flow is None or expired or flow.org_id != FLOW_ORG or flow.login_code:
@@ -134,21 +135,29 @@ def complete(db: Session, state: str, code: str, redirect_uri: str) -> User:
     profile, emails = _profile(code, redirect_uri, flow.code_verifier)
     if not emails:
         raise SsoError("Your GitHub account has no verified e-mail address")
-    match = _config_for(db, emails)
-    if match is None:
-        raise SsoError("None of your verified GitHub e-mail addresses is in a domain allowed to sign in")
-    cfg, email = match
-    user = _user_for(db, cfg, email, profile)
+    user = _existing(db, emails, profile)
+    if user is None:
+        match = _config_for(db, emails)
+        if match is None:
+            raise SsoError(
+                "No RepoLens account uses a verified e-mail address of your GitHub account. "
+                "Ask an administrator to invite you."
+            )
+        user = _create(db, match[0], match[1], profile)
     flow.login_code, flow.user_id = "", user.id  # cleared below once the SPA exchange code is minted
     return user
 
 
-def _user_for(db: Session, cfg: GithubLoginConfig, email: str, profile: dict) -> User:
+def _existing(db: Session, emails: list[str], profile: dict) -> User | None:
+    """The account a verified address belongs to (the primary address first), linked to this GitHub identity."""
     external = f"github:{profile['id']}"
-    user = db.scalar(select(User).where(User.email == email))
-    if user is not None:
-        if user.org_id != cfg.org_id:
-            raise SsoError("This e-mail address belongs to another organisation")
+    for email in emails:
+        user = db.scalar(select(User).where(User.email == email))
+        if user is None:
+            continue
+        cfg = db.scalar(select(GithubLoginConfig).where(GithubLoginConfig.org_id == user.org_id))
+        if cfg is not None and not cfg.enabled:
+            raise SsoError("Signing in with GitHub is turned off for your organisation")
         if not user.active:
             raise SsoError("This account is deactivated")
         if user.external_id and user.external_id != external and user.auth_source != "password":
@@ -156,6 +165,10 @@ def _user_for(db: Session, cfg: GithubLoginConfig, email: str, profile: dict) ->
         user.external_id = user.external_id or external
         db.commit()
         return user
+    return None
+
+
+def _create(db: Session, cfg: GithubLoginConfig, email: str, profile: dict) -> User:
     if not cfg.auto_provision:
         raise SsoError("Your account has not been created yet. Ask an administrator.")
     role = cfg.default_role if cfg.default_role in SSO_ROLES else "viewer"
@@ -166,7 +179,7 @@ def _user_for(db: Session, cfg: GithubLoginConfig, email: str, profile: dict) ->
         role=role,
         password_hash=hash_password(secrets.token_urlsafe(32)),
         auth_source="github",
-        external_id=external,
+        external_id=f"github:{profile['id']}",
     )
     db.add(user)
     db.commit()

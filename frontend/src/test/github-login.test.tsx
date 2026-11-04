@@ -54,7 +54,7 @@ describe("admin card", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const method = init?.method ?? "GET";
       if (String(input).endsWith("/settings/github-login")) {
-        if (method === "PUT") { const b = JSON.parse(String(init?.body)); calls.push({ method, body: b }); state = { ...state, configured: true, allowed_domains: String(b.allowed_domains).split(",").map((d: string) => d.trim()), default_role: b.default_role, auto_provision: b.auto_provision, enabled: b.enabled }; return json(state); }
+        if (method === "PUT") { const b = JSON.parse(String(init?.body)); calls.push({ method, body: b }); const list = String(b.allowed_domains).split(",").map((d: string) => d.trim()).filter(Boolean); state = { ...state, configured: true, allowed_domains: list, default_role: b.default_role, auto_provision: list.length > 0, enabled: b.enabled }; return json(state); }
         if (method === "DELETE") { calls.push({ method }); state = base; return json(null, 204); }
         return json(state);
       }
@@ -64,26 +64,36 @@ describe("admin card", () => {
     return calls;
   }
 
-  it("shows the callback URL, saves the allowed domains and the role, and can remove the setting", async () => {
+  it("needs nothing to be set to let people with an account use GitHub, and says so", async () => {
+    card(base);
+    const region = await screen.findByLabelText("Sign in with GitHub");
+    await within(region).findByLabelText("E-mail domains that get an account");
+    expect(region).toHaveTextContent("Nothing else needs to be set here");
+    expect(region).toHaveTextContent("https://repolens.example/api/auth/github/callback");
+    expect(within(region).getByText("on")).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: "Save" })).toBeEnabled();  // empty domains are fine: existing accounts only
+  });
+
+  it("saves the optional domains and the role, can switch it off for the workspace, and can reset to the defaults", async () => {
     const calls = card(base);
     const region = await screen.findByLabelText("Sign in with GitHub");
-    await within(region).findByLabelText("Allowed e-mail domains");  // the settings have loaded
-    expect(region).toHaveTextContent("https://repolens.example/api/auth/github/callback");
-    expect(within(region).getByRole("button", { name: "Save" })).toBeDisabled();
-    await userEvent.type(within(region).getByLabelText("Allowed e-mail domains"), "acme.io, acme.com");
+    await userEvent.type(await within(region).findByLabelText("E-mail domains that get an account"), "acme.io, acme.com");
     await userEvent.selectOptions(within(region).getByLabelText("Role for new people"), "member");
     await userEvent.click(within(region).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(calls[0].body).toEqual({ allowed_domains: "acme.io, acme.com", default_role: "member", auto_provision: true, enabled: true }));
-    expect(await within(region).findByText("on")).toBeInTheDocument();
-    await userEvent.click(await within(region).findByRole("button", { name: "Remove" }));
-    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(calls[0].body).toEqual({ allowed_domains: "acme.io, acme.com", default_role: "member", enabled: true }));
+    await userEvent.click(within(region).getByLabelText("Allow GitHub sign-in for people in this workspace"));
+    await userEvent.click(within(region).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls[1].body?.enabled).toBe(false));
+    expect(await within(region).findByText("off")).toBeInTheDocument();
+    await userEvent.click(await within(region).findByRole("button", { name: "Reset" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Reset" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE")).toBe(true));
   });
 
-  it("tells an admin the server has no OAuth app yet, and that the setting is still off", async () => {
+  it("tells an admin the server has no OAuth app yet, and that it is off", async () => {
     card({ ...base, app_configured: false });
     const region = await screen.findByLabelText("Sign in with GitHub");
-    await within(region).findByLabelText("Allowed e-mail domains");
+    await within(region).findByLabelText("E-mail domains that get an account");
     expect(region).toHaveTextContent("no GitHub OAuth app yet");
     expect(region).toHaveTextContent("REPOLENS_GITHUB_LOGIN_CLIENT_ID");
     expect(within(region).getByText("off")).toBeInTheDocument();

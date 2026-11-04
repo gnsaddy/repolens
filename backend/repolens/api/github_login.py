@@ -58,9 +58,8 @@ def callback(request: Request, state: str = "", code: str = "", error: str = "",
 
 # ------------------------------------------------------------------------------------------------ admin settings
 class GithubLoginIn(BaseModel):
-    allowed_domains: str | list[str]
+    allowed_domains: str | list[str] = ""  # domains whose people get an account created; empty: existing accounts only
     default_role: str = Field(default="viewer", pattern="^(viewer|member)$")
-    auto_provision: bool = True
     enabled: bool = True
 
 
@@ -89,8 +88,9 @@ def put_config(
     body: GithubLoginIn, request: Request, p: Principal = Depends(current_principal), db: Session = Depends(get_db)
 ):
     authorize(db, p, "sso.configure", "github-login")
+    blank = not (body.allowed_domains.strip() if isinstance(body.allowed_domains, str) else body.allowed_domains)
     try:
-        domains = gl.parse_domains(body.allowed_domains)
+        domains = [] if blank else gl.parse_domains(body.allowed_domains)
     except gl.SsoError as e:
         raise HTTPException(400, str(e)) from None
     taken = [
@@ -108,7 +108,7 @@ def put_config(
         cfg = GithubLoginConfig(org_id=p.org_id)
         db.add(cfg)
     cfg.allowed_domains, cfg.default_role = domains, body.default_role
-    cfg.auto_provision, cfg.enabled = body.auto_provision, body.enabled
+    cfg.auto_provision, cfg.enabled = bool(domains), body.enabled
     db.commit()
     return _view(request, cfg)
 
