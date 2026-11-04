@@ -17,6 +17,8 @@ export default function Login() {
   const [sp] = useSearchParams();
   const ssoError = sp.get("sso_error");
   const [sso, setSso] = useState<{ organization: string } | null>(null);
+  const [github, setGithub] = useState(false);  // the server has a GitHub OAuth app and a workspace allows it
+  useEffect(() => { api<{ enabled: boolean }>("/auth/github/enabled").then((r) => setGithub(!!r.enabled)).catch(() => setGithub(false)); }, []);
   useEffect(() => {
     setSso(null);
     if (mode !== "login" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return;
@@ -59,6 +61,7 @@ export default function Login() {
           {ssoError && <p role="alert" className="text-sm text-red-600">{ssoError}</p>}
           {sso && <Button type="button" variant="outline" className="w-full" onClick={() => { window.location.href = `/api/auth/sso/start?email=${encodeURIComponent(f.email)}`; }}>Continue with single sign-on{sso.organization ? ` (${sso.organization})` : ""}</Button>}
           <Button className="w-full" disabled={busy}>{mode === "login" ? "Sign in" : "Create account"}</Button>
+          {github && mode === "login" && <Button type="button" variant="outline" className="w-full" onClick={() => { window.location.href = "/api/auth/github/start"; }}>Continue with GitHub</Button>}
         </form>
         <button className="mt-4 text-xs text-brand hover:underline" onClick={() => { setMode(mode === "login" ? "register" : "login"); setErr(null); }}>
           {mode === "login" ? "New here? Create a workspace" : "Have an account? Sign in"}

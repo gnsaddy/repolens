@@ -145,6 +145,9 @@ PUBLIC = {
     ("GET", "/api/auth/sso/start"),
     ("GET", "/api/auth/sso/callback"),
     ("POST", "/api/auth/sso/exchange"),
+    ("GET", "/api/auth/github/enabled"),
+    ("GET", "/api/auth/github/start"),
+    ("GET", "/api/auth/github/callback"),
     ("POST", "/api/webhooks/github"),
 }
 OWN_ACCOUNT_OR_READ = {  # POSTs that read, or act only on the caller's own account

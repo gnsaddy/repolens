@@ -86,6 +86,10 @@ of CSRF handling); tokens issued before server-side sessions existed cannot be r
 access-scoped, but protect the database itself); registration is open until `REPOLENS_ALLOW_REGISTRATION=false`, so turn it off
 once your workspace exists; a generated-code execution sandbox is not implemented (the fix-generation agents are out of scope).
 
+## Sign in with GitHub
+
+OAuth authorization code flow with PKCE. The OAuth client secret lives only in the server's environment and is never returned by any API. `state` is random, single use and expires after ten minutes, and the PKCE verifier stays on the server; the redirect URI is fixed from the server's public URL. Only **verified** GitHub e-mail addresses count, so an attacker cannot claim someone else's address by adding it unverified to their GitHub account. A workspace admin lists the e-mail domains that may sign in; a domain belongs to one workspace; people are never moved between workspaces; a GitHub sign-in never grants admin; an account linked to a different GitHub identity cannot be taken over; failures show a short message and nothing from GitHub's answer. The permission requested is `user:email`, so no repository can be read. The access token is used once and not stored.
+
 ## Agent personas
 
 A persona review sends the request and the text of up to five matching files to the configured language model, like Ask does, and stores the findings as text. A finding is kept only if it quotes code that is really in a file it was shown, which also stops the model inventing a file or a line. Reviews are never run or applied, secrets are redacted from what is stored, and a review is private to its author (admins cannot read it) until shared, and then only for people who can open its repository. A finding is a lead for a person to check, not a verified vulnerability.

@@ -7,6 +7,7 @@ import { PeoplePanel } from "@/pages/People";
 import { Link, useSearchParams } from "react-router-dom";
 import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import AccessTokens from "@/components/AccessTokens";
+import GithubLoginCard from "@/components/GithubLoginCard";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
 import LanguageModelCard from "@/components/LanguageModelCard";
 import QualityPanel from "@/components/QualityPanel";
@@ -39,7 +40,7 @@ export default function SettingsPage() {
             className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       <div className={tab === "people" ? "" : "max-w-4xl"}>
-        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <IntegrationsPanel admin={admin} /> : tab === "quality" ? <QualityPanel canWrite={!!user && user.role !== "viewer"} /> : tab === "skills" ? <SkillsPanel admin={admin} canSubmit={!!user && user.role !== "viewer"} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
+        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <div className="space-y-4"><IntegrationsPanel admin={admin} />{admin && <GithubLoginCard />}</div> : tab === "quality" ? <QualityPanel canWrite={!!user && user.role !== "viewer"} /> : tab === "skills" ? <SkillsPanel admin={admin} canSubmit={!!user && user.role !== "viewer"} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
           <div className="space-y-4">
             <OutboundCard />
             {!managed && <LanguageModelCard admin={admin} />}

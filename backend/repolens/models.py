@@ -974,3 +974,16 @@ class PersonaRun(Base):
     shared: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str] = mapped_column(String(32), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GithubLoginConfig(Base):
+    """Which e-mail domains may sign in to a workspace with GitHub, and as what (the OAuth app is the server's)."""
+
+    __tablename__ = "github_login_configs"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), unique=True)
+    allowed_domains: Mapped[list] = mapped_column(JSON, default=list)
+    default_role: Mapped[str] = mapped_column(String(20), default="viewer")
+    auto_provision: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

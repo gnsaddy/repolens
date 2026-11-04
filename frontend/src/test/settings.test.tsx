@@ -153,6 +153,7 @@ describe("GitHub connect", () => {
       const u = String(input);
       if (u.endsWith("/auth/me")) return json({ id: "1", email: "a@b.io", name: "A", role, org_id: "o" });
       if (u.endsWith("/settings/llm")) return json(base);
+      if (u.endsWith("/settings/github-login")) return json({ configured: false, app_configured: false, redirect_uri: "http://localhost/api/auth/github/callback" });
       return routes(u, init) ?? json({}, 404);
     });
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     github_webhook_secret: str = ""
     # OAuth App client id used for the "Connect with GitHub" device flow (public value; no secret needed)
     github_client_id: str = ""
+    # OAuth App for "Sign in with GitHub" (web flow; the secret stays on the server). Register it on GitHub with the
+    # callback URL shown in Settings; each workspace then chooses which e-mail domains may sign in.
+    github_login_client_id: str = ""
+    github_login_client_secret: str = ""
 
 
 @lru_cache

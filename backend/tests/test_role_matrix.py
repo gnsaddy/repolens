@@ -20,6 +20,7 @@ PUBLIC_PREFIXES = (
     "/api/auth/register",
     "/api/auth/reset",
     "/api/auth/sso/",
+    "/api/auth/github/",
     "/api/webhooks/",
     "/scim/",
 )
@@ -273,6 +274,7 @@ ADMIN_ONLY_READS = {
     "/api/settings/llm/models",
     "/api/settings/scim",
     "/api/settings/sso",
+    "/api/settings/github-login",
     "/api/settings/sso/users",
     "/api/wiki/confluence/spaces",
     "/api/wiki/confluence/spaces/{key}/pages",
