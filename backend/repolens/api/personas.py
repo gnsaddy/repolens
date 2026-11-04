@@ -19,6 +19,7 @@ class RunIn(BaseModel):
     persona: str = Field(min_length=1, max_length=30)
     request: str = Field(min_length=svc.REQUEST_MIN, max_length=svc.REQUEST_MAX)
     fresh: bool = False  # ask the model again even when an earlier run says the same thing
+    mode: str = Field("review", pattern="^(review|design)$")  # design: an HLD and LLD instead of findings
 
 
 class ShareIn(BaseModel):
@@ -52,6 +53,7 @@ def _short(db: Session, row: PersonaRun, names: dict[str, str], p: Principal, pe
         "repo": names.get(row.repo_id, "a removed repository"),
         "repo_id": row.repo_id,
         "created_at": row.created_at,
+        "mode": (row.notes or {}).get("mode", "review"),
         "found": len(findings),
         "high": sum(1 for f in findings if f.get("severity") == "high"),
         "tokens": features.ledger(db, row.org_id, row.id, svc.WORKFLOW),
@@ -119,7 +121,7 @@ def create_run(body: RunIn, p: Principal = Depends(current_principal), db: Sessi
         raise HTTPException(404, "Repository not found")
     authorize(db, p, "persona.run", repo.name, persona=body.persona)
     try:
-        row, reused = svc.run(db, p.org_id, p.user_id, scope, repo, body.persona, body.request, body.fresh)
+        row, reused = svc.run(db, p.org_id, p.user_id, scope, repo, body.persona, body.request, body.fresh, body.mode)
     except svc.PersonaError as e:
         raise HTTPException(409, str(e)) from e
     return {**_view(db, row, p), "reused": reused}

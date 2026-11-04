@@ -5,7 +5,7 @@ import json
 import pytest
 
 from repolens.config import get_settings
-from repolens.models import PersonaRun
+from repolens.models import PersonaRun, Repository
 from repolens.services import llm
 from repolens.services import personas as svc
 from repolens.services.llm import LLMResult
@@ -86,7 +86,7 @@ def model(monkeypatch):
         assert "untrusted" in system and "FILE app/auth.py" in prompt
         if state.fail:
             raise RuntimeError(state.fail)
-        return LLMResult(json.dumps(state.reply), 1500, 400)
+        return LLMResult(state.reply if isinstance(state.reply, str) else json.dumps(state.reply), 1500, 400)
 
     monkeypatch.setattr(llm, "_anthropic_call", fake)
     yield state
@@ -157,7 +157,7 @@ def test_an_unknown_persona_a_short_request_and_no_model_are_refused_plainly(cli
     assert r.status_code == 409 and "needs a language model" in r.json()["detail"]
 
 
-def test_a_failed_model_call_is_reported_and_a_request_with_no_matching_code_is_refused(
+def test_a_failed_model_call_is_reported_and_a_request_naming_no_code_reads_the_main_files(
     client, auth, repo, model, session
 ):
     model.fail = "overloaded"
@@ -166,7 +166,8 @@ def test_a_failed_model_call_is_reported_and_a_request_with_no_matching_code_is_
     assert session.query(PersonaRun).one().status == "failed"
     model.fail, model.calls = None, 0
     r = run(client, auth, repo, request="zebra giraffe telescope orchestration for the moon base")
-    assert r.status_code == 409 and model.calls == 0
+    assert r.status_code == 201 and model.calls == 1  # nothing matched, so it read the repository's main files instead
+    assert r.json()["notes"]["main_files"] == ["app/auth.py"]
 
 
 def test_the_same_review_in_other_words_is_reused_but_another_persona_or_fresh_is_not(client, auth, repo, model):
@@ -321,3 +322,155 @@ def test_a_shared_architect_review_does_not_name_a_repository_the_reader_cannot_
     assert seen["notes"]["dependencies"]["facts"] == [] and seen["notes"]["dependencies"]["hidden"] >= 1
     assert "shop-app" not in json.dumps({k: v for k, v in seen["notes"].items()})
     assert client.get(url, headers=ann).json()["notes"]["dependencies"]["facts"]  # the author can still see them
+
+
+DESIGN = {
+    "summary": "A small service that looks users up.",
+    "hld": "## Purpose\nLooks users up in a database.",
+    "lld": "## auth\nfind_user builds a query; total sums prices.",
+    "diagram": "```mermaid\nflowchart LR\n  A[auth] --> B[(db)]\n```",
+    "components": [
+        {"name": "auth", "responsibility": "looks users up", "files": ["app/auth.py"]},
+        {"name": "ghost", "responsibility": "not in the code", "files": ["app/none.py"]},
+    ],
+    "flows": [
+        {
+            "name": "lookup",
+            "steps": ["find_user builds the query", "fetchone returns the row"],
+            "files": ["app/auth.py", "nope.py"],
+        },
+        {"name": "empty", "steps": [], "files": ["app/auth.py"]},
+    ],
+    "not_covered": ["the web layer was not shown"],
+}
+
+
+def design_text(d):
+    """A design as the model is asked to write it: plain sections, not JSON."""
+    comps = "\n".join(f"- {c['name']} | {c['responsibility']} | {', '.join(c['files'])}" for c in d["components"])
+    flows = "\n".join(
+        f"FLOW: {f['name']} | {', '.join(f['files'])}\n" + "\n".join(f"{i}. {x}" for i, x in enumerate(f["steps"], 1))
+        for f in d["flows"]
+    )
+    notes = "\n".join(f"- {n}" for n in d["not_covered"])
+    return (
+        f"=== SUMMARY ===\n{d['summary']}\n=== HLD ===\n{d['hld']}\n=== LLD ===\n{d['lld']}\n"
+        f"=== DIAGRAM ===\n{d['diagram']}\n=== COMPONENTS ===\n{comps}\n=== FLOWS ===\n{flows}\n"
+        f"=== NOT COVERED ===\n{notes}\n"
+    )
+
+
+def test_a_design_written_as_text_survives_quotes_code_and_missing_sections():
+    text = (
+        'Here is the design.\n=== SUMMARY ===\nIt says "hello" a lot.\n=== HLD ===\n'
+        '## Purpose\nUses `db.execute("x")` and {braces}.\n\n```python\nprint("a, b")\n```\n'
+        "=== COMPONENTS ===\n* `store` | keeps rows | `app/store.py`, app/db.py\nnot a component line\n"
+        "=== FLOWS ===\nFLOW: read | app/store.py\n1) open\n- fetch\n"
+    )
+    got = svc.parse_design(text)
+    assert got["summary"] == 'It says "hello" a lot.' and 'print("a, b")' in got["hld"] and got["lld"] == ""
+    assert got["components"] == [
+        {"name": "store", "responsibility": "keeps rows", "files": ["app/store.py", "app/db.py"]}
+    ]
+    assert got["flows"] == [{"name": "read", "files": ["app/store.py"], "steps": ["open", "fetch"]}]
+    assert svc.parse_design("no headings at all")["hld"] == "" and svc.parse_design("")["components"] == []
+
+
+def test_the_architect_can_write_a_design_overview_and_only_what_names_shown_files_is_kept(client, auth, repo, model):
+    model.reply = design_text(DESIGN)
+    r = run(client, auth, repo, "architect", "Explain the HLD and LLD", mode="design")
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["mode"] == "design" and d["status"] == "done" and d["findings"] == [] and model.calls == 1
+    design = d["notes"]["design"]
+    assert "## Purpose" in design["hld"] and "find_user" in design["lld"]
+    assert design["diagram"] == "flowchart LR\n  A[auth] --> B[(db)]"  # the fence is taken off
+    assert [c["name"] for c in design["components"]] == ["auth"]  # "ghost" names a file that was not shown
+    assert [(f["name"], f["files"]) for f in design["flows"]] == [("lookup", ["app/auth.py"])]
+    assert design["not_covered"] == ["the web layer was not shown"] and d["notes"]["dropped"] == 2
+    assert "design overview" in model.systems[0] and "software architect" in model.systems[0]
+
+
+def test_a_design_overview_reads_the_main_files_and_a_review_of_the_same_words_is_not_reused_for_it(
+    client, auth, repo, model
+):
+    review = run(client, auth, repo, "architect", "Explain the HLD and LLD").json()  # nothing in the code matches
+    assert review["mode"] == "review" and review["notes"]["main_files"] == ["app/auth.py"]
+    model.reply = design_text(DESIGN)
+    first = run(client, auth, repo, "architect", "Explain the HLD and LLD", mode="design").json()
+    assert first["id"] != review["id"] and not first["reused"] and model.calls == 2
+    again = run(client, auth, repo, "architect", "explain the HLD and the LLD", mode="design").json()
+    assert again["id"] == first["id"] and again["reused"] and model.calls == 2
+
+
+OVERVIEWS = {  # persona: (the choice on the page, a phrase its instruction must carry)
+    "architect": ("Design overview (HLD and LLD)", "software architect"),
+    "security-auditor": ("Threat model", "threat model"),
+    "test-engineer": ("Test plan", "test plan"),
+    "developer": ("Code walkthrough", "walkthrough"),
+}
+
+
+def test_every_persona_can_describe_the_repository_in_its_own_way_and_the_list_says_so(client, auth, repo, model):
+    listed = {p["key"]: p for p in client.get("/api/personas", headers=auth).json()["personas"]}
+    assert all(p["modes"] == ["review", "design"] for p in listed.values())
+    assert {k: p["overview"]["label"] for k, p in listed.items()} == {k: v[0] for k, v in OVERVIEWS.items()}
+    assert listed["security-auditor"]["overview"]["first"] == "Threat model"
+    assert listed["developer"]["overview"]["second"] == "Where to change what"
+    model.reply = design_text(DESIGN)
+    for key, (_, phrase) in OVERVIEWS.items():
+        d = run(client, auth, repo, key, "Describe it", mode="design").json()
+        assert d["mode"] == "design" and d["notes"]["design"]["components"][0]["name"] == "auth"
+        assert phrase in model.systems[-1] and "=== HLD ===" in model.systems[-1]  # each asks in its own words
+    assert model.calls == 4 and len({sys for sys in model.systems}) == 4
+    assert run(client, auth, repo, "architect", "Explain the HLD and LLD", mode="poem").status_code == 422
+
+
+def test_a_diagram_that_could_act_is_left_out_and_odd_model_output_does_not_break_the_design(client, auth, repo, model):
+    model.reply = design_text({**DESIGN, "diagram": 'flowchart LR\n  A --> B\n  click A href "http://example.test"'})
+    d = run(client, auth, repo, "architect", "Explain the design", mode="design").json()
+    assert d["notes"]["design"]["diagram"] == "" and any("diagram" in why for why in d["notes"]["reasons"])
+    texts = {"a.py": "x = 1\n"}
+    odd = {"hld": 5, "components": "no", "flows": [3, {"name": "f", "steps": "s", "files": 7}], "not_covered": {}}
+    design, why = svc.verify_design(odd, texts)
+    assert design["components"] == [] and design["flows"] == [] and design["not_covered"] == [] and len(why) == 1
+    assert svc._clean_diagram("graph TD\n A --> B <--> C").startswith("graph TD")
+    assert svc._clean_diagram("sequenceDiagram\n A->>B: hi") == ""  # only flowcharts are shown
+    assert "<br/>" in svc._clean_diagram("mermaid\nflowchart TD\n  A[main.py<br/>routes] --> B")  # a line break is fine
+    assert svc._diagram("graph LR\n A --> B\n click A call f()")[1].startswith("it contained 'click")
+    assert svc._diagram("graph LR\n A[<script>x</script>] --> B")[0] == ""
+    labelled, _ = svc.verify_design({"hld": "markdown\n## Purpose", "lld": "md\ntext"}, texts)
+    assert labelled["hld"] == "## Purpose" and labelled["lld"] == "text"  # a language name on its own line is dropped
+
+
+def test_the_main_files_come_entry_points_first_without_tests_or_docs_and_long_files_are_outlined(
+    client, auth, tmp_path, model, session
+):
+    p = tmp_path / "svc"
+    p.mkdir()
+    git(p, "init", "-q", "-b", "main")
+    big = "\n".join(f"def f{i}():\n    return {i}" for i in range(200))
+    files = {
+        "app/auth.py": AUTH,
+        "app/main.py": "from app.auth import find_user\n\n\ndef run():\n    return find_user(None, 'a')\n",
+        "app/big.py": big,
+        "tests/test_auth.py": "def test_x():\n    assert True\n",
+        "docs/guide.md": "# guide\n",
+        "package.json": "{}\n",
+    }
+    commit(p, files, "feat: svc", days_ago(2))
+    repo = add_repo(client, auth, p, name="svc")
+    found = svc.overview_files(session, session.get(Repository, repo["id"]), set())
+    assert next(iter(found)) == "app/main.py"  # the entry point comes first
+    assert set(found) == {"app/main.py", "app/auth.py", "app/big.py"}  # no tests, docs or package.json
+    assert svc.overview_files(session, session.get(Repository, repo["id"]), {"app/main.py"}, limit=1).keys() != {
+        "app/main.py"
+    }
+    got = run(client, auth, repo, "architect", "zebra giraffe telescope orchestration for the moon base", mode="design")
+    assert got.status_code == 201, got.text
+    notes = got.json()["notes"]
+    assert not any(f.startswith(("tests/", "docs/")) or f.endswith(".json") for f in notes["main_files"])
+    assert "app/main.py" in notes["main_files"] and "app/big.py" in {c["file"] for c in notes["coverage"]}
+    text = svc.outline(big)
+    assert "a long file" in text and "def f0" in text and "def f199" not in text
+    assert svc.outline("a = 1\n") == "    1  a = 1"

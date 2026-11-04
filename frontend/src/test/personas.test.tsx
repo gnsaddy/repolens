@@ -15,10 +15,10 @@ afterEach(() => vi.restoreAllMocks());
 const me = (role = "member") => ({ id: "1", email: "sam@acme.io", name: "Sam", role, org_id: "o", auth_source: "password" });
 const repos = [{ id: "a", name: "shop", source: "git", status: "ready" }, { id: "h", name: "handbook", source: "docs", status: "ready" }];
 const personas: Persona[] = [
-  { key: "security-auditor", name: "Security auditor", summary: "Reads code for ways it could be attacked.", placeholder: "The login endpoint." },
-  { key: "test-engineer", name: "Test engineer", summary: "Reads code for behaviour that has no test.", placeholder: "The order total." },
-  { key: "architect", name: "Architect", summary: "Reads how the code is structured.", placeholder: "The orders module." },
-  { key: "developer", name: "Developer", summary: "Reviews the code like a colleague.", placeholder: "create_order." },
+  { key: "security-auditor", name: "Security auditor", summary: "Reads code for ways it could be attacked.", placeholder: "The login endpoint.", modes: ["review", "design"], overview: { label: "Threat model", action: "Write the threat model", first: "Threat model", second: "Weak points and attack paths", placeholder: "Leave empty for the whole repository." } },
+  { key: "test-engineer", name: "Test engineer", summary: "Reads code for behaviour that has no test.", placeholder: "The order total.", modes: ["review", "design"], overview: { label: "Test plan", action: "Write the test plan", first: "Test strategy", second: "Test plan by module", placeholder: "Leave empty for the whole repository." } },
+  { key: "architect", name: "Architect", summary: "Reads how the code is structured.", placeholder: "The orders module.", modes: ["review", "design"], overview: { label: "Design overview (HLD and LLD)", action: "Write the design overview", first: "High-level design", second: "Low-level design", placeholder: "Leave empty for the whole repository." } },
+  { key: "developer", name: "Developer", summary: "Reviews the code like a colleague.", placeholder: "create_order.", modes: ["review", "design"], overview: { label: "Code walkthrough", action: "Write the code walkthrough", first: "How it works", second: "Where to change what", placeholder: "Leave empty for the whole repository." } },
 ];
 const tokens = { calls: 1, input_tokens: 1500, output_tokens: 400, cost: 0.0105 };
 const short: PersonaRunShort = { id: "r1", persona: "security-auditor", persona_name: "Security auditor", title: "the user lookup", status: "done", repo: "shop", repo_id: "a", created_at: new Date().toISOString(), found: 1, high: 1, tokens, shared: false, mine: true, author_name: "sam" };
@@ -28,7 +28,20 @@ const full: PersonaRunView = {
   notes: { coverage: [{ file: "app/auth.py", whole: true }, { file: "app/big.py", whole: false }], dropped: 2, reasons: ["a", "b"], limit: "Read by a model, not run. A finding quotes real code, but that does not make it correct; check it." },
 };
 
-function open(opts: { role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean; architectNotes?: boolean } = {}) {
+const designRun: PersonaRunView = {
+  ...full, persona: "architect", persona_name: "Architect", mode: "design", findings: [], summary: "A small service that looks users up.",
+  notes: {
+    mode: "design", coverage: [{ file: "app/auth.py", whole: true }, { file: "app/big.py", whole: false, outline: true }], main_files: ["app/auth.py", "app/big.py"], dropped: 1, reasons: ["x"], limit: "Read by a model, not run.",
+    design: {
+      hld: "## Purpose\n\nLooks users up in a database.", lld: "## auth\n\nfind_user builds a query.", diagram: "flowchart LR\n  A[auth] --> B[(db)]",
+      components: [{ name: "auth", responsibility: "looks users up", files: ["app/auth.py"] }],
+      flows: [{ name: "lookup", steps: ["find_user builds the query", "fetchone returns the row"], files: ["app/auth.py"] }],
+      not_covered: ["the web layer was not shown"],
+    },
+  },
+};
+
+function open(opts: { design?: boolean; mainFiles?: boolean;  role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean; architectNotes?: boolean } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -36,11 +49,13 @@ function open(opts: { role?: string; fail?: string; reuse?: boolean; theirs?: bo
     if (url.endsWith("/auth/me")) return json(me(opts.role));
     if (url.endsWith("/repositories")) return json(repos);
     if (url.endsWith("/personas")) return json({ personas });
-    if (url.endsWith("/personas/runs") && method === "POST") return opts.fail ? json({ detail: opts.fail }, 409) : json({ ...full, reused: opts.reuse && !JSON.parse(String(init?.body)).fresh }, 201);
+    if (url.endsWith("/personas/runs") && method === "POST") return opts.fail ? json({ detail: opts.fail }, 409) : opts.design ? json(designRun, 201) : json({ ...full, reused: opts.reuse && !JSON.parse(String(init?.body)).fresh }, 201);
     if (url.endsWith("/personas/runs")) return json({ runs: [opts.theirs ? { ...short, mine: false, shared: true, author_name: "ann" } : short] });
     if (url.includes("/personas/runs/r1") && method === "DELETE") return json(null, 204);
     if (url.includes("/personas/runs/r1") && method === "PATCH") return json({ ...full, shared: JSON.parse(String(init?.body)).shared });
     if (url.includes("/personas/runs/r1") && opts.architectNotes) return json({ ...full, notes: { ...full.notes, dependencies: { hidden: 2, facts: [{ direction: "used_by", path: "app/auth.py", repo: "billing", repo_id: "b", from: "billing/invoice.py:total", to: "app/auth.py:find_user", kind: "import", trust: "fact", evidence: "total calls find_user" }] } } });
+    if (url.includes("/personas/runs/r1") && opts.design) return json(designRun);
+    if (url.includes("/personas/runs/r1") && opts.mainFiles) return json({ ...full, notes: { ...full.notes, main_files: ["app/auth.py", "app/main.py"] } });
     if (url.includes("/personas/runs/r1")) return json(opts.empty ? { ...full, findings: [], notes: { ...full.notes, dropped: 0 } } : opts.theirs ? { ...full, mine: false, shared: true, author_name: "ann" } : full);
     return json({});
   });
@@ -143,5 +158,48 @@ describe("Agent personas", () => {
     await userEvent.click(screen.getByRole("button", { name: /Ask the architect/ }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/personas/runs") && c.body?.persona === "architect")).toBe(true));
     expect(within(group).getByRole("radio", { name: /Developer/ })).toBeInTheDocument();
+  });
+
+  it("lets a persona switch to its own overview, and a blank box asks for the whole repository", async () => {
+    const calls = open({ design: true });
+    const group = await screen.findByRole("group", { name: "Persona" });
+    await userEvent.click(within(group).getByRole("radio", { name: /Architect/ }));
+    await userEvent.click(within(await screen.findByRole("group", { name: "What the architect does" })).getByRole("radio", { name: /Design overview/ }));
+    const go = screen.getByRole("button", { name: "Write the design overview" });
+    expect(go).toBeEnabled();  // an empty box is fine here
+    await userEvent.click(go);
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/personas/runs") && c.body?.mode === "design" && c.body?.persona === "architect" && c.body?.request === "Describe the design of this repository")).toBe(true));
+  });
+
+  it("shows the design: high-level and low-level text, components and flows with their files, the diagram, and what it could not tell", async () => {
+    open({ design: true });
+    await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
+    expect(await screen.findByLabelText("High-level design")).toHaveTextContent("Looks users up in a database.");
+    expect(screen.getByLabelText("Components")).toHaveTextContent("auth — looks users up");
+    expect(screen.getByLabelText("Diagram")).toHaveTextContent("flowchart LR");
+    const lld = screen.getByLabelText("Low-level design");
+    expect(lld).toHaveTextContent("find_user builds a query.");
+    expect(within(screen.getByLabelText("Flows")).getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByLabelText("Not covered")).toHaveTextContent("the web layer was not shown");
+    expect(screen.queryByLabelText("Findings")).toBeNull();
+    expect(screen.getByLabelText("Coverage")).toHaveTextContent("its first lines and what it declares");
+    expect(screen.getByLabelText("Coverage")).toHaveTextContent("1 part was left out");
+  });
+
+  it("says when nothing in the request matched and the main files were read instead", async () => {
+    open({ mainFiles: true });
+    await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
+    expect(await screen.findByRole("note")).toHaveTextContent("it read the repository's main files: app/auth.py, app/main.py");
+  });
+
+  it("gives each persona its own overview: a threat model, a test plan, a code walkthrough", async () => {
+    open();
+    const group = await screen.findByRole("group", { name: "Persona" });
+    for (const [persona, label, action] of [["Security auditor", "Threat model", "Write the threat model"], ["Test engineer", "Test plan", "Write the test plan"], ["Developer", "Code walkthrough", "Write the code walkthrough"]] as const) {
+      await userEvent.click(within(group).getByRole("radio", { name: new RegExp(persona) }));
+      const picker = await screen.findByRole("group", { name: `What the ${persona.toLowerCase()} does` });
+      await userEvent.click(within(picker).getByRole("radio", { name: label }));
+      expect(screen.getByRole("button", { name: action })).toBeEnabled();  // an empty box is fine
+    }
   });
 });

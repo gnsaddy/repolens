@@ -3,9 +3,10 @@ import { Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
-import { api, type Persona, type PersonaRunView, type PersonaRunShort, type Repo } from "@/lib/api";
+import { api, type Persona, type PersonaDesign, type PersonaOverview, type PersonaRunView, type PersonaRunShort, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
+import Markdown from "./wiki/Markdown";
 
 const TONE: Record<string, "red" | "amber" | "blue" | "gray"> = { high: "red", medium: "amber", low: "blue", info: "gray" };
 const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
@@ -21,6 +22,7 @@ export default function PersonasPage() {
   const [personaKey, setPersonaKey] = useState("");
   const [repoId, setRepoId] = useState("");
   const [request, setRequest] = useState("");
+  const [mode, setMode] = useState<"review" | "design">("review");
   const [openId, setOpenId] = useState<string | null>(null);
   const [reusedId, setReusedId] = useState<string | null>(null);
   const personas = useQuery({ queryKey: ["personas"], queryFn: () => api<{ personas: Persona[] }>("/personas") });
@@ -31,8 +33,11 @@ export default function PersonasPage() {
   const persona = all.find((p) => p.key === personaKey) ?? all[0];
   const ready = (repos.data ?? []).filter((r) => r.source !== "docs" && r.status === "ready");
   const repo = repoId || ready[0]?.id || "";
+  const canDesign = !!persona?.modes?.includes("design") && !!persona.overview;
+  const design = canDesign && mode === "design";
+  const asked = design && request.trim().length < 5 ? "Describe the design of this repository" : request;  // a blank box means the whole repository
   const make = useMutation({
-    mutationFn: (fresh: boolean) => api<PersonaRunView>("/personas/runs", { method: "POST", json: { repo_id: repo, persona: persona?.key, request, fresh } }),
+    mutationFn: (fresh: boolean) => api<PersonaRunView>("/personas/runs", { method: "POST", json: { repo_id: repo, persona: persona?.key, request: asked, fresh, mode: design ? "design" : "review" } }),
     onSuccess: (d) => {
       setOpenId(d.id); setReusedId(d.reused ? d.id : null);
       qc.setQueryData(["persona-run", d.id], d); qc.invalidateQueries({ queryKey: ["persona-runs"] });
@@ -66,14 +71,20 @@ export default function PersonasPage() {
                       <span className="font-medium">{p.name}</span><span className="mt-0.5 block text-xs text-muted">{p.summary}</span>
                     </label>))}
                 </fieldset>
+                {canDesign && (
+                  <fieldset className="flex gap-2 text-sm" aria-label={`What the ${persona.name.toLowerCase()} does`}>
+                    {([["review", "Review (findings)"], ["design", persona.overview?.label ?? "Overview"]] as const).map(([k, label]) => (
+                      <label key={k} className={`flex-1 cursor-pointer rounded-lg border p-2 ${mode === k ? "border-brand bg-brand/5" : "border-line"}`}>
+                        <input type="radio" name="mode" className="mr-2" checked={mode === k} onChange={() => setMode(k)} />{label}</label>))}
+                  </fieldset>)}
                 <Label>Repository
                   <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
-                <Label>What should it look at?
-                  <Textarea aria-label="What should it look at?" rows={4} maxLength={2000} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={persona?.placeholder} /></Label>
-                <p className="text-xs text-muted">Uses the language model once and spends tokens. It sees the code that matches your request, so use the names in the code. It reads the indexed commit and will say which files it saw whole.</p>
+                <Label>{design ? "What should it describe? (optional)" : "What should it look at?"}
+                  <Textarea aria-label={design ? "What should it describe?" : "What should it look at?"} rows={4} maxLength={2000} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={design ? persona?.overview?.placeholder : persona?.placeholder} /></Label>
+                <p className="text-xs text-muted">{design ? "Uses the language model once and spends tokens (more than a review: it reads the repository's main files). It describes what the code shows and lists what it could not tell." : "Uses the language model once and spends tokens. It sees the code that matches your request, so use the names in the code; if nothing matches it reads the repository's main files. It reads the indexed commit and will say which files it saw whole."}</p>
                 <ErrorNote error={make.error} />
-                <Button type="submit" disabled={make.isPending || !repo || !persona || request.trim().length < 5}><Sparkles className="h-4 w-4" />{make.isPending ? "Reviewing…" : `Ask the ${persona?.name.toLowerCase() ?? "specialist"}`}</Button>
+                <Button type="submit" disabled={make.isPending || !repo || !persona || (!design && request.trim().length < 5)}><Sparkles className="h-4 w-4" />{make.isPending ? (design ? "Writing…" : "Reviewing…") : design ? (persona?.overview?.action ?? "Write it") : `Ask the ${persona?.name.toLowerCase() ?? "specialist"}`}</Button>
               </form>)}
           </Card>
           <Card aria-label="Reviews">
@@ -84,7 +95,7 @@ export default function PersonasPage() {
                   <button className={`min-w-0 flex-1 py-2 text-left hover:bg-slate-50 ${openId === x.id ? "font-medium" : ""}`} onClick={() => setOpenId(x.id)}>
                     <div className="truncate">{x.title || "Untitled"}</div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted">{x.persona_name} · {x.repo} · {x.mine ? "you" : x.author_name} · {timeAgo(x.created_at)} · {tokens(x.tokens.input_tokens + x.tokens.output_tokens)} tokens
-                      <Badge tone={x.status === "failed" ? "red" : x.high ? "red" : "green"}>{x.status === "failed" ? "failed" : `${x.found} finding${x.found === 1 ? "" : "s"}`}</Badge>
+                      <Badge tone={x.status === "failed" ? "red" : x.high ? "red" : "green"}>{x.status === "failed" ? "failed" : x.mode === "design" ? "overview" : `${x.found} finding${x.found === 1 ? "" : "s"}`}</Badge>
                       <Badge tone={x.shared ? "blue" : "gray"}>{x.shared ? "shared" : "private"}</Badge></div>
                   </button>
                   {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "review"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
@@ -94,7 +105,7 @@ export default function PersonasPage() {
 
         <div className="space-y-4 lg:col-span-3">
           {!openId ? <Empty>Ask a specialist, or open a review.</Empty> : one.isLoading ? <Spinner /> : !d ? <ErrorNote error={one.error} /> : (
-            <Review d={d} reused={d.id === reusedId} admin={user?.role === "admin"} write={write} again={make.isPending ? undefined : () => make.mutate(true)}
+            <Review d={d} titles={all.find((p) => p.key === d.persona)?.overview ?? undefined} reused={d.id === reusedId} admin={user?.role === "admin"} write={write} again={make.isPending ? undefined : () => make.mutate(true)}
               onShare={(shared) => share.mutate({ id: d.id, shared })} onDelete={() => ask(d)} />)}
         </div>
       </div>
@@ -102,7 +113,7 @@ export default function PersonasPage() {
   );
 }
 
-function Review({ d, reused, admin, write, again, onShare, onDelete }: { d: PersonaRunView; reused: boolean; admin: boolean; write: boolean; again?: () => void; onShare: (shared: boolean) => void; onDelete: () => void }) {
+function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: { d: PersonaRunView; titles?: PersonaOverview; reused: boolean; admin: boolean; write: boolean; again?: () => void; onShare: (shared: boolean) => void; onDelete: () => void }) {
   const toast = useToast();
   const copy = (text: string) => navigator.clipboard?.writeText(text).then(() => toast("Copied"), () => toast("Could not copy"));
   const t = d.tokens;
@@ -124,6 +135,9 @@ function Review({ d, reused, admin, write, again, onShare, onDelete }: { d: Pers
         {d.status === "failed" ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{d.error}</p> : <p className="text-sm">{d.summary}</p>}
       </Card>
       {d.status === "done" && (<>
+        {!!d.notes.main_files?.length && d.notes.mode !== "design" && (
+          <p role="note" className="rounded-lg bg-blue-50 p-2 text-xs text-blue-800">Nothing in your request matched particular code, so it read the repository's main files: {d.notes.main_files.join(", ")}.</p>)}
+        {d.notes.mode === "design" && d.notes.design ? <Design design={d.notes.design} titles={titles} copy={copy} /> : (
         <Card aria-label="Findings">
           <CardTitle>Findings ({d.findings.length})</CardTitle>
           {!d.findings.length ? <p className="text-sm text-muted">Nothing was found in the code it saw. That does not mean there is nothing to find.</p> : (
@@ -139,7 +153,7 @@ function Review({ d, reused, admin, write, again, onShare, onDelete }: { d: Pers
                     <Button size="sm" variant="ghost" aria-label={`Copy code for ${f.title}`} onClick={() => copy(f.code)}><Copy className="h-4 w-4" /></Button></div>
                   <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs">{f.code}</pre></div>)}
               </li>))}</ul>)}
-        </Card>
+        </Card>)}
         {d.notes.dependencies && (
           <Card aria-label="Dependencies">
             <CardTitle>What it was told about other repositories</CardTitle>
@@ -151,11 +165,43 @@ function Review({ d, reused, admin, write, again, onShare, onDelete }: { d: Pers
           </Card>)}
         <Card aria-label="Coverage">
           <CardTitle>What it saw</CardTitle>
-          <ul className="space-y-0.5 text-xs">{d.notes.coverage.map((c) => <li key={c.file}><code>{c.file}</code> <span className="text-muted">{c.whole ? "whole file" : "only the parts around the match"}</span></li>)}</ul>
-          {d.notes.dropped > 0 && <p className="mt-2 text-xs text-muted">{d.notes.dropped} finding{d.notes.dropped === 1 ? " was" : "s were"} dropped because {d.notes.dropped === 1 ? "it quoted" : "they quoted"} code that is not in the file, or a file that was not shown.</p>}
+          <ul className="space-y-0.5 text-xs">{d.notes.coverage.map((c) => <li key={c.file}><code>{c.file}</code> <span className="text-muted">{c.whole ? "whole file" : c.outline ? "its first lines and what it declares" : "only the parts around the match"}</span></li>)}</ul>
+          {d.notes.dropped > 0 && <p className="mt-2 text-xs text-muted">{d.notes.mode === "design" ? `${d.notes.dropped} part${d.notes.dropped === 1 ? " was" : "s were"} left out because ${d.notes.dropped === 1 ? "it named" : "they named"} no file that was shown, or ${d.notes.dropped === 1 ? "was" : "were"} not a plain diagram.` : `${d.notes.dropped} finding${d.notes.dropped === 1 ? " was" : "s were"} dropped because ${d.notes.dropped === 1 ? "it quoted" : "they quoted"} code that is not in the file, or a file that was not shown.`}</p>}
           <p className="mt-2 text-xs text-muted">{d.notes.limit}</p>
         </Card>
       </>)}
+    </>
+  );
+}
+
+/** The architect's design overview: the high-level and low-level design as text, the components and flows with the files
+ *  they come from, and a Mermaid diagram as text to paste into any Mermaid viewer. */
+function Design({ design, titles, copy }: { design: PersonaDesign; titles?: PersonaOverview; copy: (text: string) => void }) {
+  const first = titles?.first ?? "High-level design", second = titles?.second ?? "Low-level design";
+  return (
+    <>
+      <Card aria-label={first}><CardTitle>{first}</CardTitle><Markdown text={design.hld} onOpen={() => {}} />
+        {!!design.components.length && (
+          <ul className="mt-3 space-y-2 text-sm" aria-label="Components">{design.components.map((c) => (
+            <li key={c.name} className="rounded-lg border border-line p-2"><span className="font-medium">{c.name}</span>{c.responsibility && <span className="text-muted"> — {c.responsibility}</span>}
+              <div className="mt-1 flex flex-wrap gap-1">{c.files.map((f) => <code key={f} className="text-xs text-muted">{f}</code>)}</div></li>))}</ul>)}
+      </Card>
+      {design.diagram && (
+        <Card aria-label="Diagram">
+          <CardTitle right={<Button size="sm" variant="ghost" aria-label="Copy the diagram" onClick={() => copy(design.diagram)}><Copy className="h-4 w-4" /></Button>}>Diagram (Mermaid)</CardTitle>
+          <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs">{design.diagram}</pre>
+          <p className="mt-1 text-xs text-muted">Paste it into a Mermaid viewer (mermaid.live, or a Markdown file on GitHub) to see it drawn.</p>
+        </Card>)}
+      <Card aria-label={second}><CardTitle>{second}</CardTitle><Markdown text={design.lld} onOpen={() => {}} />
+        {!!design.flows.length && (
+          <div className="mt-3 space-y-2 text-sm" aria-label="Flows">{design.flows.map((f) => (
+            <div key={f.name} className="rounded-lg border border-line p-2"><div className="font-medium">{f.name}</div>
+              <ol className="ml-5 list-decimal">{f.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+              <div className="mt-1 flex flex-wrap gap-1">{f.files.map((x) => <code key={x} className="text-xs text-muted">{x}</code>)}</div></div>))}</div>)}
+      </Card>
+      {!!design.not_covered.length && (
+        <Card aria-label="Not covered"><CardTitle>What it could not tell</CardTitle>
+          <ul className="list-disc space-y-0.5 pl-5 text-sm">{design.not_covered.map((n, i) => <li key={i}>{n}</li>)}</ul></Card>)}
     </>
   );
 }
