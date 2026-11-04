@@ -1,6 +1,9 @@
 name: CD
+# Images are published under the app's own version (backend/repolens/__init__.py), on every push to main and on a
+# version tag. Until the version number changes, each push to main replaces the images of that version.
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -20,7 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: meta
-        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION=$(sed -n 's/^__version__ = "\(.*\)".*/\1/p' backend/repolens/__init__.py)
+          [ -n "$VERSION" ] || { echo "could not read the app version"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "the tag $GITHUB_REF_NAME does not match the app version $VERSION"; exit 1
+          fi
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
@@ -44,7 +53,7 @@ jobs:
     # Deploying from CI is opt-in: set the repository variable DEPLOY_MODE=kubectl (and the KUBECONFIG_B64 secret) to have a
     # tag roll out to a cluster. Without it a tag only publishes the images, which is what you want with Argo CD (the cluster
     # pulls from git: tag, wait for the images, change the image tag in your overlay by pull request) or with no cluster at all.
-    if: ${{ vars.DEPLOY_MODE == 'kubectl' }}
+    if: ${{ vars.DEPLOY_MODE == 'kubectl' && github.ref_type == 'tag' }}  # a push to main never rolls out
     runs-on: ubuntu-latest
     environment: production        # configure required reviewers on this environment for manual approval
     steps:

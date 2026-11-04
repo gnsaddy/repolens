@@ -96,8 +96,20 @@ def test_cd_deploys_only_when_asked_to_and_publishing_never_needs_the_cluster():
     cd = yaml.safe_load((ROOT / ".github" / "workflows" / "cd.yml").read_text())
     deploy = cd["jobs"]["deploy"]
     assert "DEPLOY_MODE" in deploy["if"] and "== 'kubectl'" in deploy["if"]  # off unless DEPLOY_MODE=kubectl
+    assert "github.ref_type == 'tag'" in deploy["if"]  # a push to main publishes images but never rolls out
     assert deploy["needs"] == "publish"  # an image exists before anything is rolled out
     assert "KUBECONFIG" not in str(cd["jobs"]["publish"])  # a release with no cluster still publishes the images
+
+
+def test_images_are_published_on_every_push_to_main_under_the_app_version():
+    from repolens import __version__
+
+    cd = yaml.safe_load((ROOT / ".github" / "workflows" / "cd.yml").read_text())
+    trigger = cd.get("on") or cd[True]  # YAML reads a bare `on` as true
+    assert trigger["push"]["branches"] == ["main"] and trigger["push"]["tags"] == ["v*.*.*"]
+    meta = next(s for s in cd["jobs"]["publish"]["steps"] if s.get("id") == "meta")
+    assert "backend/repolens/__init__.py" in meta["run"] and "GITHUB_REF_NAME" in meta["run"]  # version from the code
+    assert "tag=$VERSION" in meta["run"] and __version__  # what is published is the version, not the branch name
 
 
 def test_the_release_compose_file_runs_the_published_images_of_this_version():

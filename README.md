@@ -107,7 +107,7 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
 * HTTPS and GitOps: `docs/operations.md` explains how to attach a certificate (your own, or automatic with cert-manager or Caddy) and how to deploy with Argo CD (`deploy/argocd`, `deploy/overlays`).
 * Backups: a nightly `CronJob` dumps PostgreSQL to its own volume; `docs/operations.md` has the restore steps, the secrets you must keep, and `make backup` / `make restore` for Compose.
 * CI (`.github/workflows/ci.yml`): lint, mypy, tests on SQLite and pgvector, migrations, frontend lint/type/test/build,
-  image builds, Trivy scan. CD (`cd.yml`): on `v*.*.*` tags pushes images to GHCR (free for public images; see `docs/operations.md`) and, only if the repository variable `DEPLOY_MODE=kubectl` is set, rolls out to a cluster (approval via the
+  image builds, Trivy scan. CD (`cd.yml`): on every push to `main`, and on a `v*.*.*` tag that matches the app version, pushes images to GHCR tagged with the app version (`0.2.2` until the number changes) (free for public images; see `docs/operations.md`) and, only if the repository variable `DEPLOY_MODE=kubectl` is set, rolls out to a cluster (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).
 
 ## License
