@@ -56,6 +56,14 @@ Open a GitHub issue with the question. Inside the app, **Report a bug / request 
 ## Reporting security problems
 Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 
+## How a version is made (maintainers)
+Work for a version happens on a branch named after it, for example `0.2.2`; nothing is committed straight to `main`.
+1. Branch from `main`, change the version number (see `docs/operations.md`) if it is a new version, and commit there.
+2. Push the branch and open a pull request into `main`. CI runs on the pull request.
+3. When CI passes, merge it. CI runs again on `main`.
+4. When that CI run passes, the CD workflow publishes the images to GHCR tagged with the version (`0.2.2`). A tag is only needed to deploy to a cluster.
+Fixes before the next version go on the same branch and the same kind of pull request; the images of that version are replaced each time `main` passes CI. A new version is a new branch.
+
 ## Commit messages
 Plain and descriptive, one idea per commit.
 
