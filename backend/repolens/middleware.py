@@ -33,6 +33,17 @@ HEADERS = [
     (b"content-security-policy", b"default-src 'none'; frame-ancestors 'none'"),
 ]
 
+# The interactive API docs exist only in development (main.py). They load their script and styles from one CDN, so they
+# get a policy that allows just that; every other path keeps the strict one above.
+DOCS_PATHS = ("/docs", "/redoc")
+DOCS_CSP = (
+    b"default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; "
+    b"style-src 'unsafe-inline' https://cdn.jsdelivr.net; "
+    b"img-src 'self' data: https://fastapi.tiangolo.com https://cdn.redoc.ly; font-src https://cdn.jsdelivr.net; "
+    b"worker-src blob:; connect-src 'self'; frame-ancestors 'none'"
+)
+DOCS_HEADERS = [(k, DOCS_CSP if k == b"content-security-policy" else v) for k, v in HEADERS]
+
 
 def _client(scope: Scope) -> str:
     from fastapi import Request
@@ -118,7 +129,7 @@ class EdgeGuard:
                 ):  # the path only: query strings can hold what people searched for
                     access_log.info("%s %s %d %.0fms %s", scope["method"], path, status, ms, _client(scope))
                 have = {k.lower() for k, _ in msg["headers"]}
-                extra = [(k, v) for k, v in HEADERS if k not in have]
+                extra = [(k, v) for k, v in (DOCS_HEADERS if path in DOCS_PATHS else HEADERS) if k not in have]
                 if path.startswith(("/api/", "/scim/")):
                     extra.append((b"cache-control", b"no-store"))
                 msg = {**msg, "headers": [*msg["headers"], *extra]}

@@ -23,6 +23,15 @@ def test_api_answers_carry_security_headers_and_are_never_cached(client, auth):
     assert r.headers["x-content-type-options"] == "nosniff" and r.headers["x-frame-options"] == "DENY"
     assert r.headers["cache-control"] == "no-store" and "frame-ancestors 'none'" in r.headers["content-security-policy"]
     assert r.headers["referrer-policy"] == "no-referrer" and "permissions-policy" in r.headers
+    assert r.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+
+
+def test_the_dev_api_docs_may_load_their_own_scripts_and_nothing_else_may(client):
+    docs = client.get("/docs")
+    csp = docs.headers["content-security-policy"]
+    assert docs.status_code == 200 and "script-src 'unsafe-inline' https://cdn.jsdelivr.net" in csp
+    assert "frame-ancestors 'none'" in csp and "*" not in csp
+    assert client.get("/healthz").headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
 
 
 def test_oversized_bodies_are_refused_before_they_are_read(client, auth, monkeypatch):
