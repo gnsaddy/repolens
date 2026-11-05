@@ -26,10 +26,10 @@ export default function StoragePanel() {
       {!d.checkouts.length ? <p className="text-xs text-muted">No cloned repositories. Local-path repositories are read in place and use no extra space.</p> : (
         <ul className="space-y-1.5 text-xs">{d.checkouts.map((c) => (
           <li key={c.path} className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate" title={c.repos.join(", ")}>{c.repos.join(", ")}</span>
-            {c.partial && <Badge tone="blue">blob-less</Badge>}{!c.exists && <Badge tone="amber">removed</Badge>}
+            {c.partial && <span title="A partial clone: file contents are fetched only when needed, so it takes less disk space"><Badge tone="blue">blob-less</Badge></span>}{!c.exists && <Badge tone="amber">removed</Badge>}
             <span className="text-muted">{c.exists ? fmtBytes(c.bytes) : "—"} · {c.last_used_at ? timeAgo(c.last_used_at) : "never used"}</span></li>))}</ul>)}
-      <div className="mt-3 flex items-center gap-2 text-xs">
-        <label htmlFor="ttl">Unused for</label>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <label htmlFor="ttl" className="whitespace-nowrap">Unused for</label>
         <select id="ttl" className="h-8 rounded-md border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[0, 7, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? "any time" : `${n} days`}</option>)}</select>
         <Button size="sm" variant="outline" disabled={clean.isPending} onClick={() => clean.mutate(true)}>Preview</Button>
         <Button size="sm" disabled={clean.isPending} onClick={async () => { if (await ask({ title: "Delete unused clones?", message: "Indexes stay. Clones are re-created the next time you re-index.", confirmLabel: "Delete clones", danger: true })) clean.mutate(false); }}>Free space</Button>

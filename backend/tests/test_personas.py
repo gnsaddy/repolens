@@ -466,6 +466,7 @@ def test_the_main_files_come_entry_points_first_without_tests_or_docs_and_long_f
     assert svc.overview_files(session, session.get(Repository, repo["id"]), {"app/main.py"}, limit=1).keys() != {
         "app/main.py"
     }
+    session.commit()  # reading a file touches the repository row; end that transaction before the API updates the same row
     got = run(client, auth, repo, "architect", "zebra giraffe telescope orchestration for the moon base", mode="design")
     assert got.status_code == 201, got.text
     notes = got.json()["notes"]
