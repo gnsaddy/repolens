@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
@@ -57,15 +57,15 @@ export default function FeaturesPage() {
             {!write ? <p className="text-sm text-muted">Members can draft features. You can read drafts others shared with the workspace.</p> : (
               <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); make.mutate(false); }}>
                 <Label>Repository
-                  <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
+                  <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-line bg-white px-2 text-sm text-ink">
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
                 {others.length > 0 && (
                   <fieldset className="space-y-1" aria-label="Other repositories">
                     <legend className="text-sm font-medium">Also show code from <span className="font-normal text-muted">(read-only, optional)</span></legend>
-                    <details className="group rounded-md border border-line bg-white text-sm text-ink">
+                    <details className="group rounded-lg border border-line bg-white text-sm text-ink">
                       <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 px-2" aria-label="Choose other repositories">
                         <span className="truncate">{chosen.length ? others.filter((o) => chosen.includes(o.id)).map((o) => o.name).join(", ") : "None"}</span>
-                        <span className="shrink-0 text-xs text-muted">{chosen.length ? `${chosen.length} of ${RELATED_MAX} max` : "choose"} ▾</span>
+                        <span className="flex shrink-0 items-center gap-1 text-xs text-muted">{chosen.length ? `${chosen.length} of ${RELATED_MAX} max` : "choose"}<ChevronDown className="h-3.5 w-3.5" aria-hidden /></span>
                       </summary>
                       <div className="max-h-48 space-y-1 overflow-auto border-t border-line p-2">
                         {others.map((o) => (
@@ -93,8 +93,8 @@ export default function FeaturesPage() {
                   <button className={`min-w-0 flex-1 py-2 text-left hover:bg-slate-50 ${openId === x.id ? "font-medium" : ""}`} onClick={() => setOpenId(x.id)}>
                     <div className="truncate">{x.title || "Untitled"}</div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted">{x.repo} · {x.mine ? "you" : x.author_name} · {timeAgo(x.created_at)} · {tokens(x.tokens.input_tokens + x.tokens.output_tokens)} tokens
-                      <Badge tone={x.status === "failed" ? "red" : x.ok === false ? "amber" : "green"}>{x.status === "failed" ? "failed" : x.ok === false ? "needs work" : "drafted"}</Badge>
-                      <Badge tone={x.shared ? "blue" : "gray"}>{x.shared ? "shared" : "private"}</Badge></div>
+                      {x.status === "failed" ? <Badge tone="red">failed</Badge> : x.ok === false ? <Badge tone="amber">needs work</Badge> : <span>drafted</span>}
+                      {x.shared && <span className="inline-flex items-center gap-1"><Share2 className="h-3 w-3" />shared</span>}</div>
                   </button>
                   {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "draft"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
                 </li>))}</ul>)}
@@ -124,8 +124,8 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
           <p role="status" className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800">This is your earlier draft for the same request on the same code, so no tokens were used.
             {write && again && <Button size="sm" variant="outline" className="ml-2" onClick={again}>Draft again anyway</Button>}</p>)}
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-          <Badge tone={d.status === "failed" ? "red" : "green"}>{d.status}</Badge>
-          <Badge tone={d.shared ? "blue" : "gray"}>{d.shared ? `shared by ${d.mine ? "you" : d.author_name}` : "private to you"}</Badge>
+          {d.status === "failed" ? <Badge tone="red">failed</Badge> : <span>{d.status}</span>}
+          <span className="inline-flex items-center gap-1">{d.shared ? <Share2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}{d.shared ? `shared by ${d.mine ? "you" : d.author_name}` : "private to you"}</span>
           <span>{d.repo} · written against {d.base_sha.slice(0, 8)} · {d.model || "no model"}</span>
           <span aria-label="Tokens used">{tokens(t.input_tokens)} in, {tokens(t.output_tokens)} out, {t.calls} call{t.calls === 1 ? "" : "s"}{t.cost ? `, about $${t.cost.toFixed(4)}` : ""}</span>
         </div>

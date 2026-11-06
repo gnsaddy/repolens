@@ -42,7 +42,7 @@ export default function GithubLoginCard() {
             <legend className="px-1 text-xs font-medium text-muted">Optional: create accounts for new people</legend>
             <label className="block"><Label>E-mail domains that get an account on first sign-in</Label><Input aria-label="E-mail domains that get an account" value={domains} onChange={(e) => setDomains(e.target.value)} placeholder="acme.io, acme.com (leave empty for existing accounts only)" /></label>
             <label className="block"><Label>Role for new people</Label>
-              <select aria-label="Role for new people" value={role} onChange={(e) => setRole(e.target.value)} className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink"><option value="viewer">Viewer</option><option value="member">Member</option></select></label>
+              <select aria-label="Role for new people" value={role} onChange={(e) => setRole(e.target.value)} className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm text-ink"><option value="viewer">Viewer</option><option value="member">Member</option></select></label>
             <p className="text-xs text-muted">New people need a <strong>verified</strong> GitHub address in one of these domains. Nobody becomes an admin this way.</p>
           </fieldset>
           <ErrorNote error={save.error} />

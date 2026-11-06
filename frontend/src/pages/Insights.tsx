@@ -37,7 +37,7 @@ export default function Insights() {
   return (
     <div>
       <PageHeader title="Insights" subtitle="What your team did, what AI used and what it saved, and how busy the server is."
-        actions={<select aria-label="Period" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={days} onChange={(e) => setDays(+e.target.value)}>{[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}</select>} />
+        actions={<select aria-label="Period" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={days} onChange={(e) => setDays(+e.target.value)}>{[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}</select>} />
       {!m ? <p className="text-sm text-muted">Loading…</p> : (<div className="space-y-8">
         <section aria-label="AI utilisation" className="space-y-4">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -77,7 +77,7 @@ export default function Insights() {
             <Card className="lg:col-span-2"><CardTitle>Which models did the work</CardTitle>
               {!models.length ? <Empty>No model has been used yet.</Empty> : <ul className="space-y-3 text-sm">{models.map((x) => (
                 <li key={x.name}><div className="mb-1 flex justify-between gap-2"><span className="truncate font-medium" title={x.name}>{x.name}</span><span className="shrink-0 text-xs text-muted">{fmtTokens(x.input_tokens + x.output_tokens)}{x.cost > 0 ? ` · ${fmtCost(x.cost)}` : ""}</span></div>
-                  <div className="h-1.5 overflow-hidden rounded bg-slate-100"><div className="h-full bg-brand" style={{ width: `${Math.max(3, ((x.input_tokens + x.output_tokens) / top) * 100)}%` }} /></div></li>))}</ul>}
+                  <div className="h-1.5 overflow-hidden rounded-md bg-slate-100"><div className="h-full bg-brand" style={{ width: `${Math.max(3, ((x.input_tokens + x.output_tokens) / top) * 100)}%` }} /></div></li>))}</ul>}
               {models.length > 1 && <p className="mt-3 text-xs text-muted">Cheaper models take simple tasks; stronger ones are used when a task is hard.</p>}</Card>
           </div>
         </section>

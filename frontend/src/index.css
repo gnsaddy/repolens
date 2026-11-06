@@ -6,15 +6,18 @@
   --color-sidebar: #0f172a;
   --color-ink: #0f172a;
   --color-muted: #64748b;
-  --color-line: #e2e8f0;
+  --color-line: #e7e9f0;
   --color-surface: #ffffff;
-  --color-canvas: #f8fafc;
+  --color-canvas: #f7f8fb;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
 }
 
-/* Night mode: `html.dark` re-points the colour tokens that components already use (surface, ink, slate and the tinted
-   badge colours). White text on brand buttons and the always-dark sidebar are left as they are. */
+/* Corner radius, one scale: 6px for small chips and code (rounded-lg), 8px for controls and inset panels (rounded-lg),
+   12px for cards, panels and dialogs (rounded-xl), full for pills and dots. Cards are flat: a border, no shadow.
+
+   Night mode: `html.dark` re-points the colour tokens that components already use (surface, ink, slate and the tinted
+   badge colours). White text on brand buttons is left as it is. */
 .dark {
   color-scheme: dark;
   --color-canvas: #0b1120; --color-surface: #111827; --color-ink: #e5e7eb; --color-muted: #94a3b8; --color-line: #263247;
@@ -32,9 +35,6 @@
 .dark .text-slate-100, .dark .text-slate-200 { color: #e2e8f0; }
 .dark input, .dark select, .dark textarea { color: var(--color-ink); }
 .dark input::placeholder, .dark textarea::placeholder { color: #7a8aa3; }
-.dark aside { /* the sidebar is dark in both modes: restore the light-mode slate values inside it */
-  --color-slate-100: #f1f5f9; --color-slate-200: #e2e8f0; --color-slate-300: #cbd5e1; --color-slate-400: #94a3b8; --color-slate-700: #334155; --color-ink: #0f172a;
-}
 .dark .text-brand, .dark .hover\:text-brand:hover { color: #a5b4fc; }   /* links and active tabs: the brand blue is too dark on a dark card */
 .dark .border-brand { border-color: #818cf8; }
 .dark .recharts-cartesian-grid line { stroke: #263247; }
@@ -46,7 +46,7 @@ body { @apply bg-canvas text-ink antialiased; }
 .prose-report p, .prose-report li { @apply text-sm text-slate-700; }
 .prose-report ul { @apply list-disc pl-5; }
 .prose-report ol { @apply list-decimal pl-5; }
-.prose-report code { @apply font-mono text-xs bg-slate-100 px-1 rounded; }
+.prose-report code { @apply font-mono text-xs bg-slate-100 px-1 rounded-md; }
 
 .prose-wiki { @apply text-sm leading-6 text-slate-800; }
 .prose-wiki h1 { @apply mt-0 mb-3 text-2xl font-semibold tracking-tight; }
@@ -55,7 +55,7 @@ body { @apply bg-canvas text-ink antialiased; }
 .prose-wiki p { @apply my-2; }
 .prose-wiki ul { @apply my-2 list-disc pl-5; }
 .prose-wiki ol { @apply my-2 list-decimal pl-5; }
-.prose-wiki code { @apply rounded bg-slate-100 px-1 font-mono text-xs; }
+.prose-wiki code { @apply rounded-md bg-slate-100 px-1 font-mono text-xs; }
 .prose-wiki pre { @apply my-3 overflow-x-auto rounded-lg border border-line bg-slate-50 p-3; }
 .prose-wiki pre code { @apply bg-transparent p-0; }
 .prose-wiki blockquote { @apply my-3 border-l-4 border-indigo-200 bg-indigo-50/50 px-3 py-1; }

@@ -2,17 +2,19 @@ import { Download, Expand, Maximize2, Minimize2, Minus, Pause, Play, Plus, ScanS
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphEdge, GraphNode } from "@/lib/api";
 
+/** One calm palette for the whole graph: indigo and violet for code, sky for documents, amber for history, emerald for
+ *  tests and pull requests, slate for plain files. The same hues are used for edges, so a colour means one thing. */
 export const NODE_COLORS: Record<string, string> = {
-  file: "#64748b", doc: "#0ea5e9", section: "#38bdf8", function: "#4f46e5", class: "#7c3aed", commit: "#f59e0b", pr: "#10b981",
+  file: "#94a3b8", doc: "#38bdf8", section: "#7dd3fc", function: "#6366f1", class: "#8b5cf6", commit: "#fbbf24", pr: "#34d399",
 };
-export const COMMUNITY_COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#ef4444", "#84cc16", "#f97316"];
+export const COMMUNITY_COLORS = ["#6366f1", "#38bdf8", "#34d399", "#fbbf24", "#f472b6", "#a78bfa", "#2dd4bf", "#fb7185", "#a3e635", "#fb923c"];
 export const communityColor = (c: number | null | undefined) => (c == null ? "#cbd5e1" : COMMUNITY_COLORS[c % COMMUNITY_COLORS.length]);
 /** Solid = found directly in code or links, dashed = inferred from words or meaning, dotted = a weak guess. */
 export const trustDash = (t?: string) => (t === "inferred" ? "5 3" : t === "uncertain" ? "1.5 3" : undefined);
 export const REL_COLORS: Record<string, string> = {
-  CALLS: "#4f46e5", IMPORTS: "#64748b", MENTIONS: "#0ea5e9", LINKS_TO: "#06b6d4", TESTS: "#10b981",
-  MODIFIES: "#f59e0b", RELATED_TO: "#ec4899", CONTAINS: "#cbd5e1", INCLUDES: "#10b981", HTTP: "#0d9488", USES: "#c026d3", DECLARES: "#0891b2",
-  REFERENCES: "#64748b", DEPLOYS: "#ea580c", CONNECTS: "#0ea5e9", USES_QUEUE: "#a855f7", CONFIGURED: "#65a30d",
+  CALLS: "#6366f1", IMPORTS: "#94a3b8", MENTIONS: "#38bdf8", LINKS_TO: "#22d3ee", TESTS: "#34d399",
+  MODIFIES: "#fbbf24", RELATED_TO: "#a78bfa", CONTAINS: "#e2e8f0", INCLUDES: "#34d399", HTTP: "#14b8a6", USES: "#8b5cf6", DECLARES: "#0ea5e9",
+  REFERENCES: "#94a3b8", DEPLOYS: "#f59e0b", CONNECTS: "#38bdf8", USES_QUEUE: "#c4b5fd", CONFIGURED: "#a3e635",
 };
 
 /** blue (cold) -> yellow -> red (hot) */
@@ -246,7 +248,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
       a.download = "repolens-graph.svg"; a.click(); URL.revokeObjectURL(a.href);
     } catch { /* the browser cannot save files here */ }
   };
-  const btn = "grid h-8 w-8 place-items-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2";
+  const btn = "grid h-8 w-8 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2";
 
   return (
     <div className={fill ? "relative min-h-0 flex-1" : "relative"}>
@@ -257,7 +259,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
         <button className={btn} aria-label="Fit to screen" title="Fit everything (0)" onClick={() => setView(fitView(nodes, pos, pad))}><ScanSearch className="h-4 w-4" /></button>
         <button className={btn} aria-label="Actual size" title="Reset to 100%" onClick={() => setView({ x: 0, y: 0, k: 1 })}><Expand className="h-4 w-4" /></button>
         <button className={btn} aria-label="Animate connections" aria-pressed={animate} title={calm ? "Your system asks for less motion, so the animation stays off" : "Show flow from the selected node to what it connects to"} onClick={() => setAnimate((a) => !a)}>{animate && !calm ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
-        <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-md border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
+        <select aria-label="Labels" title="Which labels to draw" className="h-8 rounded-lg border-0 bg-transparent px-1 text-xs text-slate-600" value={labelMode} onChange={(e) => setLabelMode(e.target.value as LabelMode)}>
           <option value="smart">Key labels</option><option value="all">All labels</option><option value="none">No labels</option></select>
         <button className={btn} aria-label="Download SVG" title="Download as SVG" onClick={exportSvg}><Download className="h-4 w-4" /></button>
         {!fill && <button className={btn} aria-label={tall ? "Shrink graph" : "Enlarge graph"} aria-pressed={tall} title={tall ? "Shrink" : "Enlarge"} onClick={() => setTall((t) => !t)}>{tall ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>}
@@ -293,7 +295,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {worlds.map((w) => (
             <g key={w.id} data-world={w.name} pointerEvents="none">
-              <circle cx={w.cx} cy={w.cy} r={w.r} fill={w.color} fillOpacity={0.05} stroke={w.color} strokeOpacity={0.4} strokeDasharray="6 5" />
+              <circle cx={w.cx} cy={w.cy} r={w.r} fill={w.color} fillOpacity={0.04} stroke={w.color} strokeOpacity={0.3} strokeDasharray="2 6" strokeLinecap="round" />
               <text x={w.cx} y={w.cy - w.r - 8} textAnchor="middle" fontSize={15} fontWeight={600} fill={w.color} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{w.name} · {w.ids.length} nodes</text>
             </g>))}
           {edges.map((e) => {
@@ -307,9 +309,9 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
             const bridge = worlds.length > 0 && repoOfNode.get(e.source) !== repoOfNode.get(e.target); // from one repository's world into another's
             return (
               <g key={e.id} data-bridge={bridge ? "" : undefined}>
-                <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={bridge ? "#d97706" : (REL_COLORS[e.rel] ?? "#94a3b8")}
+                <line x1={a.x} y1={a.y} x2={b.x - (dx / len) * end} y2={b.y - (dy / len) * end} stroke={bridge ? "#4f46e5" : (REL_COLORS[e.rel] ?? "#94a3b8")}
                   markerEnd={DIRECTED.has(e.rel) && (on || !focus) ? `url(#arrow-${e.rel})` : undefined}
-                  strokeWidth={on || bridge ? 2.5 : 1} strokeDasharray={bridge ? "7 4" : trustDash(e.trust ?? (e.provenance === "semantic" ? "inferred" : "fact"))}
+                  strokeWidth={on || bridge ? 2 : 1} strokeDasharray={bridge ? "7 4" : trustDash(e.trust ?? (e.provenance === "semantic" ? "inferred" : "fact"))}
                   opacity={away ? 0.06 : on ? 0.95 : focus ? (bridge ? 0.5 : 0.12) : bridge ? 0.9 : e.rel === "CONTAINS" ? 0.35 : 0.55}><title>{`${bridge ? "BRIDGE between repositories: " : ""}${e.rel} (${e.trust ?? e.provenance}: ${e.provenance}, ${e.weight})\n${e.evidence}`}</title></line>
                 {on && !away && e.rel !== "CONTAINS" && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} textAnchor="middle" fontSize={9} fill={REL_COLORS[e.rel] ?? "#475569"} style={{ stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{e.rel.toLowerCase().replace("_", " ")}</text>}
               </g>);
@@ -336,7 +338,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
               <g key={n.id} transform={`translate(${p.x} ${p.y})`} opacity={inArea(n.id) ? (near(n.id) ? 1 : 0.25) : 0.12} className="cursor-pointer"
                 onClick={(ev) => { ev.stopPropagation(); onSelect(n.id); }} onDoubleClick={(ev) => ev.stopPropagation()} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
                 onMouseDown={(ev) => ev.stopPropagation()} role="button" aria-label={`${n.type} ${n.qualname || n.name}`}>
-                <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : byCommunity ? communityColor(n.community) : (NODE_COLORS[n.type] ?? "#94a3b8")} style={{ stroke: sel ? "var(--color-ink)" : highlight?.has(n.id) ? "#ec4899" : "var(--color-surface)" }} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
+                <circle r={radius(n)} fill={heat ? (n.id in heat ? heatColor(heat[n.id]) : "#e2e8f0") : byCommunity ? communityColor(n.community) : (NODE_COLORS[n.type] ?? "#94a3b8")} style={{ stroke: sel ? "var(--color-ink)" : highlight?.has(n.id) ? "#f59e0b" : "var(--color-surface)" }} strokeWidth={sel || highlight?.has(n.id) ? 3 : 1.5} />
                 <title>{`${n.type} ${n.qualname || n.name}\n${n.degree} connections${n.community != null ? `\narea ${n.community + 1}` : ""}${heat && n.id in heat ? `\nheat ${Math.round(heat[n.id] * 100)}%` : ""}`}</title>
                 {showLabel && <text y={-radius(n) - 4} textAnchor="middle" fontSize={10} style={{ fill: "var(--color-ink)", stroke: "var(--color-surface)" }} strokeWidth={3} paintOrder="stroke">{n.name.length > 28 ? `${n.name.slice(0, 27)}…` : n.name}</text>}
               </g>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/feedback";
-import { File, Gauge, GitPullRequest, Lock, RefreshCw, Trash2 } from "lucide-react";
+import { BookOpen, File, FolderGit2, Gauge, GitPullRequest, Lock, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, statusTone } from "@/components/ui";
 import StoragePanel from "@/components/StoragePanel";
@@ -14,7 +14,8 @@ export default function Repositories() {
   const ask = useConfirm();
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [sel, setSel] = useState<string | null>(null);
+  const [chosen, setSel] = useState<string | null>(null);
+  const [scope, setScope] = useState<"all" | "repo">("all");
   const [measuring, setMeasuring] = useState(false);
   const [file, setFile] = useState<{ path: string; line?: [number, number] } | null>(null);
   const [form, setForm] = useState({ name: "", source: "local", url: "" });
@@ -24,6 +25,7 @@ export default function Repositories() {
 
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories"),
     refetchInterval: (query) => (query.state.data?.some((r) => r.status === "indexing" || r.status === "pending") ? 2000 : false) });
+  const sel = chosen ?? repos.data?.[0]?.id ?? null;  // the first repository is open until another is picked
   const add = useMutation({ mutationFn: () => api<Repo>("/repositories", { method: "POST", json: { ...form, branches: picked } }),
     onSuccess: (r) => { qc.invalidateQueries({ queryKey: ["repos"] }); setForm({ name: "", source: "local", url: "" }); setPicked([]); branchList.reset(); setSel(r.id); } });
   const branchList = useMutation({ mutationFn: () => api<BranchList>(`/repositories/branches?source=${form.source}&url=${encodeURIComponent(form.url)}`),
@@ -47,7 +49,8 @@ export default function Repositories() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["pulls", sel] }); qc.invalidateQueries({ queryKey: ["runs", sel] }); } });
   const lastRun = runs.data?.find((r) => r.commit_sha !== "pull-requests" && r.finished_at);
   const prRun = runs.data?.find((r) => r.commit_sha === "pull-requests");
-  const hits = useQuery({ queryKey: ["search", sel, searchQ], enabled: searchQ.length > 1, queryFn: () => api<SearchHit[]>(`/search?q=${encodeURIComponent(searchQ)}${sel ? `&repo_id=${sel}` : ""}`) });
+  const searchRepo = scope === "repo" ? sel : null;
+  const hits = useQuery({ queryKey: ["search", searchRepo, searchQ], enabled: searchQ.length > 1, queryFn: () => api<SearchHit[]>(`/search?q=${encodeURIComponent(searchQ)}${searchRepo ? `&repo_id=${searchRepo}` : ""}`) });
 
   function submit(e: FormEvent) { e.preventDefault(); add.mutate(); }
   function search(e: FormEvent) { e.preventDefault(); setSearchQ(q.trim()); }
@@ -56,9 +59,12 @@ export default function Repositories() {
     <div>
       <PageHeader title="Repository Explorer" subtitle="Search and explore your indexed codebase with semantic understanding." />
       {measuring && repo && <MeasurePanel repo={repo} onClose={() => setMeasuring(false)} />}
-      <form onSubmit={search} className="mb-6 flex gap-2">
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files, symbols, or ask a question…" aria-label="Search code" />
-        <Button type="submit" variant="outline">Search{sel ? " in repo" : " all"}</Button>
+      <form onSubmit={search} className="mb-6 flex flex-wrap gap-2">
+        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
+          <Input className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files and symbols, or ask a question…" aria-label="Search code" /></div>
+        <select aria-label="Search in" value={scope} onChange={(e) => setScope(e.target.value as "all" | "repo")} className="h-9 rounded-lg border border-line bg-white px-2 text-sm">
+          <option value="all">All repositories</option>{repo && <option value="repo">{repo.name}</option>}</select>
+        <Button type="submit">Search</Button>
       </form>
       {searchQ && (
         <Card className="mb-6"><CardTitle right={<button className="text-xs text-muted" onClick={() => { setSearchQ(""); setQ(""); }}>Clear</button>}>Results for “{searchQ}”</CardTitle>
@@ -66,17 +72,23 @@ export default function Repositories() {
             <ul className="space-y-3">{hits.data.map((h, i) => (
               <li key={i}><button className="text-left text-sm font-medium text-brand hover:underline" onClick={() => { setSel(h.repo_id); setFile({ path: h.file, line: [h.start_line, h.end_line] }); }}>
                 {h.repo}:{h.file}</button><span className="ml-2 text-xs text-muted">{h.parent ? `${h.parent}.` : ""}{h.symbol} · lines {h.start_line}–{h.end_line}{h.symbol_match && " · symbol match"}</span>
-                <pre className="mt-1 max-h-24 overflow-hidden rounded bg-slate-50 p-2 font-mono text-xs">{h.snippet}</pre></li>))}</ul>)}
+                <pre className="mt-1 max-h-24 overflow-hidden rounded-md bg-slate-50 p-2 font-mono text-xs">{h.snippet}</pre></li>))}</ul>)}
         </Card>)}
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="space-y-4">
           <Card>
-            <CardTitle>Repositories</CardTitle>
+            <CardTitle icon={FolderGit2}>Repositories</CardTitle>
             {!repos.data?.length ? <Empty>No repositories yet.</Empty> : (
-              <ul className="space-y-1">{repos.data.map((r) => (
+              <ul className="space-y-0.5">{repos.data.map((r) => (
                 <li key={r.id}><button onClick={() => { setSel(r.id); setFile(null); }} aria-current={sel === r.id}
-                  className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50 ${sel === r.id ? "bg-indigo-50" : ""}`}>
-                  <span className="flex min-w-0 items-center gap-1.5 truncate">{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}<span className="truncate">{r.name}</span></span><Badge tone={statusTone(r.status)}>{r.status}</Badge></button></li>))}</ul>)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-slate-50 ${sel === r.id ? "bg-indigo-50 hover:bg-indigo-50" : ""}`}>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500" aria-hidden>{r.source === "docs" ? <BookOpen className="h-4 w-4" /> : <FolderGit2 className="h-4 w-4" />}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5"><span className="truncate text-sm font-medium">{r.name}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}</span>
+                    <span className="block truncate text-xs text-muted">{r.file_count} files · updated {timeAgo(r.updated_at)}</span>
+                  </span>
+                  {r.status !== "ready" && <Badge tone={statusTone(r.status)}>{r.status}</Badge>}
+                </button></li>))}</ul>)}
           </Card>
           {user?.role === "admin" && <StoragePanel />}
           {canWrite(user) && (
@@ -85,14 +97,14 @@ export default function Repositories() {
               <form onSubmit={submit} className="space-y-3">
                 <label className="block"><Label>Name</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="user-service" /></label>
                 <label className="block"><Label>Source</Label>
-                  <select className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
                     <option value="local">Local path (server)</option><option value="git">Git URL (https/ssh)</option></select></label>
                 <label className="block"><Label>{form.source === "local" ? "Path" : "Clone URL"}</Label><Input required value={form.url} onChange={(e) => { setForm({ ...form, url: e.target.value }); branchList.reset(); setPicked([]); }} placeholder={form.source === "local" ? "/srv/repos/user-service" : "https://github.com/org/repo.git"} /></label>
                 <div>
                   <Button type="button" size="sm" variant="outline" disabled={!form.url || branchList.isPending} onClick={() => branchList.mutate()}>{branchList.isPending ? "Loading…" : "Choose branches"}</Button>
                   <ErrorNote error={branchList.error} />
                   {branchList.data && (
-                    <fieldset className="mt-2 max-h-40 space-y-1 overflow-auto rounded-md border border-line p-2">
+                    <fieldset className="mt-2 max-h-40 space-y-1 overflow-auto rounded-lg border border-line p-2">
                       <legend className="px-1 text-xs text-muted">Each selected branch is indexed separately (max 8)</legend>
                       {branchList.data.branches.map((b) => (
                         <label key={b} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={picked.includes(b)} onChange={() => togglePick(b)} />{b}{b === branchList.data.default && <Badge>default</Badge>}</label>))}
@@ -127,7 +139,7 @@ export default function Repositories() {
               <Card className="max-h-[32rem] overflow-auto p-3">
                 <CardTitle>Files</CardTitle>
                 <ul className="space-y-0.5">{tree.data?.map((f) => (
-                  <li key={f.path}><button onClick={() => setFile({ path: f.path })} className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-slate-50 ${file?.path === f.path ? "bg-indigo-50" : ""}`}>
+                  <li key={f.path}><button onClick={() => setFile({ path: f.path })} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-slate-50 ${file?.path === f.path ? "bg-indigo-50" : ""}`}>
                     <File className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="truncate">{f.path}</span></button></li>))}</ul>
               </Card>
               <div className="min-w-0 space-y-4">

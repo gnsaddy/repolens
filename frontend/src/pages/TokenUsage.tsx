@@ -35,7 +35,7 @@ export default function TokenUsage() {
   return (
     <div>
       <PageHeader title="Token Usage & Cost" subtitle="Measured usage per model, agent and workflow. Local operations are recorded but cost nothing."
-        actions={<select aria-label="Period" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={days} onChange={(e) => setDays(+e.target.value)}>
+        actions={<select aria-label="Period" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={days} onChange={(e) => setDays(+e.target.value)}>
           {[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}</select>} />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Total tokens" value={t ? fmtTokens(t.input_tokens + t.output_tokens) : "—"} hint={delta(data?.vs_previous.tokens ?? null)} />
@@ -43,7 +43,7 @@ export default function TokenUsage() {
         <Stat label="Cache hit rate" value={pct(t?.cache_hit_rate)} hint={t ? `~${fmtTokens(t.tokens_avoided)} tokens avoided (estimate)` : undefined} />
         <Stat label="Cost / successful RCA" value={t?.cost_per_successful_rca != null ? fmtCost(t.cost_per_successful_rca) : "—"} hint={t ? `${t.successful_investigations} completed · ${pct(t.error_rate)} errors` : undefined} />
       </div>
-      {unpriced && <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no price is set for these models. Add each model's price per 1M tokens in <Link className="font-medium underline" to="/settings?tab=ai">Settings → AI &amp; search</Link>, or ask whoever runs the server to set <code>REPOLENS_PRICING_JSON</code>. Prices apply to new usage from then on.</div>}
+      {unpriced && <div className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no price is set for these models. Add each model's price per 1M tokens in <Link className="font-medium underline" to="/settings?tab=ai">Settings → AI &amp; search</Link>, or ask whoever runs the server to set <code>REPOLENS_PRICING_JSON</code>. Prices apply to new usage from then on.</div>}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardTitle>Tokens per day</CardTitle>
           {!data?.daily.length ? <Empty>No data yet.</Empty> : (

@@ -54,9 +54,9 @@ export default function AccessTokens({ canWrite }: { canWrite: boolean }) {
         <summary className="flex cursor-pointer items-center gap-1.5 font-medium"><Plug className="h-4 w-4" />Use RepoLens from your editor (MCP)</summary>
         <div className="mt-3 space-y-3 text-xs">
           <p className="text-muted">RepoLens speaks the Model Context Protocol, so an editor can search your code, docs and pull requests, ask questions with cited sources, and check a symbol before changing it, using your access. Replace the token with yours.</p>
-          <div><div className="mb-1 font-medium">Claude Code</div><pre className="overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-100">{`claude mcp add --transport http repolens ${url} --header "Authorization: Bearer ${shown}"`}</pre></div>
-          <div><div className="mb-1 font-medium">Cursor / other clients that accept a URL (.cursor/mcp.json)</div><pre className="overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-100">{JSON.stringify({ mcpServers: { repolens: { url, headers: { Authorization: `Bearer ${shown}` } } } }, null, 2)}</pre></div>
-          <div><div className="mb-1 font-medium">Claude Desktop (standard input/output bridge)</div><pre className="overflow-x-auto rounded bg-slate-900 p-2 font-mono text-slate-100">{JSON.stringify({ mcpServers: { repolens: { command: "python", args: ["-m", "repolens.devtools.mcp_stdio", "--url", url], env: { REPOLENS_TOKEN: shown } } } }, null, 2)}</pre></div>
+          <div><div className="mb-1 font-medium">Claude Code</div><pre className="overflow-x-auto rounded-md bg-slate-900 p-2 font-mono text-slate-100">{`claude mcp add --transport http repolens ${url} --header "Authorization: Bearer ${shown}"`}</pre></div>
+          <div><div className="mb-1 font-medium">Cursor / other clients that accept a URL (.cursor/mcp.json)</div><pre className="overflow-x-auto rounded-md bg-slate-900 p-2 font-mono text-slate-100">{JSON.stringify({ mcpServers: { repolens: { url, headers: { Authorization: `Bearer ${shown}` } } } }, null, 2)}</pre></div>
+          <div><div className="mb-1 font-medium">Claude Desktop (standard input/output bridge)</div><pre className="overflow-x-auto rounded-md bg-slate-900 p-2 font-mono text-slate-100">{JSON.stringify({ mcpServers: { repolens: { command: "python", args: ["-m", "repolens.devtools.mcp_stdio", "--url", url], env: { REPOLENS_TOKEN: shown } } } }, null, 2)}</pre></div>
         </div>
       </details>
     </Card>

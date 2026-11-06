@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 
 const PAGE = 50;
-const sel = "h-9 rounded-md border border-line bg-white px-2 text-sm";
+const sel = "h-9 rounded-lg border border-line bg-white px-2 text-sm";
 
 /** Who did what, and what was refused. Admins only. */
 export default function AuditLog() {

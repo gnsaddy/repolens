@@ -32,7 +32,7 @@ export default function Ownership() {
       <PageHeader title="Ownership" subtitle="Who maintains which code, and who to ask. Based on recent commit history, so a hint rather than a verdict." />
       {!code.length ? <Empty>Index a code repository first. Ownership is computed from its commit history.</Empty> : (<>
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <select aria-label="Repository" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>
+          <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>
             {code.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
           <div className="ml-auto w-72"><Input aria-label="Look up a file or folder" placeholder="Who owns… e.g. src/billing" value={path} onChange={(e) => setPath(e.target.value)} /></div>
         </div>

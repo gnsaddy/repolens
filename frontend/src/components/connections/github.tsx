@@ -87,7 +87,7 @@ export function GithubForm({ onDone }: { onDone: () => void }) {
             <p className="text-sm">1. Open <a className="inline-flex items-center gap-1 font-medium text-brand hover:underline" href={safeHref(flow.verification_uri)} target="_blank" rel="noreferrer">{flow.verification_uri}<ExternalLink className="h-3 w-3" /></a></p>
             <p className="mt-2 text-sm">2. Enter this code:</p>
             <div className="my-2 flex items-center gap-2">
-              <code className="rounded bg-white px-3 py-2 text-xl font-semibold tracking-widest" aria-label="Device code">{flow.user_code}</code>
+              <code className="rounded-md bg-white px-3 py-2 text-xl font-semibold tracking-widest" aria-label="Device code">{flow.user_code}</code>
               <Button size="sm" variant="outline" type="button" onClick={() => navigator.clipboard?.writeText(flow.user_code)}><Copy className="h-3.5 w-3.5" />Copy</Button>
             </div>
             <p className="text-xs text-muted">Waiting for approval… this updates automatically.</p>

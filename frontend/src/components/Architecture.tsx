@@ -72,7 +72,7 @@ export default function ArchitectureCard({ groupId, repos, write }: { groupId: s
   });
   const remove = useMutation({ mutationFn: (id: string) => api(`/groups/${groupId}/rules/${id}`, { method: "DELETE" }), onSuccess: () => { done(); toast("Rule removed"); } });
   const a = q.data;
-  const select = "h-8 rounded-md border border-line bg-white px-2 text-sm text-ink";
+  const select = "h-8 rounded-lg border border-line bg-white px-2 text-sm text-ink";
   const bad = !!a && (a.broken > 0 || a.cycles.length > 0);
   return (
     <Card aria-label="Architecture rules">

@@ -51,7 +51,7 @@ export default function LanguageModelCard({ admin }: { admin: boolean }) {
         {on && data ? (
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
             <div><dt className="text-xs text-muted">Provider</dt><dd className="font-medium">{providerLabel(data.provider)}</dd></div>
-            <div><dt className="text-xs text-muted">Model in use</dt><dd><code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium">{data.model}</code></dd></div>
+            <div><dt className="text-xs text-muted">Model in use</dt><dd><code className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium">{data.model}</code></dd></div>
             <div><dt className="text-xs text-muted">Key</dt><dd className="flex items-center gap-1.5 font-medium">stored<Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></dd></div>
             {data.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-3">GitHub retired GitHub Models on 30 July 2026, so this no longer answers. Choose Change model and pick another provider.</p>}
           </dl>

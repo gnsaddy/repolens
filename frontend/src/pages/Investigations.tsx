@@ -37,7 +37,7 @@ export default function Investigations() {
           <CardTitle>New investigation</CardTitle>
           <div role="tablist" className="mb-4 inline-flex rounded-lg border border-line p-0.5 text-sm">
             {([["describe", "Describe a bug"], ["ci", "From a CI log"]] as const).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={cn("rounded-md px-3 py-1", mode === k ? "bg-brand text-white" : "text-muted hover:text-ink")}>{label}</button>))}
+              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={cn("rounded-lg px-3 py-1", mode === k ? "bg-brand text-white" : "text-muted hover:text-ink")}>{label}</button>))}
           </div>
           {mode === "describe" && (<>
             <Label>Bug report, error message or stack trace</Label>

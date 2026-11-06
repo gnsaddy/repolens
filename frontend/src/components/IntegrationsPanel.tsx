@@ -72,16 +72,16 @@ export default function IntegrationsPanel({ admin }: { admin: boolean }) {
               <li key={d.id} className="flex flex-wrap items-center gap-4 p-4">
                 <IconTile icon={d.icon} tint={d.tint} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><span className="font-semibold">{d.name}</span><StatusPill on onLabel={d.wiki ? `${d.wiki.count} source${d.wiki.count === 1 ? "" : "s"}` : "Connected"} />{d.state?.account && <span className="truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700" title="The account this credential belongs to">{d.state.account}</span>}</div>
+                  <div className="flex items-center gap-2"><span className="font-semibold">{d.name}</span>{d.wiki && <StatusPill on onLabel={`${d.wiki.count} source${d.wiki.count === 1 ? "" : "s"}`} />}{d.state?.account && <span className="truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700" title="The account this credential belongs to">{d.state.account}</span>}</div>
                   <p className="truncate text-sm text-muted">{d.wiki ? "Set up per collection in the wiki." : d.state?.detail}</p>
                   {notes[d.id] && <p role="status" className={cn("text-sm", notes[d.id].ok ? "text-emerald-700" : "text-red-600")}>{notes[d.id].text}</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {d.wiki ? <Link to={`/wiki?tab=sources`} className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-3 text-sm hover:bg-slate-50">Manage<ExternalLink className="h-3.5 w-3.5" /></Link>
+                  {d.wiki ? <Link to={`/wiki?tab=sources`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-3 text-sm hover:bg-slate-50">Manage<ExternalLink className="h-3.5 w-3.5" /></Link>
                     : admin && (<>
                       {d.state?.test && <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => runTest(d)} aria-label={`Test ${d.name}`}>Test</Button>}
                       <Button size="sm" variant="outline" onClick={() => setOpen(d.id)} aria-label={`Configure ${d.name}`}>Configure</Button>
-                      <Button size="sm" variant="danger" disabled={busy === d.id} onClick={() => disconnect(d)} aria-label={`Disconnect ${d.name}`}>Disconnect</Button></>)}
+                      <Button size="sm" variant="danger-outline" disabled={busy === d.id} onClick={() => disconnect(d)} aria-label={`Disconnect ${d.name}`}>Disconnect</Button></>)}
                 </div>
               </li>))}</ul>
           </Card>)}
@@ -94,7 +94,7 @@ export default function IntegrationsPanel({ admin }: { admin: boolean }) {
             <li key={d.id} className="flex flex-wrap items-center gap-4 p-4">
               <IconTile icon={d.icon} tint={d.tint} />
               <div className="min-w-0 flex-1"><div className="font-semibold">{d.name}</div><p className="text-sm text-muted">{d.description}</p></div>
-              {d.wiki ? <Link to={`/wiki?tab=sources&connector=${d.wiki.kind}`} className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600" aria-label={`Connect ${d.name}`}>Connect</Link>
+              {d.wiki ? <Link to={`/wiki?tab=sources&connector=${d.wiki.kind}`} className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600" aria-label={`Connect ${d.name}`}>Connect</Link>
                 : admin ? <Button onClick={() => setOpen(d.id)} aria-label={`Connect ${d.name}`}>Connect</Button> : <span className="text-xs text-muted">Admins only</span>}
             </li>))}
             {!available.length && <li className="p-6 text-center text-sm text-muted"><Plug className="mx-auto mb-1 h-5 w-5" />Everything is connected.</li>}</ul>

@@ -85,9 +85,9 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
     <div className="space-y-4">
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <Input className="min-w-64 flex-1" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. How are deleted users handled? Where is get_profile documented?" aria-label="Question" />
-        <select aria-label="Scope" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
+        <select aria-label="Scope" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
           <option value="">All sources</option>{repos.filter((r) => r.status === "ready").map((r) => <option key={r.id} value={r.id}>{r.name}{r.source === "docs" ? " (docs)" : ""}</option>)}</select>
-        <select aria-label="Kind" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value as "" | "doc" | "code" | "pr")}>
+        <select aria-label="Kind" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value as "" | "doc" | "code" | "pr")}>
           <option value="">Docs + code + PRs</option><option value="doc">Docs only</option><option value="code">Code only</option><option value="pr">Pull requests only</option></select>
         <Button disabled={ask.isPending || search.isPending}><Search className="h-4 w-4" />Ask</Button>
       </form>
@@ -124,7 +124,7 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
                 {h.url && /^https?:\/\//.test(h.url) ? <a href={h.url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand hover:underline">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</a> : <span className="text-xs text-muted">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</span>}
                 {h.node_id && <button className="ml-auto text-xs text-brand hover:underline" onClick={() => openNode(h.node_id!)}>Open in graph</button>}
               </div>
-              <pre className="max-h-32 overflow-hidden whitespace-pre-wrap rounded bg-slate-50 p-2 font-mono text-xs">{h.content.slice(0, 500)}</pre>
+              <pre className="max-h-32 overflow-hidden whitespace-pre-wrap rounded-md bg-slate-50 p-2 font-mono text-xs">{h.content.slice(0, 500)}</pre>
               <ConnectionChips conns={h.connections} onOpen={openNode} />
             </Card>))}
         </div>)}
@@ -213,7 +213,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
         <Stat label="From docs & semantics" value={s?.edges.filter((e) => ["doc_mention", "doc_link", "semantic"].includes(e.provenance)).reduce((a, e) => a + e.count, 0) ?? "—"} hint="mentions, links, similarity" />
       </div>}
       <div className="flex flex-wrap items-center gap-3">
-        <select aria-label="Repository" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
+        <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
           <option value="">All sources</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
         {ALL_TYPES.map((t) => (
           <label key={t} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={types.includes(t)} onChange={() => toggle(t)} />
@@ -225,7 +225,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
         <div className="relative w-64">
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a symbol, file or section…" aria-label="Find node" />
           {query.length > 1 && found.data && (
-            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-line bg-white shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-white shadow-lg">
               {found.data.map((n) => (<li key={n.id}><button className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50"
                 onClick={() => { pick(n.id); setExtra((x) => ({ nodes: [...x.nodes, n], edges: x.edges })); setQuery(""); }}>
                 <span className="h-2 w-2 rounded-full" style={{ background: NODE_COLORS[n.type] }} /><span className="truncate">{n.qualname || n.name}</span><span className="ml-auto text-muted">{n.type}</span></button></li>))}
@@ -249,11 +249,11 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={factsOnly} onChange={(e) => setFactsOnly(e.target.checked)} />Facts only <span className="text-muted">(hide inferred and uncertain links)</span></label>
             <label className="flex items-center gap-1.5">Colour by
-              <select aria-label="Colour by" className="h-8 rounded-md border border-line bg-white px-2" value={colorBy} onChange={(e) => setColorBy(e.target.value)}>
+              <select aria-label="Colour by" className="h-8 rounded-lg border border-line bg-white px-2" value={colorBy} onChange={(e) => setColorBy(e.target.value)}>
                 <option value="type">Node type</option><option value="community">Area (what hangs together)</option><option value="churn">Heat: recent change (90 days)</option><option value="bugs">Heat: bug-fix activity</option>
                 <option value="connections">Heat: most connected</option><option value="undocumented">Heat: undocumented code</option></select></label>
             {!["type", "community"].includes(colorBy) && (<span className="flex items-center gap-2 text-muted" aria-label="Heat legend">
-              {heat.isLoading ? "Loading…" : (<><span>cold</span><span className="h-2.5 w-28 rounded" style={{ background: HEAT_GRADIENT }} /><span>hot</span><span>· {heat.data?.label}</span>{heat.data && !Object.keys(heat.data.values).length && <span className="text-amber-700">· no data for these nodes</span>}</>)}</span>)}
+              {heat.isLoading ? "Loading…" : (<><span>cold</span><span className="h-2.5 w-28 rounded-md" style={{ background: HEAT_GRADIENT }} /><span>hot</span><span>· {heat.data?.label}</span>{heat.data && !Object.keys(heat.data.values).length && <span className="text-amber-700">· no data for these nodes</span>}</>)}</span>)}
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
             {Object.entries(REL_COLORS).filter(([r]) => r !== "INCLUDES").map(([r, c]) => (
@@ -350,7 +350,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
         <Card><CardTitle>Collections</CardTitle>
           {!collections.length ? <Empty>No document collections yet.</Empty> : (
             <ul className="space-y-1">{collections.map((c) => (
-              <li key={c.id}><button onClick={() => setSel(c.id)} className={cn("flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50", active?.id === c.id && "bg-indigo-50")}>
+              <li key={c.id}><button onClick={() => setSel(c.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50", active?.id === c.id && "bg-indigo-50")}>
                 <span className="truncate">{c.name}</span><Badge tone={statusTone(c.status)}>{c.status}</Badge></button></li>))}</ul>)}
         </Card>
         {writable && (<Card><CardTitle>New collection</CardTitle>
@@ -360,7 +360,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
       </div>
       <Card>
         {!active ? <Empty>Create a collection, then upload Markdown, reStructuredText or text files. They are split by heading, linked to your code and added to the graph.</Empty> : (<>
-          <CardTitle right={writable && (<label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600">
+          <CardTitle right={writable && (<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600">
             <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}
             {user?.role === "admin" && <button aria-label="Delete collection" title="Delete this collection and all its documents" className="ml-2 align-middle text-muted hover:text-red-600"
               onClick={async () => { if (await ask({ title: `Delete the collection "${active.name}"?`, message: `All ${active.file_count} documents, their search entries and graph nodes are removed.`, confirmLabel: "Delete collection", danger: true })) dropCollection.mutate(active.id); }}><Trash2 className="inline h-4 w-4" /></button>}</CardTitle>

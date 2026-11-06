@@ -56,6 +56,14 @@ Open a GitHub issue with the question. Inside the app, **Report a bug / request 
 ## Reporting security problems
 Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 
+## UI conventions
+- **One corner-radius scale:** `rounded-md` (6px) for chips and code, `rounded-lg` (8px) for controls and inset blocks, `rounded-xl` (12px) for cards and dialogs, `rounded-full` for pills and dots. Do not add other radii.
+- **Cards are flat** (a border, no shadow) and never hold another card. Inside a card use `Panel` (a tinted block), `Section`, or a list divided by rules (`divide-y divide-line`). Several numbers in a row use `StatGroup`.
+- **A badge says something unusual** (failed, needs attention, shared). The normal state is plain text or a `StatusDot`: do not badge "ready", "done", "private" or "connected".
+- **Icons are lucide icons**, passed as the `icon` of `CardTitle`/`Section` or placed beside the label. Do not use text characters such as ✓, ✗ or ▾ as icons.
+- **The sidebar is grouped** (Work, Knowledge, Sources, Monitor); a new page goes in the group of what people do with it.
+- **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
+
 ## How a version is made (maintainers)
 Work for a version happens on a branch named after it, for example `0.2.2`; nothing is committed straight to `main`.
 1. Branch from `main`, change the version number (see `docs/operations.md`) if it is a new version, and commit there.

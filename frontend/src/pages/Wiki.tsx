@@ -63,7 +63,7 @@ function TreeNode({ node, depth, selected, onPick }: { node: WikiTreeNode; depth
   const has = node.children.length > 0;
   return (
     <li>
-      <div className={cn("flex items-center gap-1 rounded py-0.5 pr-1 text-sm hover:bg-slate-50", node.path && node.path === selected && "bg-indigo-50 font-medium")} style={{ paddingLeft: depth * 12 }}>
+      <div className={cn("flex items-center gap-1 rounded-md py-0.5 pr-1 text-sm hover:bg-slate-50", node.path && node.path === selected && "bg-indigo-50 font-medium")} style={{ paddingLeft: depth * 12 }}>
         {has ? <button aria-label={openState ? "Collapse" : "Expand"} onClick={() => setOpen(!openState)} className="text-muted">{openState ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button> : <span className="w-3.5" />}
         {node.path ? <button className="truncate text-left" onClick={() => onPick(node.path!)} title={node.path}>{node.title}</button> : <span className="truncate text-muted">{node.title}</span>}
       </div>
@@ -79,9 +79,9 @@ function AtAGlance({ i }: { i: PageInsights }) {
     <Card className="p-4" aria-label="At a glance"><CardTitle>At a glance</CardTitle>
       <div className="space-y-3 text-sm">
         {i.purpose && <p className="leading-5">{i.purpose}</p>}
-        {!!i.warnings.length && <ul className="space-y-1">{i.warnings.map((w, k) => <li key={k} className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900"><b className="capitalize">{w.level}:</b> {w.text}</li>)}</ul>}
+        {!!i.warnings.length && <ul className="space-y-1">{i.warnings.map((w, k) => <li key={k} className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900"><b className="capitalize">{w.level}:</b> {w.text}</li>)}</ul>}
         {!!i.owners.length && <div className="text-xs"><span className="text-muted">Who to ask: </span>{i.owners.map((o) => `${o.who} (${o.role})`).join(", ")}</div>}
-        {!!i.commands.length && <div><div className="mb-1 text-xs text-muted">Commands{i.steps ? ` · ${i.steps} steps` : ""}</div><pre className="max-h-32 overflow-auto rounded bg-slate-900 p-2 font-mono text-xs text-slate-100">{i.commands.join("\n")}</pre></div>}
+        {!!i.commands.length && <div><div className="mb-1 text-xs text-muted">Commands{i.steps ? ` · ${i.steps} steps` : ""}</div><pre className="max-h-32 overflow-auto rounded-md bg-slate-900 p-2 font-mono text-xs text-slate-100">{i.commands.join("\n")}</pre></div>}
         {!!i.endpoints.length && <div className="text-xs"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
         {!!i.settings.length && <div className="text-xs"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
         {i.last_dated && <div className="text-xs text-muted">Last dated {i.last_dated}</div>}
@@ -145,7 +145,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
     <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
       <Card className="max-h-[40rem] overflow-auto p-3">
         <label className="mb-2 block text-xs font-medium text-muted">Source
-          <select aria-label="Source" className="mt-1 h-8 w-full rounded-md border border-line bg-white px-2 text-sm font-normal text-ink" value={repoId ?? ""} onChange={(e) => open(e.target.value, "")}>
+          <select aria-label="Source" className="mt-1 h-8 w-full rounded-lg border border-line bg-white px-2 text-sm font-normal text-ink" value={repoId ?? ""} onChange={(e) => open(e.target.value, "")}>
             {sources.map((s) => <option key={s.repo_id} value={s.repo_id}>{s.name} ({s.pages})</option>)}</select></label>
         <div className="mb-2"><NewPageButton source={current} onClick={() => setEditing("new")} /></div>
         {tree.isLoading ? <Spinner /> : <ul aria-label="Page tree">{tree.data?.map((n) => <TreeNode key={n.key} node={n} depth={0} selected={pagePath} onPick={(pp) => open(repoId!, pp)} />)}</ul>}
@@ -168,7 +168,7 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
               {p.managed_by && <span className="ml-auto" title="This page is kept in sync with its source. Remove the source on the Sources tab to delete it.">Synced from {p.managed_by}</span>}
               {p.source.url && /^https?:\/\//.test(p.source.url) && <a className="inline-flex items-center gap-1 text-brand hover:underline" href={p.source.url} target="_blank" rel="noopener noreferrer">Open original<ExternalLink className="h-3 w-3" /></a>}
             </div>
-            {!!p.unresolved_links.length && <p role="alert" className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{p.unresolved_links.length} link(s) on this page point to pages that do not exist: {p.unresolved_links.map((l) => l.link).join(", ")}</p>}
+            {!!p.unresolved_links.length && <p role="alert" className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{p.unresolved_links.length} link(s) on this page point to pages that do not exist: {p.unresolved_links.map((l) => l.link).join(", ")}</p>}
             {paged ? (<div className="space-y-4">
               <SectionNav sections={sections} index={Math.min(sec, sections.length - 1)} onIndex={setSec} onAll={showAll} label="Jump to section" />
               <Markdown key={`${pagePath}:${sec}`} text={sections[Math.min(sec, sections.length - 1)].text} onOpen={open} />
@@ -231,7 +231,7 @@ function AskWiki({ open }: { open: Open }) {
           <Card key={s.id} className="p-4"><div className="mb-1 flex flex-wrap items-center gap-2 text-sm"><span className="text-xs text-muted">{s.id}</span>
             {s.repo_id ? <button className="font-medium text-brand hover:underline" onClick={() => open(s.repo_id!, s.file)}>{s.title}</button> : <b>{s.title}</b>}
             <span className="text-xs text-muted">{s.repo}</span>{s.url && /^https?:\/\//.test(s.url) && <a className="text-xs text-brand hover:underline" href={s.url} target="_blank" rel="noopener noreferrer">original</a>}</div>
-            <pre className="max-h-24 overflow-hidden whitespace-pre-wrap rounded bg-slate-50 p-2 font-mono text-xs">{s.snippet}</pre></Card>))}
+            <pre className="max-h-24 overflow-hidden whitespace-pre-wrap rounded-md bg-slate-50 p-2 font-mono text-xs">{s.snippet}</pre></Card>))}
       </>)}
     </div>
   );
@@ -251,7 +251,7 @@ function Concepts({ initial, open }: { initial: string | null; open: Open }) {
         <Input aria-label="Filter concepts" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} className="mb-2" />
         {list.isLoading ? <Spinner /> : !shown.length ? <Empty>No recurring terms yet. Concepts appear when several pages mention the same identifiers or headings.</Empty> : (
           <ul className="space-y-0.5">{shown.map((c) => (
-            <li key={c.term}><button onClick={() => setTerm(c.term)} className={cn("flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-slate-50", term === c.term && "bg-indigo-50")}>
+            <li key={c.term}><button onClick={() => setTerm(c.term)} className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50", term === c.term && "bg-indigo-50")}>
               <span className="truncate">{c.term}</span>{c.in_code && <Badge tone="brand">in code</Badge>}<span className="ml-auto text-xs text-muted">{c.docs} pages</span></button></li>))}</ul>)}
       </Card>
       <div className="min-w-0 space-y-3">
@@ -259,7 +259,7 @@ function Concepts({ initial, open }: { initial: string | null; open: Open }) {
           <Card><CardTitle right={<Badge>{d.documents} pages</Badge>}>{d.term}</CardTitle>
             <p className="text-sm leading-6">{d.summary || "No summary available."}</p>
             <p className="mt-1 text-xs text-muted">from {d.summary_source.repo} · {d.summary_source.section}</p>
-            {!!d.code.length && <div className="mt-3 flex flex-wrap gap-2">{d.code.map((c) => <Link key={c.id} to={`/knowledge?tab=graph&node=${c.id}`} className="rounded-md border border-line px-2 py-1 text-xs hover:bg-slate-50"><code>{c.qualname}</code> <span className="text-muted">{c.repo}:{c.path}</span></Link>)}</div>}
+            {!!d.code.length && <div className="mt-3 flex flex-wrap gap-2">{d.code.map((c) => <Link key={c.id} to={`/knowledge?tab=graph&node=${c.id}`} className="rounded-lg border border-line px-2 py-1 text-xs hover:bg-slate-50"><code>{c.qualname}</code> <span className="text-muted">{c.repo}:{c.path}</span></Link>)}</div>}
             {!!d.related_terms.length && <div className="mt-3 flex flex-wrap gap-1.5">{d.related_terms.map((r) => <button key={r.term} onClick={() => setTerm(r.term)} className="rounded-full border border-line px-2 py-0.5 text-xs hover:bg-slate-50">{r.term}</button>)}</div>}
           </Card>
           {!!d.definitions.length && <Card><CardTitle>Defined in</CardTitle><ul className="space-y-2 text-sm">{d.definitions.map((m, i) => <li key={i}><button className="text-brand hover:underline" onClick={() => open(m.repo_id, m.path)}>{m.section}</button> <span className="text-xs text-muted">{m.repo} · {m.path}</span></li>)}</ul></Card>}
@@ -284,7 +284,7 @@ function Health({ open }: { open: Open }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm"><label htmlFor="stale">Stale after</label>
-        <select id="stale" className="h-8 rounded-md border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[90, 180, 365].map((n) => <option key={n} value={n}>{n} days</option>)}</select></div>
+        <select id="stale" className="h-8 rounded-lg border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[90, 180, 365].map((n) => <option key={n} value={n}>{n} days</option>)}</select></div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Orphan pages" count={s.orphans} hint="Nothing links to these and no parent page contains them.">
           <ul className="space-y-1 text-sm">{d.orphans.map((o) => <li key={o.repo_id + o.path}>{page(o)} <span className="text-xs text-muted">{o.repo}</span></li>)}</ul></Section>
@@ -327,7 +327,7 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
     <div className="space-y-3">
       <div className="flex items-center gap-3 text-sm">
         <p className="text-muted">Pages that describe code which has changed since they were written. Edit the page and the alert closes by itself.</p>
-        <select aria-label="Show" className="ml-auto h-8 rounded-md border border-line bg-white px-2" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select aria-label="Show" className="ml-auto h-8 rounded-lg border border-line bg-white px-2" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="open">Needs review</option><option value="dismissed">Reviewed, no change needed</option><option value="resolved">Updated</option></select>
       </div>
       {status === "open" && (list.data?.length ?? 0) > 1 && (
@@ -348,7 +348,7 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
             <div className="mt-2 text-xs"><span className="text-muted">Changed code the page mentions:</span>
               <ul className="mt-1 space-y-1.5">{a.symbols.map((s) => (
                 <li key={s.id}>
-                  <Link to={`/knowledge?tab=graph&node=${s.id}`} className="rounded border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>
+                  <Link to={`/knowledge?tab=graph&node=${s.id}`} className="rounded-md border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>
                   {!!s.lines && <span className="ml-2 text-muted">{s.lines} line{s.lines === 1 ? "" : "s"} changed in <code>{s.path}</code></span>}
                   {s.mention && <blockquote className="mt-1 border-l-2 border-line pl-2 text-muted" aria-label={`Where the page mentions ${s.name}`}>{s.mention}</blockquote>}
                   {!!s.changes?.length && <div className="mt-0.5 text-muted">{s.changes.map((c) => `${c.subject || c.sha} (${c.author || "unknown"})`).join("; ")}</div>}
@@ -395,11 +395,11 @@ function Proposals({ selectedId, open }: { selectedId: string | null; open: Open
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
       <Card className="max-h-[40rem] overflow-auto p-3">
-        <select aria-label="Show proposals" className="mb-2 h-8 w-full rounded-md border border-line bg-white px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select aria-label="Show proposals" className="mb-2 h-8 w-full rounded-lg border border-line bg-white px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="pending">Waiting for a decision</option><option value="applied">Applied</option><option value="rejected">Rejected</option><option value="failed">Could not be applied</option></select>
         {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "pending" ? "No proposals. Draft one from a Drift alert, or from a confirmed investigation." : "Nothing here."}</Empty> : (
           <ul className="space-y-1">{list.data.map((p) => (
-            <li key={p.id}><button onClick={() => { setSel(p.id); setEditing(null); }} className={cn("w-full rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50", sel === p.id && "bg-indigo-50")}>
+            <li key={p.id}><button onClick={() => { setSel(p.id); setEditing(null); }} className={cn("w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50", sel === p.id && "bg-indigo-50")}>
               <div className="flex items-center gap-2"><Badge tone={p.kind === "new" ? "green" : "blue"}>{p.kind === "new" ? "new page" : "update"}</Badge><span className="truncate font-medium">{p.title}</span></div>
               <div className="mt-0.5 truncate text-xs text-muted">{p.source === "drift" ? "code changed" : p.source === "incident" ? "from an incident" : p.source} · {timeAgo(p.created_at)}</div></button></li>))}</ul>)}
       </Card>

@@ -15,7 +15,7 @@ export default function ReportIssue() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10"><MessageSquarePlus className="h-4 w-4" />Report a bug / request a feature</button>
+      <button onClick={() => setOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100"><MessageSquarePlus className="h-4 w-4" />Report a bug / request a feature</button>
       {open && (
         <Modal title="Help improve RepoLens" subtitle="Opens the project's public issue form on GitHub in a new tab." onClose={() => setOpen(false)}>
           <ul className="space-y-3">

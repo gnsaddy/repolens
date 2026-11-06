@@ -80,14 +80,14 @@ export default function GraphPage() {
             <CardTitle right={active && <button className="text-xs text-muted hover:underline" onClick={() => open(null)}>Start a new selection</button>}>Saved systems</CardTitle>
             {groups.isLoading ? <Spinner /> : groups.error ? <ErrorNote error={groups.error} /> : !groups.data?.groups.length ? <p className="text-sm text-muted">None yet. Pick repositories below and save the picture.</p> : (
               <ul className="space-y-1">{groups.data.groups.map((g) => (
-                <li key={g.id}><button onClick={() => open(g)} aria-pressed={g.id === activeId} className={`w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${g.id === activeId ? "bg-indigo-50 font-medium text-brand" : ""}`}>
+                <li key={g.id}><button onClick={() => open(g)} aria-pressed={g.id === activeId} className={`w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50 ${g.id === activeId ? "bg-indigo-50 font-medium text-brand" : ""}`}>
                   {g.name}<span className="block text-xs font-normal text-muted">{g.repo_ids.length + g.hidden} repositories · {g.created_by_name}</span></button></li>))}</ul>)}
           </Card>
           <Card aria-label="Repositories">
             <CardTitle>Repositories ({picked.length} of {maxRepos})</CardTitle>
             {repos.isLoading ? <Spinner /> : !repos.data?.length ? <p className="text-sm text-muted">Add repositories first.</p> : (
               <ul className="max-h-72 space-y-1 overflow-auto">{repos.data.map((r) => (
-                <li key={r.id}><label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
+                <li key={r.id}><label className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-slate-50">
                   <input type="checkbox" checked={picked.includes(r.id)} onChange={() => toggle(r.id)} /><span className="min-w-0 flex-1 truncate">{r.name}</span>
                   {r.source === "docs" && <Badge tone="blue">docs</Badge>}</label></li>))}</ul>)}
             {write && picked.length > 0 && (
@@ -109,7 +109,7 @@ export default function GraphPage() {
             {picked.length > 1 && active && !dirty && <ArchitectureCard groupId={active.id} repos={a.repos.map((r) => ({ id: r.id, name: r.name }))} write={write} />}
             <Card aria-label="Repository map">
               <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Colour repositories by
-                <select aria-label="Colour repositories by" value={metric} onChange={(e) => setMetric(e.target.value as HeatMetric)} className="h-8 rounded-md border border-line bg-white px-2 text-sm text-ink">{METRICS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}>
+                <select aria-label="Colour repositories by" value={metric} onChange={(e) => setMetric(e.target.value as HeatMetric)} className="h-8 rounded-lg border border-line bg-white px-2 text-sm text-ink">{METRICS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}>
                 Repository map{active ? `: ${active.name}` : ""}</CardTitle>
               {picked.length > 1 && <div className="mb-2"><ExportBar ids={key} /></div>}
               {picked.length < 2 ? <p className="mb-2 text-sm text-muted">Choose a second repository to see how they relate.</p> : <p className="mb-2 text-xs text-muted">Click an arrow to show only the code behind it in the graph above.</p>}
@@ -117,7 +117,7 @@ export default function GraphPage() {
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                 {(["fact", "inferred", "uncertain"] as const).map((t) => <span key={t} className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: TRUST_COLOR[t] }} />{TRUST[t]}</span>)}
                 <span>Arrow: depends on. Number: links the code proves, by an import, a URL or a manifest (~ = matched by name only).</span>
-                {metric !== "none" && <span className="flex items-center gap-1">less<i className="inline-block h-2.5 w-16 rounded" style={{ background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(1)})` }} />more, over the last {a.window_days} days</span>}
+                {metric !== "none" && <span className="flex items-center gap-1">less<i className="inline-block h-2.5 w-16 rounded-md" style={{ background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(1)})` }} />more, over the last {a.window_days} days</span>}
               </div>
               {picked.length > 1 && !a.links.length && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-muted">No links between these repositories were found in the code or documents. They may still be related through something this analysis cannot see, such as a shared database or a message queue.</p>}
               {shownLink && (
@@ -125,8 +125,8 @@ export default function GraphPage() {
                   <Button size="sm" variant="outline" className="float-right" onClick={() => explain({ src: shownLink.src, dst: shownLink.dst })}><Sparkles className="h-4 w-4" />Explain this link</Button>
                   <div className="font-medium">{pairs.get(shownLink.src)} → {pairs.get(shownLink.dst)} <Badge tone={shownLink.trust === "fact" ? "green" : "amber"}>{TRUST[shownLink.trust]}</Badge></div>
                   <div className="text-xs text-muted">{Object.entries(shownLink.rels).map(([k, n]) => `${REL[k] ?? k.toLowerCase()} ${n}`).join(", ")}{shownLink.weak > 0 && ` · ${shownLink.weak} matched by name only`}</div>
-                  {shownLink.declared_unused && <p role="note" className="mt-1 rounded bg-amber-50 p-1.5 text-xs text-amber-800">Declared in a manifest, but nothing was found using it. It may be unused, or used in a way this graph cannot see.</p>}
-                  {shownLink.undeclared && <p role="note" className="mt-1 rounded bg-amber-50 p-1.5 text-xs text-amber-800">Used in the code, but not declared in its manifest. It may be missing from the dependencies.</p>}
+                  {shownLink.declared_unused && <p role="note" className="mt-1 rounded-md bg-amber-50 p-1.5 text-xs text-amber-800">Declared in a manifest, but nothing was found using it. It may be unused, or used in a way this graph cannot see.</p>}
+                  {shownLink.undeclared && <p role="note" className="mt-1 rounded-md bg-amber-50 p-1.5 text-xs text-amber-800">Used in the code, but not declared in its manifest. It may be missing from the dependencies.</p>}
                   <ul className="mt-2 space-y-1 text-xs">{shownLink.examples.map((e, i) => <li key={i}><code>{e.from}</code> → <code>{e.to}</code>{e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>)}</ul>
                 </div>)}
             </Card>
@@ -144,7 +144,7 @@ export default function GraphPage() {
                 <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Repository</th><th className="font-normal">Commits</th><th className="font-normal">Lines</th><th className="font-normal">Fixes</th><th className="font-normal">Docs</th></tr></thead>
                   <tbody>{a.repos.map((r) => (
                     <tr key={r.id} className="border-t border-line"><td className="py-1.5 pr-2 font-medium">{r.name}</td>
-                      {(["commits", "lines", "fixes", "drift_open"] as const).map((k) => <td key={k} className="pr-1"><span className="inline-block min-w-8 rounded px-1.5 py-0.5 text-center" style={{ background: heatColor(r.heat[k]) }}>{r.risk[k]}</span></td>)}</tr>))}</tbody></table>
+                      {(["commits", "lines", "fixes", "drift_open"] as const).map((k) => <td key={k} className="pr-1"><span className="inline-block min-w-8 rounded-md px-1.5 py-0.5 text-center" style={{ background: heatColor(r.heat[k]) }}>{r.risk[k]}</span></td>)}</tr>))}</tbody></table>
                 <p className="mt-2 text-xs text-muted">Last {a.window_days} days. Docs = pages that may be out of date.</p>
               </Card>
             </div>
@@ -223,17 +223,23 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
             <p className="mt-2">Imports are read for Python, JavaScript/TypeScript, Go, Java, Kotlin, C#, Rust, C, C++, Ruby, PHP, Swift and Scala, and URLs are matched against the routes another repository serves. Dependencies through a shared database, a message queue or a URL held in configuration cannot be seen from the code.</p>
           </div>) : (
           <ForceGraph nodes={cg.nodes} edges={cg.edges} selectedId={node} onSelect={(id) => onNode(node === id ? null : id)} heat={hot ? cg.heat : undefined} />)}
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+        <div className="mt-3 space-y-2 text-xs text-muted">
           {cg.nodes.length > 0 && cg.heat && (
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} />Colour by recent changes
               <span>(commits touching the file in the last {cg.heat_days} days; every function takes its file's heat)</span></label>)}
-          {cg.nodes.length > 0 && <span>{crossing} link{crossing === 1 ? "" : "s"} across repositories, drawn amber and dashed between each repository's area.</span>}
-          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.HTTP }} />calls over HTTP (URL matches a route)</span>
-          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.USES }} />uses a class or function it imports (the import line is the proof)</span>
-          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.DECLARES }} />declared in a manifest (pyproject, package.json, go.mod…)</span>
-          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.DEPLOYS }} />shared names: an image deployed, a service called, a queue used, a repository referenced</span>
-          <span className="flex items-center gap-1"><i className="inline-block h-0.5 w-5" style={{ background: REL_COLORS.CALLS }} />calls the code states</span>
-          {(["function", "class", "file"] as const).map((t) => <span key={t} className="flex items-center gap-1"><i className="inline-block h-2 w-2 rounded-full" style={{ background: NODE_COLORS[t] }} />{t}</span>)}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Legend">
+            <span className="font-medium text-ink">Links</span>
+            {cg.nodes.length > 0 && <span className="flex items-center gap-1.5"><i className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: "#4f46e5" }} />{crossing} link{crossing === 1 ? "" : "s"} across repositories</span>}
+            <span title="The code states the call" className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 rounded-full" style={{ background: REL_COLORS.CALLS }} />call</span>
+            <span title="Calls over HTTP: a URL matches a route" className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 rounded-full" style={{ background: REL_COLORS.HTTP }} />calls over HTTP</span>
+            <span title="Uses a class or function it imports; the import line is the proof" className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 rounded-full" style={{ background: REL_COLORS.USES }} />import</span>
+            <span title="Declared in a manifest: pyproject, package.json, go.mod…" className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 rounded-full" style={{ background: REL_COLORS.DECLARES }} />manifest</span>
+            <span title="Shared names: an image deployed, a service called, a queue used, a repository referenced" className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 rounded-full" style={{ background: REL_COLORS.DEPLOYS }} />shared name</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="font-medium text-ink">Nodes</span>
+            {(["function", "class", "file"] as const).map((t) => <span key={t} className="flex items-center gap-1.5"><i className="inline-block h-2 w-2 rounded-full" style={{ background: NODE_COLORS[t] }} />{t}</span>)}
+          </div>
         </div>
         {(cg.available.weak > 0 || weak) && (
           <label className="mt-2 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5" checked={weak} onChange={(e) => onWeak(e.target.checked)} />
@@ -307,7 +313,7 @@ function PublicSurface({ repos }: { repos: { id: string; name: string }[] }) {
   return (
     <Card aria-label="Public surface">
       <CardTitle right={<label className="flex items-center gap-2 text-xs text-muted">Repository
-        <select aria-label="Repository" value={id} onChange={(e) => setRepo(e.target.value)} className="h-8 rounded-md border border-line bg-white px-2 text-sm text-ink">{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}>What other repositories use from it</CardTitle>
+        <select aria-label="Repository" value={id} onChange={(e) => setRepo(e.target.value)} className="h-8 rounded-lg border border-line bg-white px-2 text-sm text-ink">{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>}>What other repositories use from it</CardTitle>
       {q.isLoading ? <Spinner /> : !s ? <ErrorNote error={q.error} /> : (<>
         {!s.symbols.length ? <p className="text-sm text-muted">No other repository uses anything from {s.repo.name} that RepoLens can see.</p> : (
           <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Class or function</th><th className="font-normal">Used</th><th className="font-normal">By</th></tr></thead>

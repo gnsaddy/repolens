@@ -37,7 +37,7 @@ export default function Sources({ overview }: { overview?: WikiOverview }) {
                 <div className="truncate text-xs text-muted"><Badge>{s.kind}</Badge> {s.label ?? s.url}{s.space_key ? ` · ${s.space_key}` : ""} · {s.pages} pages · {s.last_synced_at ? `synced ${timeAgo(s.last_synced_at)}` : "never synced"}</div>
                 {s.error && <div role="alert" className="text-xs text-red-600">{s.error}</div>}</div>
               <Badge tone={statusTone(s.status)}>{s.status}</Badge><Badge tone={s.visibility === "restricted" ? "amber" : "gray"}>{s.visibility}</Badge>
-              {admin && <select aria-label={`Sync schedule for ${s.name}`} className="h-8 rounded-md border border-line bg-white px-1.5 text-xs" value={s.sync_interval_hours ?? 0}
+              {admin && <select aria-label={`Sync schedule for ${s.name}`} className="h-8 rounded-lg border border-line bg-white px-1.5 text-xs" value={s.sync_interval_hours ?? 0}
                 onChange={(e) => schedule.mutate({ id: s.id, hours: +e.target.value })}>{SCHEDULES.map(([h, l]) => <option key={h} value={h}>{l}</option>)}</select>}
               {admin && <>
                 <Button variant="outline" size="sm" aria-label={`Sync ${s.name}`} disabled={sync.isPending} onClick={() => sync.mutate(s.id)}><RefreshCw className="h-3.5 w-3.5" />Sync</Button>
@@ -58,7 +58,7 @@ export default function Sources({ overview }: { overview?: WikiOverview }) {
 
 function CollectionPick({ collections, value, onChange }: { collections: { id: string; name: string }[]; value: string; onChange: (v: string) => void }) {
   return (
-    <select aria-label="Collection" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
+    <select aria-label="Collection" className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">New collection…</option>{collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
   );
 }
@@ -155,9 +155,9 @@ function ConfluenceImport({ onDone }: { onDone: () => void }) {
       <h4 className="text-sm font-semibold">Import pages</h4>
       <Input value={url} onChange={(e) => { setUrl(e.target.value); preview.reset(); }} placeholder="https://yourco.atlassian.net/wiki/spaces/ENG/pages/12345/Handbook" aria-label="Confluence URL" />
       <div className="flex flex-wrap items-end gap-3">
-        <div><Label>Scope</Label><select aria-label="Scope" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={mode} onChange={(e) => setMode(e.target.value)}><option value="auto">Auto</option><option value="page">This page only</option><option value="tree">Page and children</option><option value="space">Whole space</option></select></div>
+        <div><Label>Scope</Label><select aria-label="Scope" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={mode} onChange={(e) => setMode(e.target.value)}><option value="auto">Auto</option><option value="page">This page only</option><option value="tree">Page and children</option><option value="space">Whole space</option></select></div>
         <div><Label>Max pages</Label><Input type="number" min={1} max={2000} value={maxPages} onChange={(e) => setMax(+e.target.value)} className="w-24" aria-label="Max pages" /></div>
-        <div><Label>Who can see it</Label><select aria-label="Visibility" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted (grant access per source)</option><option value="org">Whole organization</option></select></div>
+        <div><Label>Who can see it</Label><select aria-label="Visibility" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted (grant access per source)</option><option value="org">Whole organization</option></select></div>
       </div>
       <ErrorNote error={preview.error || imp.error} />
       {pv && <p role="status" className="text-sm">Found {pv.kind} <b>{pv.title || pv.space_key}</b> in space {pv.space_key}. Suggested scope: {pv.suggested_mode}.</p>}
@@ -214,8 +214,8 @@ function ConnectorsCard({ onDone }: { onDone: () => void }) {
               {f.secret && <p className="mt-1 text-xs text-muted">Stored encrypted and never shown again.</p>}
             </div>))}
           <div><Label>Collection name (optional)</Label><Input aria-label="Collection name" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><Label>Keep up to date</Label><select aria-label="Keep up to date" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={hours} onChange={(e) => setHours(+e.target.value)}>{SCHEDULES.map(([h, l]) => <option key={h} value={h}>{l}</option>)}</select></div>
-          <div><Label>Who can see it</Label><select aria-label="Visibility of imported content" className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted (grant access per source)</option><option value="org">Whole organization</option></select></div>
+          <div><Label>Keep up to date</Label><select aria-label="Keep up to date" className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={hours} onChange={(e) => setHours(+e.target.value)}>{SCHEDULES.map(([h, l]) => <option key={h} value={h}>{l}</option>)}</select></div>
+          <div><Label>Who can see it</Label><select aria-label="Visibility of imported content" className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted (grant access per source)</option><option value="org">Whole organization</option></select></div>
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <Button type="button" variant="outline" disabled={missing || check.isPending} onClick={() => check.mutate()}>Test connection</Button>
             <Button disabled={missing || imp.isPending}>Import</Button>
@@ -282,12 +282,12 @@ function ConfluenceBrowser({ onDone }: { onDone: () => void }) {
         <div className="mt-3 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
           <div>{spaces.isLoading ? <Spinner /> : spaces.error ? <ErrorNote error={spaces.error} /> : (
             <ul className="max-h-72 space-y-0.5 overflow-auto" aria-label="Spaces">{spaces.data?.map((s) => (
-              <li key={s.key}><button onClick={() => setSpace(s)} aria-current={space?.key === s.key} className={`w-full rounded px-2 py-1 text-left text-sm hover:bg-slate-50 ${space?.key === s.key ? "bg-indigo-50" : ""}`}>{s.name} <span className="text-xs text-muted">{s.key}</span></button></li>))}</ul>)}</div>
+              <li key={s.key}><button onClick={() => setSpace(s)} aria-current={space?.key === s.key} className={`w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50 ${space?.key === s.key ? "bg-indigo-50" : ""}`}>{s.name} <span className="text-xs text-muted">{s.key}</span></button></li>))}</ul>)}</div>
           <div className="min-w-0">
             {!space ? <p className="text-sm text-muted">Choose a space to see its pages.</p> : (<>
               <div className="mb-2 flex flex-wrap items-center gap-2"><span className="text-sm font-medium">{space.name}</span>
                 <Button size="sm" disabled={imp.isPending} onClick={() => imp.mutate({ url: space.import_url, mode: "space" })}>Import whole space</Button>
-                <select aria-label="Visibility of browsed import" className="h-8 rounded-md border border-line bg-white px-2 text-xs" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted</option><option value="org">Whole organization</option></select></div>
+                <select aria-label="Visibility of browsed import" className="h-8 rounded-lg border border-line bg-white px-2 text-xs" value={vis} onChange={(e) => setVis(e.target.value)}><option value="restricted">Restricted</option><option value="org">Whole organization</option></select></div>
               {tree.isLoading ? <Spinner /> : tree.error ? <ErrorNote error={tree.error} /> : (<>
                 <ul className="max-h-72 overflow-auto rounded-lg border border-line p-2" aria-label="Pages">{roots.map((p) => render(p, 0))}</ul>
                 {tree.data?.truncated && <p className="mt-1 text-xs text-amber-700">Showing the first 1,000 pages.</p>}</>)}

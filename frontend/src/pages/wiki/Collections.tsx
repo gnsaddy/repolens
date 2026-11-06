@@ -39,7 +39,7 @@ export default function Collections({ sources, onChanged }: { sources: WikiSourc
               <div className="mt-2 rounded-lg bg-slate-50 p-2">
                 {docs.isLoading ? <Spinner /> : !docs.data?.length ? <p className="p-2 text-xs text-muted">No pages.</p> : (
                   <ul className="space-y-0.5">{docs.data.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white">
+                    <li key={d.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-white">
                       <FileText className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="truncate">{d.path}</span><span className="ml-auto text-xs text-muted">{(d.size / 1024).toFixed(1)} KB</span>
                       {writable && d.deletable !== false && (
                         <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600"

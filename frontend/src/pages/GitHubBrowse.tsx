@@ -48,7 +48,7 @@ export default function GitHubBrowse({ provider = "github" }: { provider?: Provi
           <ErrorNote error={repos.error} />
           {repos.isLoading ? <Spinner /> : !repos.data?.items.length ? <Empty>{debounced ? "No repository matches." : "This token can not see any repositories. Check its repository access."}</Empty> : (
             <ul className="max-h-[34rem] space-y-1 overflow-auto" aria-label="Repositories">{repos.data.items.map((r) => (
-              <li key={r.full_name}><button onClick={() => setSel(r.full_name)} aria-current={sel === r.full_name} className={cn("w-full rounded-md px-2 py-2 text-left hover:bg-slate-50", sel === r.full_name && "bg-indigo-50")}>
+              <li key={r.full_name}><button onClick={() => setSel(r.full_name)} aria-current={sel === r.full_name} className={cn("w-full rounded-lg px-2 py-2 text-left hover:bg-slate-50", sel === r.full_name && "bg-indigo-50")}>
                 <div className="flex items-center gap-1.5 text-sm font-medium">{r.private && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="private" />}<span className="truncate">{r.full_name}</span>
                   {r.added_repo_id && <Badge tone="green">added</Badge>}</div>
                 <div className="truncate text-xs text-muted">{r.description || "No description"}</div>
@@ -102,7 +102,7 @@ function RepoDetail({ repo, writable, provider }: { repo: GhRepo; writable: bool
                 <div className="text-xs text-muted">{i.author} · {i.comments} comments · updated {timeAgo(i.updated_at)}</div></div>
               {i.labels.slice(0, 3).map((l) => <Badge key={l} tone="blue">{l}</Badge>)}</li>))}</ul>))}
         {tab === "branches" && (branches.isLoading ? <Spinner /> : branches.error ? <ErrorNote error={branches.error} /> : (
-          <ul className="grid gap-1 sm:grid-cols-2">{branches.data?.map((b) => <li key={b.name} className="flex items-center gap-2 rounded border border-line px-2 py-1 text-sm"><GitBranch className="h-3.5 w-3.5 text-muted" />{b.name}{b.protected && <Badge tone="amber">protected</Badge>}{b.name === repo.default_branch && <Badge>default</Badge>}</li>)}</ul>))}
+          <ul className="grid gap-1 sm:grid-cols-2">{branches.data?.map((b) => <li key={b.name} className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-sm"><GitBranch className="h-3.5 w-3.5 text-muted" />{b.name}{b.protected && <Badge tone="amber">protected</Badge>}{b.name === repo.default_branch && <Badge>default</Badge>}</li>)}</ul>))}
       </div>
     </Card>
   );

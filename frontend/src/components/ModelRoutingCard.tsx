@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Layers, Search, Trash2 } from "lucide-react";
+import { Brain, Check, Layers, Search, Trash2, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ConnectionCard, StatusPill, selectCls } from "@/components/ConnectionCard";
@@ -46,7 +46,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
                 <ul className="divide-y divide-line">
                   {c.models.map((m) => (
                     <li key={m.id} className={cn("flex flex-wrap items-center gap-3 px-3 py-2 text-sm", !m.enabled && "opacity-60")}>
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium">{m.model}</code>
+                      <code className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium">{m.model}</code>
                       {admin && !c.legacy ? (<>
                         <select aria-label={`Tier for ${m.model}`} className={cn(selectCls, "h-8 w-auto text-xs")} value={m.tier} onChange={(e) => patch.mutate({ id: m.id, tier: e.target.value as Tier })}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                         <label className="flex items-center gap-1.5 text-xs text-muted"><input type="checkbox" checked={m.enabled} onChange={(e) => patch.mutate({ id: m.id, enabled: e.target.checked })} />In use</label>
@@ -125,7 +125,7 @@ function AddModels({ data, onDone }: { data: ModelRegistry; onDone: (d: ModelReg
           <ul className="max-h-56 space-y-1 overflow-auto">{shown.map((m) => (
             <li key={m} className="flex items-center gap-2 text-sm">
               <label className="flex flex-1 items-center gap-2"><input type="checkbox" checked={m in picked} onChange={(e) => { setPicked((p) => { const n = { ...p }; if (e.target.checked) n[m] = guessTier(m); else delete n[m]; return n; }); setResults((x) => { const n = { ...x }; delete n[m]; return n; }); }} /><code className="text-xs">{m}</code></label>
-              {results[m] && <span role="status" className={cn("text-xs", results[m].ok ? "text-emerald-700" : "text-red-600")}>{results[m].ok ? "✓ " : "✗ "}{results[m].text}</span>}
+              {results[m] && <span role="status" className={cn("text-xs", results[m].ok ? "text-emerald-700" : "text-red-600")}>{results[m].ok ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : <X className="mr-1 inline h-3 w-3" aria-hidden />}{results[m].text}</span>}
               {m in picked && <select aria-label={`Tier for ${m}`} className={cn(selectCls, "h-7 w-auto text-xs")} value={picked[m]} onChange={(e) => setPicked((p) => ({ ...p, [m]: e.target.value as Tier }))}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
             </li>))}</ul>
           {count > 0 && <Button type="button" variant={allOk ? "outline" : "primary"} disabled={testing || allOk} onClick={testAll}>{testing ? "Testing…" : allOk ? "All models work" : `Test ${count} selected model${count === 1 ? "" : "s"}`}</Button>}
@@ -149,7 +149,7 @@ export function MemoryCard({ admin }: { admin: boolean }) {
     <ConnectionCard icon={Brain} tint="violet" title="Answer memory" status={<StatusPill on={data.enabled} onLabel="On" offLabel="Off" />}
       description="Answers are remembered on this server. A repeated or re-worded question is answered from memory, with no model call and no tokens, until the underlying docs or code change."
       footer={data.entries > 0 ? (<>
-        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3 text-sm font-medium text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
+        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-medium text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
         {admin && <Button size="sm" variant="outline" onClick={async () => { if (await ask({ title: "Forget all remembered answers?", message: "Questions will be sent to the model again.", confirmLabel: "Forget", danger: true })) clear.mutate(); }}>Clear memory</Button>}</>) : undefined}>
       <dl className="grid gap-4 text-sm sm:grid-cols-3">
         <div><dt className="text-xs text-muted">Remembered answers</dt><dd className="font-medium">{data.entries}</dd></div>

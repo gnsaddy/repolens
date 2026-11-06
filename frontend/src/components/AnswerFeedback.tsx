@@ -19,8 +19,8 @@ export default function AnswerFeedback({ query, targetId, fromMemory }: { query:
     <div className="mt-3 border-t border-line pt-3">
       <div className="flex items-center gap-2 text-xs text-muted">
         <span>Was this helpful?</span>
-        <button type="button" aria-label="Helpful" disabled={send.isPending} onClick={() => send.mutate({ rating: "up" })} className={cn("rounded p-1 hover:bg-emerald-50 hover:text-emerald-700")}><ThumbsUp className="h-4 w-4" /></button>
-        <button type="button" aria-label="Not helpful" disabled={send.isPending} onClick={() => setAsking(true)} className="rounded p-1 hover:bg-red-50 hover:text-red-700"><ThumbsDown className="h-4 w-4" /></button>
+        <button type="button" aria-label="Helpful" disabled={send.isPending} onClick={() => send.mutate({ rating: "up" })} className={cn("rounded-md p-1 hover:bg-emerald-50 hover:text-emerald-700")}><ThumbsUp className="h-4 w-4" /></button>
+        <button type="button" aria-label="Not helpful" disabled={send.isPending} onClick={() => setAsking(true)} className="rounded-md p-1 hover:bg-red-50 hover:text-red-700"><ThumbsDown className="h-4 w-4" /></button>
       </div>
       {asking && (
         <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); send.mutate({ rating: "down", note }); }}>

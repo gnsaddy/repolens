@@ -32,7 +32,7 @@ export default function MeasurePanel({ repo, onClose }: { repo: Repo; onClose: (
           <p className="text-muted">{repo.source === "docs" ? "Document collections have no bug-fix history to test." : "Index this repository first so its history is available."}</p>
         ) : (
           <div className="flex flex-wrap items-end gap-3">
-            <label className="text-xs text-muted">Bug fixes to test<select aria-label="Bug fixes to test" value={cases} onChange={(e) => setCases(+e.target.value)} disabled={busy} className="mt-1 block h-9 rounded-md border border-line bg-white px-2 text-sm text-ink">{[5, 10, 15].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+            <label className="text-xs text-muted">Bug fixes to test<select aria-label="Bug fixes to test" value={cases} onChange={(e) => setCases(+e.target.value)} disabled={busy} className="mt-1 block h-9 rounded-lg border border-line bg-white px-2 text-sm text-ink">{[5, 10, 15].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
             <Button disabled={busy} onClick={() => start.mutate()}>{busy ? "Measuring…" : latest ? "Measure again" : "Measure now"}</Button>
           </div>)}
         {start.error && <ErrorNote error={start.error} />}

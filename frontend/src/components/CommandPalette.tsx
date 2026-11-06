@@ -63,12 +63,12 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
               else if (e.key === "Enter" && items[idx]) go(items[idx].to);
               else if (e.key === "Escape") onClose();
             }} />
-          <kbd className="rounded border border-line px-1.5 text-[10px] text-muted">esc</kbd>
+          <kbd className="rounded-md border border-line px-1.5 text-[10px] text-muted">esc</kbd>
         </div>
         <ul role="listbox" className="max-h-80 overflow-auto p-1">
           {items.map((it, i) => (
             <li key={it.key} role="option" aria-selected={i === idx}>
-              <button onClick={() => go(it.to)} onMouseEnter={() => setIdx(i)} className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm ${i === idx ? "bg-indigo-50" : ""}`}>
+              <button onClick={() => go(it.to)} onMouseEnter={() => setIdx(i)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${i === idx ? "bg-indigo-50" : ""}`}>
                 <span className="truncate font-medium">{it.label}</span><span className="ml-auto shrink-0 text-xs text-muted">{it.hint}</span>{i === idx && <CornerDownLeft className="h-3.5 w-3.5 text-muted" />}
               </button></li>))}
           {!items.length && <li className="px-3 py-6 text-center text-sm text-muted">Nothing matches “{q}”.</li>}

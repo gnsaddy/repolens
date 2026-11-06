@@ -13,7 +13,7 @@ function Claims({ title, items }: { title: string; items: JiraClaim[] }) {
   if (!items.length) return null;
   return (
     <section><h4 className="mb-1 text-xs font-medium text-muted">{title}</h4>
-      <ul className="space-y-1 text-sm">{items.map((c, i) => <li key={i} className="rounded-md bg-slate-50 px-2.5 py-1.5">{c.text}<span className="ml-2 text-xs text-muted">{c.by || "someone"} · comment {c.comment}</span></li>)}</ul></section>
+      <ul className="space-y-1 text-sm">{items.map((c, i) => <li key={i} className="rounded-lg bg-slate-50 px-2.5 py-1.5">{c.text}<span className="ml-2 text-xs text-muted">{c.by || "someone"} · comment {c.comment}</span></li>)}</ul></section>
   );
 }
 
@@ -32,12 +32,12 @@ export default function JiraIssuePanel({ issueKey, canInvestigate, onClose }: { 
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div role="tablist" className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm">
-              {(["ticket", "analysis"] as const).map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => (t === "analysis" && !a ? analysis.mutate() : setTab(t))} className={cn("rounded-md px-3 py-1", tab === t ? "bg-white font-medium shadow-sm" : "text-muted")}>{t === "ticket" ? `Ticket (${d.comments.length} comments)` : "Analysis"}</button>)}
+              {(["ticket", "analysis"] as const).map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => (t === "analysis" && !a ? analysis.mutate() : setTab(t))} className={cn("rounded-lg px-3 py-1", tab === t ? "bg-white font-medium shadow-sm" : "text-muted")}>{t === "ticket" ? `Ticket (${d.comments.length} comments)` : "Analysis"}</button>)}
             </div>
             <div className="ml-auto flex gap-2">
-              {d.investigation_id ? <Link className="inline-flex h-8 items-center rounded-md border border-line px-3 text-sm text-brand hover:bg-slate-50" to={`/investigations/${d.investigation_id}`}>View RCA<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+              {d.investigation_id ? <Link className="inline-flex h-8 items-center rounded-lg border border-line px-3 text-sm text-brand hover:bg-slate-50" to={`/investigations/${d.investigation_id}`}>View RCA<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
                 : canInvestigate && <Button size="sm" disabled={investigate.isPending} onClick={() => investigate.mutate()}><Microscope className="h-4 w-4" />{investigate.isPending ? "Starting…" : "Investigate"}</Button>}
-              <a className="inline-flex h-8 items-center rounded-md border border-line px-3 text-sm hover:bg-slate-50" href={safeHref(d.url)} target="_blank" rel="noopener noreferrer">Open in Jira</a>
+              <a className="inline-flex h-8 items-center rounded-lg border border-line px-3 text-sm hover:bg-slate-50" href={safeHref(d.url)} target="_blank" rel="noopener noreferrer">Open in Jira</a>
             </div>
           </div>
           <ErrorNote error={analysis.error ?? investigate.error} />

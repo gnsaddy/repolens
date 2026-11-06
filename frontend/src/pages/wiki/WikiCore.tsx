@@ -27,7 +27,7 @@ export function PageSearch({ open }: { open: Open }) {
         <Card className="mt-2 p-2">
           {hits.isLoading ? <Spinner /> : hits.error ? <ErrorNote error={hits.error} /> : !hits.data?.length ? <p className="p-2 text-sm text-muted">No page matches “{q}”.</p> : (
             <ul aria-label="Search results" className="divide-y divide-line">{hits.data.map((h) => (
-              <li key={h.repo_id + h.path}><button className="block w-full rounded px-2 py-2 text-left hover:bg-slate-50" onClick={() => { open(h.repo_id, h.path); setQ(""); setText(""); }}>
+              <li key={h.repo_id + h.path}><button className="block w-full rounded-md px-2 py-2 text-left hover:bg-slate-50" onClick={() => { open(h.repo_id, h.path); setQ(""); setText(""); }}>
                 <span className="text-sm font-medium text-brand">{h.title}</span> <span className="text-xs text-muted">{h.repo} · {h.path}</span>
                 <span className="mt-0.5 block text-xs text-muted">{h.snippet}</span></button></li>))}</ul>)}
         </Card>)}
@@ -53,7 +53,7 @@ export function PageEditor({ repoId, path, onDone }: { repoId: string; path: str
     },
   });
   if (path && src.isLoading) return <Spinner />;
-  if (path && src.data && !src.data.editable) return <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{src.data.reason}</p>;
+  if (path && src.data && !src.data.editable) return <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{src.data.reason}</p>;
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       {!path && <label className="block text-sm font-medium">Page path<Input aria-label="Page path" className="mt-1" value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder="runbooks/restart-api.md" /></label>}
@@ -85,7 +85,7 @@ export function AtlasTab({ sources }: { sources: WikiSource[] }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <select aria-label="Repository" className="h-9 rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>{repos.map((r) => <option key={r.repo_id} value={r.repo_id}>{r.name}</option>)}</select>
+        <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>{repos.map((r) => <option key={r.repo_id} value={r.repo_id}>{r.name}</option>)}</select>
         {a && <p className="text-sm text-muted"><MapIcon className="mr-1 inline h-4 w-4" />{a.summary.modules} modules · {a.summary.files} files · {a.summary.public_symbols} public symbols · <b className="text-ink">{a.summary.coverage != null ? `${Math.round(a.summary.coverage * 100)}%` : "—"}</b> documented</p>}
       </div>
       {repoId && <StartHere repoId={repoId} />}
@@ -95,7 +95,7 @@ export function AtlasTab({ sources }: { sources: WikiSource[] }) {
             <Card key={m.module} className="p-4">
               <CardTitle right={m.coverage != null ? <Badge tone={m.coverage >= 0.7 ? "green" : m.coverage >= 0.4 ? "amber" : "red"}>{Math.round(m.coverage * 100)}% documented</Badge> : undefined}>{m.module}</CardTitle>
               <p className="mb-2 text-xs text-muted">{m.files} files · {m.classes} classes · {m.functions} functions{m.languages.length ? ` · ${m.languages.join(", ")}` : ""}</p>
-              {m.coverage != null && <div className="mb-3 h-1.5 overflow-hidden rounded bg-slate-100"><div className={cn("h-full", m.coverage >= 0.7 ? "bg-emerald-500" : m.coverage >= 0.4 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.round(m.coverage * 100)}%` }} /></div>}
+              {m.coverage != null && <div className="mb-3 h-1.5 overflow-hidden rounded-md bg-slate-100"><div className={cn("h-full", m.coverage >= 0.7 ? "bg-emerald-500" : m.coverage >= 0.4 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${Math.round(m.coverage * 100)}%` }} /></div>}
               <ul className="space-y-1 text-sm">{m.top_symbols.map((s) => (
                 <li key={s.node_id} className="flex items-center gap-2"><Link className="truncate text-brand hover:underline" to={`/knowledge?tab=graph&node=${s.node_id}`}><code className="text-xs">{s.name}</code></Link>
                   <span className="text-xs text-muted">{s.connections} links</span>{!s.documented && <Badge tone="amber">undocumented</Badge>}</li>))}</ul>

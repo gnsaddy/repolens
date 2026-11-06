@@ -42,7 +42,7 @@ function Hero() {
 export default function LoginShowcase() {
   return (
     <section className="hidden max-h-screen flex-col justify-center gap-7 overflow-y-auto border-r border-line bg-slate-50 p-12 text-slate-600 lg:flex" aria-label="About RepoLens AI">
-      <div className="flex items-center gap-2 text-ink"><Logo className="h-9 w-9" /><span className="text-xl font-semibold">RepoLens AI</span><span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{APP_VERSION}</span></div>
+      <div className="flex items-center gap-2 text-ink"><Logo className="h-9 w-9" /><span className="text-xl font-semibold">RepoLens AI</span><span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{APP_VERSION}</span></div>
       <div>
         <h2 className="max-w-lg text-3xl font-semibold leading-tight text-ink">A living wiki for your code and docs.</h2>
         <p className="mt-2 max-w-lg text-sm text-slate-600">Ask questions, see what is out of date, and trace a bug to its cause, with the evidence in front of you.</p>

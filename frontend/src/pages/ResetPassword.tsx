@@ -23,7 +23,7 @@ export default function ResetPassword() {
         {set.isSuccess ? (<>
           <h1 className="mb-2 text-lg font-semibold">Password set</h1>
           <p className="mb-4 text-sm text-muted">You can sign in now. Any other device that was signed in has been signed out.</p>
-          <Link to="/login" className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Go to sign in</Link>
+          <Link to="/login" className="inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Go to sign in</Link>
         </>) : !token ? <p role="alert" className="text-sm text-red-600">This link is incomplete. Ask an admin for a new one.</p> : (<>
           <h1 className="mb-1 text-lg font-semibold">Choose a password</h1>
           <p className="mb-4 text-xs text-muted">At least 8 characters, not a common password, and not your e-mail name.</p>

@@ -90,7 +90,7 @@ export default function InvestigationView() {
           <span className="min-w-0 flex-1">{inv.error ?? "Investigation failed"}</span>
           {canWrite(user) && <Button size="sm" variant="outline" disabled={rerun.isPending} onClick={() => rerun.mutate()}>{rerun.isPending ? "Starting…" : "Run again"}</Button>}
         </div>)}
-      {running && Date.now() - new Date(inv.created_at).getTime() > 3 * 60_000 && <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">This is taking longer than usual. It stops by itself after a few minutes and can then be run again.</p>}
+      {running && Date.now() - new Date(inv.created_at).getTime() > 3 * 60_000 && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">This is taking longer than usual. It stops by itself after a few minutes and can then be run again.</p>}
       <ErrorNote error={rerun.error} />
 
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">

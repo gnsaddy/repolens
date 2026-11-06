@@ -69,12 +69,12 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
         </div>
         {page && <Badge tone="gray">{page.source.type}</Badge>}
         <div role="group" aria-label="Text size" className="flex items-center gap-1">
-          <button className="grid h-8 w-8 place-items-center rounded-md border border-line hover:bg-slate-50" aria-label="Smaller text" disabled={size === 0} onClick={() => setSize((s) => Math.max(0, s - 1))}><Minus className="h-3.5 w-3.5" /></button>
+          <button className="grid h-8 w-8 place-items-center rounded-lg border border-line hover:bg-slate-50" aria-label="Smaller text" disabled={size === 0} onClick={() => setSize((s) => Math.max(0, s - 1))}><Minus className="h-3.5 w-3.5" /></button>
           <span className="w-9 text-center text-xs tabular-nums text-muted" aria-label="Current text size">{SIZES[size]}px</span>
-          <button className="grid h-8 w-8 place-items-center rounded-md border border-line hover:bg-slate-50" aria-label="Larger text" disabled={size === SIZES.length - 1} onClick={() => setSize((s) => Math.min(SIZES.length - 1, s + 1))}><Plus className="h-3.5 w-3.5" /></button>
+          <button className="grid h-8 w-8 place-items-center rounded-lg border border-line hover:bg-slate-50" aria-label="Larger text" disabled={size === SIZES.length - 1} onClick={() => setSize((s) => Math.min(SIZES.length - 1, s + 1))}><Plus className="h-3.5 w-3.5" /></button>
         </div>
         <Button size="sm" variant="outline" onClick={download} disabled={!page}><Download className="h-4 w-4" />Download</Button>
-        {page && <Link className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-3 text-sm hover:bg-slate-50" to={`/wiki?tab=browse&repo=${encodeURIComponent(repoId)}&path=${encodeURIComponent(path)}`}><ExternalLink className="h-3.5 w-3.5" />Open in wiki</Link>}
+        {page && <Link className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-3 text-sm hover:bg-slate-50" to={`/wiki?tab=browse&repo=${encodeURIComponent(repoId)}&path=${encodeURIComponent(path)}`}><ExternalLink className="h-3.5 w-3.5" />Open in wiki</Link>}
         <Button size="sm" variant="outline" aria-pressed={full} onClick={() => setFull((f) => !f)}>{full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{full ? "Exit full screen" : "Full screen"}</Button>
       </div>
 
@@ -92,14 +92,14 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
                   <ul className="space-y-1.5 text-xs">
                     <li className="text-muted">{matches.reduce((n, m) => n + m.count, 0)} match{matches.reduce((n, m) => n + m.count, 0) === 1 ? "" : "es"} in {matches.length} section{matches.length === 1 ? "" : "s"}</li>
                     {matches.slice(0, 60).map((m) => (
-                      <li key={m.i}><button className="w-full rounded-md p-1.5 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
+                      <li key={m.i}><button className="w-full rounded-lg p-1.5 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
                         <span className="font-medium">{m.title}</span> <span className="text-muted">({m.count})</span><span className="mt-0.5 block text-muted">{m.snippet}</span></button></li>))}
                   </ul>) : <p className="text-xs text-muted">Nothing in this document matches “{find.trim()}”.</p>
               ) : (
                 <ol className="space-y-0.5 text-sm">
                   {sections.map((s, i) => (
                     <li key={i}><button aria-current={!showAll && i === current ? "true" : undefined} onClick={() => jump(i)}
-                      className={cn("w-full truncate rounded-md px-2 py-1 text-left hover:bg-slate-50", !showAll && i === current && "bg-indigo-50 font-medium text-brand")}>{s.title}</button></li>))}
+                      className={cn("w-full truncate rounded-lg px-2 py-1 text-left hover:bg-slate-50", !showAll && i === current && "bg-indigo-50 font-medium text-brand")}>{s.title}</button></li>))}
                 </ol>)}
             </nav>
           </aside>

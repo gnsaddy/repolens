@@ -19,7 +19,7 @@ export function ConnectionCard({ icon: Icon, tint = "indigo", title, description
   icon: LucideIcon; tint?: keyof typeof TINTS; title: string; description: ReactNode; status?: ReactNode; children?: ReactNode; footer?: ReactNode; id?: string;
 }) {
   return (
-    <section id={id} aria-label={title} className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+    <section id={id} aria-label={title} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
       <header className="flex items-start gap-4 p-5">
         <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl ring-1", TINTS[tint])}><Icon className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1"><h3 className="text-base font-semibold leading-6">{title}</h3><p className="mt-0.5 text-sm text-muted">{description}</p></div>

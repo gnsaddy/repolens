@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
-import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Spinner, Textarea } from "@/components/ui";
+import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Panel, Spinner, Textarea } from "@/components/ui";
 import { api, type Persona, type PersonaDesign, type PersonaOverview, type PersonaRunView, type PersonaRunShort, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
@@ -78,7 +78,7 @@ export default function PersonasPage() {
                         <input type="radio" name="mode" className="mr-2" checked={mode === k} onChange={() => setMode(k)} />{label}</label>))}
                   </fieldset>)}
                 <Label>Repository
-                  <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink">
+                  <select aria-label="Repository" value={repo} onChange={(e) => setRepoId(e.target.value)} className="mt-1 h-9 w-full rounded-lg border border-line bg-white px-2 text-sm text-ink">
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
                 <Label>{design ? "What should it describe? (optional)" : "What should it look at?"}
                   <Textarea aria-label={design ? "What should it describe?" : "What should it look at?"} rows={4} maxLength={2000} value={request} onChange={(e) => setRequest(e.target.value)} placeholder={design ? persona?.overview?.placeholder : persona?.placeholder} /></Label>
@@ -95,8 +95,8 @@ export default function PersonasPage() {
                   <button className={`min-w-0 flex-1 py-2 text-left hover:bg-slate-50 ${openId === x.id ? "font-medium" : ""}`} onClick={() => setOpenId(x.id)}>
                     <div className="truncate">{x.title || "Untitled"}</div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted">{x.persona_name} · {x.repo} · {x.mine ? "you" : x.author_name} · {timeAgo(x.created_at)} · {tokens(x.tokens.input_tokens + x.tokens.output_tokens)} tokens
-                      <Badge tone={x.status === "failed" ? "red" : x.high ? "red" : "green"}>{x.status === "failed" ? "failed" : x.mode === "design" ? "overview" : `${x.found} finding${x.found === 1 ? "" : "s"}`}</Badge>
-                      <Badge tone={x.shared ? "blue" : "gray"}>{x.shared ? "shared" : "private"}</Badge></div>
+                      {x.status === "failed" ? <Badge tone="red">failed</Badge> : <span>{x.mode === "design" ? "overview" : `${x.found} finding${x.found === 1 ? "" : "s"}`}</span>}
+                      {x.high > 0 && <Badge tone="red">{x.high} high</Badge>}{x.shared && <span className="inline-flex items-center gap-1"><Share2 className="h-3 w-3" />shared</span>}</div>
                   </button>
                   {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "review"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
                 </li>))}</ul>)}
@@ -127,8 +127,8 @@ function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: {
           <p role="status" className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800">This is your earlier review for the same request on the same code, so no tokens were used.
             {write && again && <Button size="sm" variant="outline" className="ml-2" onClick={again}>Ask again anyway</Button>}</p>)}
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-          <Badge tone={d.status === "failed" ? "red" : "green"}>{d.status}</Badge>
-          <Badge tone={d.shared ? "blue" : "gray"}>{d.shared ? `shared by ${d.mine ? "you" : d.author_name}` : "private to you"}</Badge>
+          {d.status === "failed" && <Badge tone="red">failed</Badge>}
+          <span className="inline-flex items-center gap-1">{d.shared ? <Share2 className="h-3 w-3" /> : <Lock className="h-3 w-3" />}{d.shared ? `shared by ${d.mine ? "you" : d.author_name}` : "private to you"}</span>
           <span>{d.repo} · read at {d.base_sha.slice(0, 8)} · {d.model || "no model"}</span>
           <span aria-label="Tokens used">{tokens(t.input_tokens)} in, {tokens(t.output_tokens)} out, {t.calls} call{t.calls === 1 ? "" : "s"}{t.cost ? `, about $${t.cost.toFixed(4)}` : ""}</span>
         </div>
@@ -141,17 +141,17 @@ function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: {
         <Card aria-label="Findings">
           <CardTitle>Findings ({d.findings.length})</CardTitle>
           {!d.findings.length ? <p className="text-sm text-muted">Nothing was found in the code it saw. That does not mean there is nothing to find.</p> : (
-            <ul className="space-y-3">{d.findings.map((f, i) => (
-              <li key={i} className="rounded-lg border border-line p-3 text-sm">
+            <ul className="divide-y divide-line">{d.findings.map((f, i) => (
+              <li key={i} className="py-3 text-sm first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-center gap-2"><Badge tone={TONE[f.severity] ?? "gray"}>{f.severity}</Badge><span className="font-medium">{f.title}</span>
                   <code className="text-xs text-muted">{f.file}:{f.line}</code></div>
-                <pre className="mt-2 overflow-auto rounded bg-slate-50 p-2 text-xs">{f.evidence}</pre>
+                <pre className="mt-2 overflow-auto rounded-md bg-slate-50 p-2 text-xs">{f.evidence}</pre>
                 {f.explanation && <p className="mt-2">{f.explanation}</p>}
                 {f.suggestion && <p className="mt-1 text-muted">{f.suggestion}</p>}
                 {f.code && (<div className="mt-2">
                   <div className="flex items-center justify-between text-xs text-muted"><span>Suggested code{f.code_ok === false ? " (does not parse, check it)" : ""}</span>
                     <Button size="sm" variant="ghost" aria-label={`Copy code for ${f.title}`} onClick={() => copy(f.code)}><Copy className="h-4 w-4" /></Button></div>
-                  <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs">{f.code}</pre></div>)}
+                  <pre className="overflow-auto rounded-md bg-slate-50 p-2 text-xs">{f.code}</pre></div>)}
               </li>))}</ul>)}
         </Card>)}
         {d.notes.dependencies && (
@@ -183,21 +183,21 @@ function Design({ design, titles, copy }: { design: PersonaDesign; titles?: Pers
       <Card aria-label={first}><CardTitle>{first}</CardTitle><Markdown text={design.hld} onOpen={() => {}} />
         {!!design.components.length && (
           <ul className="mt-3 space-y-2 text-sm" aria-label="Components">{design.components.map((c) => (
-            <li key={c.name} className="rounded-lg border border-line p-2"><span className="font-medium">{c.name}</span>{c.responsibility && <span className="text-muted"> — {c.responsibility}</span>}
+            <li key={c.name} className="rounded-lg bg-slate-50 p-3"><span className="font-medium">{c.name}</span>{c.responsibility && <span className="text-muted"> — {c.responsibility}</span>}
               <div className="mt-1 flex flex-wrap gap-1">{c.files.map((f) => <code key={f} className="text-xs text-muted">{f}</code>)}</div></li>))}</ul>)}
       </Card>
       {design.diagram && (
         <Card aria-label="Diagram">
           <CardTitle right={<Button size="sm" variant="ghost" aria-label="Copy the diagram" onClick={() => copy(design.diagram)}><Copy className="h-4 w-4" /></Button>}>Diagram (Mermaid)</CardTitle>
-          <pre className="overflow-auto rounded bg-slate-50 p-2 text-xs">{design.diagram}</pre>
+          <pre className="overflow-auto rounded-md bg-slate-50 p-2 text-xs">{design.diagram}</pre>
           <p className="mt-1 text-xs text-muted">Paste it into a Mermaid viewer (mermaid.live, or a Markdown file on GitHub) to see it drawn.</p>
         </Card>)}
       <Card aria-label={second}><CardTitle>{second}</CardTitle><Markdown text={design.lld} onOpen={() => {}} />
         {!!design.flows.length && (
           <div className="mt-3 space-y-2 text-sm" aria-label="Flows">{design.flows.map((f) => (
-            <div key={f.name} className="rounded-lg border border-line p-2"><div className="font-medium">{f.name}</div>
+            <Panel key={f.name}><div className="font-medium">{f.name}</div>
               <ol className="ml-5 list-decimal">{f.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
-              <div className="mt-1 flex flex-wrap gap-1">{f.files.map((x) => <code key={x} className="text-xs text-muted">{x}</code>)}</div></div>))}</div>)}
+              <div className="mt-1 flex flex-wrap gap-1">{f.files.map((x) => <code key={x} className="text-xs text-muted">{x}</code>)}</div></Panel>))}</div>)}
       </Card>
       {!!design.not_covered.length && (
         <Card aria-label="Not covered"><CardTitle>What it could not tell</CardTitle>

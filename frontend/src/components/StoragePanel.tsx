@@ -30,7 +30,7 @@ export default function StoragePanel() {
             <span className="text-muted">{c.exists ? fmtBytes(c.bytes) : "—"} · {c.last_used_at ? timeAgo(c.last_used_at) : "never used"}</span></li>))}</ul>)}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <label htmlFor="ttl" className="whitespace-nowrap">Unused for</label>
-        <select id="ttl" className="h-8 rounded-md border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[0, 7, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? "any time" : `${n} days`}</option>)}</select>
+        <select id="ttl" className="h-8 rounded-lg border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[0, 7, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? "any time" : `${n} days`}</option>)}</select>
         <Button size="sm" variant="outline" disabled={clean.isPending} onClick={() => clean.mutate(true)}>Preview</Button>
         <Button size="sm" disabled={clean.isPending} onClick={async () => { if (await ask({ title: "Delete unused clones?", message: "Indexes stay. Clones are re-created the next time you re-index.", confirmLabel: "Delete clones", danger: true })) clean.mutate(false); }}>Free space</Button>
       </div>

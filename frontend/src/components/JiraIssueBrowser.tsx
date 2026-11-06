@@ -6,7 +6,7 @@ import { Badge, Button, ErrorNote, Input, Spinner } from "@/components/ui";
 import { api, type JiraBatch, type JiraInvestigateBatch, type JiraIssue } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
-const sel = "h-9 rounded-md border border-line bg-white px-2 text-sm";
+const sel = "h-9 rounded-lg border border-line bg-white px-2 text-sm";
 const TYPE_TONE: Record<string, string> = { Bug: "bg-red-50 text-red-700", Task: "bg-blue-50 text-blue-700", Story: "bg-emerald-50 text-emerald-700", Epic: "bg-violet-50 text-violet-700", Incident: "bg-amber-50 text-amber-800" };
 const STATUS_TONE: Record<string, string> = { "To Do": "bg-slate-100 text-slate-700", "In Progress": "bg-blue-50 text-blue-700", Done: "bg-emerald-50 text-emerald-700" };
 const PRIORITY_DOT: Record<string, string> = { Highest: "bg-red-600", High: "bg-orange-500", Medium: "bg-amber-400", Low: "bg-sky-400", Lowest: "bg-slate-300" };
@@ -56,7 +56,7 @@ export default function JiraIssueBrowser({ canInvestigate, onOpen, onAnalyzed, o
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
         <span>{issues.isLoading ? "Searching…" : `${rows.length} ticket${rows.length === 1 ? "" : "s"}${rows.length === limit ? ` (showing the latest ${limit})` : ""}`}</span>
         <button className="text-brand hover:underline" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>{advanced ? "Hide JQL" : "Edit JQL"}</button>
-        <label className="flex items-center gap-1">Show<select aria-label="How many" className="h-7 rounded border border-line bg-white px-1" value={limit} onChange={(e) => setLimit(+e.target.value)}>{[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label className="flex items-center gap-1">Show<select aria-label="How many" className="h-7 rounded-md border border-line bg-white px-1" value={limit} onChange={(e) => setLimit(+e.target.value)}>{[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
         {!compact && <Link className="ml-auto text-brand hover:underline" to={`/wiki?tab=sources&connector=jira&jql=${encodeURIComponent(jql)}`}>Import these as searchable history</Link>}
       </div>
       {advanced && <Input value={jql} onChange={(e) => setCustom(e.target.value)} aria-label="JQL" className="font-mono text-xs" />}
@@ -79,7 +79,7 @@ export default function JiraIssueBrowser({ canInvestigate, onOpen, onAnalyzed, o
           {rows.map((i) => (
             <li key={i.key} className={cn("flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-slate-50", picked.includes(i.key) && "bg-indigo-50/60")}>
               <input type="checkbox" aria-label={`Select ${i.key}`} checked={picked.includes(i.key)} disabled={!picked.includes(i.key) && picked.length >= MAX_BATCH} onChange={() => toggle(i.key)} />
-              <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-xs font-medium", TYPE_TONE[i.type] ?? "bg-slate-100 text-slate-700")}>{i.type}</span>
+              <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium", TYPE_TONE[i.type] ?? "bg-slate-100 text-slate-700")}>{i.type}</span>
               <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(i.key)} title="Read the ticket and analyse it">
                 <span className="mr-2 font-medium text-ink">{i.key}</span><span className="text-slate-700 hover:text-brand">{i.summary}</span>
               </button>

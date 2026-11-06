@@ -71,13 +71,13 @@ export default function Ask() {
         <Input aria-label="Search chats" placeholder="Search chats…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <div role="tablist" aria-label="Chat list" className="flex gap-1 text-sm">
           {(["chats", "archived", "gaps"] as const).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("rounded-md px-3 py-1", tab === t ? "bg-indigo-50 font-medium text-brand" : "text-muted hover:bg-slate-50")}>{t === "chats" ? "Chats" : t === "archived" ? "Archived" : "Gaps"}</button>))}
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("rounded-lg px-3 py-1", tab === t ? "bg-indigo-50 font-medium text-brand" : "text-muted hover:bg-slate-50")}>{t === "chats" ? "Chats" : t === "archived" ? "Archived" : "Gaps"}</button>))}
         </div>
         <div className="min-h-0 flex-1 overflow-auto" aria-label={tab === "chats" ? "Chats" : tab === "archived" ? "Archived chats" : "Gaps"}>
           {tab === "gaps" ? <ChatGaps /> : list.isLoading ? <Spinner /> : !groups.length ? <p className="p-2 text-sm text-muted">{search ? "No chats match that search." : tab === "archived" ? "No archived chats." : "No chats yet. Ask a question to start one."}</p> : groups.map(([name, items]) => (
             <section key={name} className="mb-3"><h3 className="mb-1 px-2 text-xs font-medium uppercase tracking-wide text-muted">{name}</h3>
               <ul className="space-y-0.5">{items.map((c) => (
-                <li key={c.id} className={cn("group relative rounded-md", c.id === id ? "bg-indigo-50" : "hover:bg-slate-50")}>
+                <li key={c.id} className={cn("group relative rounded-lg", c.id === id ? "bg-indigo-50" : "hover:bg-slate-50")}>
                   {renaming === c.id ? (
                     <div className="flex items-center gap-1 p-1.5"><Input aria-label="Chat title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenaming(null); }} />
                       <button aria-label="Save title" className="p-1 text-emerald-600" onClick={saveRename}><Check className="h-4 w-4" /></button></div>
@@ -87,13 +87,13 @@ export default function Ask() {
                         <span className={cn("block truncate", c.id === id && "font-medium text-brand")}>{c.title}</span>
                         {c.preview && <span className="block truncate text-xs text-muted">{c.preview}</span>}
                       </Link>
-                      <button aria-label={`Options for ${c.title}`} aria-haspopup="menu" className="mr-1 rounded p-1 text-muted opacity-60 hover:bg-white hover:opacity-100 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); setMenu(menu === c.id ? null : c.id); }}><MoreVertical className="h-4 w-4" /></button>
+                      <button aria-label={`Options for ${c.title}`} aria-haspopup="menu" className="mr-1 rounded-md p-1 text-muted opacity-60 hover:bg-white hover:opacity-100 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); setMenu(menu === c.id ? null : c.id); }}><MoreVertical className="h-4 w-4" /></button>
                     </div>)}
                   {menu === c.id && (
                     <div role="menu" aria-label={`Actions for ${c.title}`} className="absolute right-1 top-9 z-20 w-40 rounded-lg border border-line bg-white p-1 text-sm shadow-lg" onClick={(e) => e.stopPropagation()}>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => startRename(c)}><Pencil className="h-3.5 w-3.5" />Rename</button>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(null); patch.mutate({ id: c.id, body: { archived: !c.archived } }); toast(c.archived ? "Chat restored" : "Chat archived"); }}>{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{c.archived ? "Restore" : "Archive"}</button>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); void removeChat(c); }}><Trash2 className="h-3.5 w-3.5" />Delete</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => startRename(c)}><Pencil className="h-3.5 w-3.5" />Rename</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(null); patch.mutate({ id: c.id, body: { archived: !c.archived } }); toast(c.archived ? "Chat restored" : "Chat archived"); }}>{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{c.archived ? "Restore" : "Archive"}</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); void removeChat(c); }}><Trash2 className="h-3.5 w-3.5" />Delete</button>
                     </div>)}
                 </li>))}</ul>
             </section>))}
@@ -166,7 +166,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
     <Card className="flex min-h-0 flex-col p-0" aria-label="Conversation panel">
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
         <label className="flex items-center gap-2 text-sm"><GitBranch className="h-4 w-4 text-muted" /><span className="text-muted">Scope:</span>
-          <select aria-label="Scope" value={scope} onChange={(e) => (thread ? onChange({ repo_ids: e.target.value ? [e.target.value] : [] }) : draft.setScope(e.target.value))} className="h-9 max-w-[16rem] rounded-md border border-line bg-white px-2 text-sm font-medium">
+          <select aria-label="Scope" value={scope} onChange={(e) => (thread ? onChange({ repo_ids: e.target.value ? [e.target.value] : [] }) : draft.setScope(e.target.value))} className="h-9 max-w-[16rem] rounded-lg border border-line bg-white px-2 text-sm font-medium">
             <option value="">All repositories &amp; knowledge base</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
         <span className="ml-auto flex items-center gap-1">
           <label className={cn("flex items-center gap-2 text-sm", !modelAvailable && "opacity-60")} title={modelAvailable ? undefined : "Needs a connected language model (Settings → AI & search)"}>
@@ -179,9 +179,9 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
           </InfoTip>
         </span>
         {thread && (<>
-          <button aria-label="Rename chat" title="Rename chat" className="rounded p-1.5 text-muted hover:bg-slate-100" onClick={onRename}><Pencil className="h-4 w-4" /></button>
-          <button aria-label={thread.archived ? "Restore chat" : "Archive chat"} title={thread.archived ? "Restore" : "Archive"} className="rounded p-1.5 text-muted hover:bg-slate-100" onClick={() => onChange({ archived: !thread.archived })}>{thread.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>
-          <button aria-label="Delete chat" title="Delete chat" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4" /></button>
+          <button aria-label="Rename chat" title="Rename chat" className="rounded-md p-1.5 text-muted hover:bg-slate-100" onClick={onRename}><Pencil className="h-4 w-4" /></button>
+          <button aria-label={thread.archived ? "Restore chat" : "Archive chat"} title={thread.archived ? "Restore" : "Archive"} className="rounded-md p-1.5 text-muted hover:bg-slate-100" onClick={() => onChange({ archived: !thread.archived })}>{thread.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>
+          <button aria-label="Delete chat" title="Delete chat" className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4" /></button>
         </>)}
       </div>
 
@@ -198,10 +198,10 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
                 <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button size="sm" disabled={!editText.trim() || edit.isPending} onClick={() => edit.mutate({ mid: m.id, content: editText.trim() })}>Save and answer again</Button></div>
                 <ErrorNote error={edit.error} /></div>
             ) : (<>
-              <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded p-1.5 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
-              <div className="max-w-2xl rounded-2xl bg-brand px-4 py-2.5 text-sm text-white">
+              <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded-md p-1.5 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
+              <div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 text-sm text-white">
                 <p className="whitespace-pre-wrap">{m.content}</p>
-                {m.attachment && <p className="mt-1.5 inline-flex items-center gap-1 rounded bg-white/15 px-2 py-0.5 text-xs"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
+                {m.attachment && <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 text-xs"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
                 {m.edited_at && <p className="mt-1 text-right text-[10px] opacity-70">edited</p>}</div></>)}
           </div>
         ) : (
@@ -212,15 +212,15 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
                 {m.mode === "llm" && /\(Check these names, not found/.test(m.content) && <Badge tone="amber" title="The answer names files, routes or functions that were not found in your indexed repositories">Check these names</Badge>}
                 {m.mode === "llm" && /^\s*Not from your documents:/m.test(m.content) && <Badge tone="amber" title="Part of this answer is not backed by your sources and has no citations">Not from your documents</Badge>}
                 <span className="text-xs text-muted">{timeAgo(m.created_at)}</span>
-                {items[items.indexOf(m) - 1]?.role === "user" && m.mode !== "failed" && <button aria-label="Save as a test" title="Save as a quality check" className="ml-auto rounded p-1 text-muted hover:bg-slate-100" onClick={() => void saveTest(items.indexOf(m))}><ClipboardCheck className="h-4 w-4" /></button>}
-                <button aria-label="Copy answer" title="Copy" className={cn("rounded p-1 text-muted hover:bg-slate-100", items[items.indexOf(m) - 1]?.role !== "user" && "ml-auto")} onClick={() => void copy(m)}>{copied === m.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</button></div>
+                {items[items.indexOf(m) - 1]?.role === "user" && m.mode !== "failed" && <button aria-label="Save as a test" title="Save as a quality check" className="ml-auto rounded-md p-1 text-muted hover:bg-slate-100" onClick={() => void saveTest(items.indexOf(m))}><ClipboardCheck className="h-4 w-4" /></button>}
+                <button aria-label="Copy answer" title="Copy" className={cn("rounded-md p-1 text-muted hover:bg-slate-100", items[items.indexOf(m) - 1]?.role !== "user" && "ml-auto")} onClick={() => void copy(m)}>{copied === m.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</button></div>
               <div className="text-sm leading-6"><Markdown text={m.content} onOpen={() => {}} /></div>
               {m.mode === "failed" && (() => { const i = items.indexOf(m); const q = items[i - 1]; return q?.role === "user" && i === items.length - 1 ? <Button size="sm" variant="outline" className="mt-3" disabled={edit.isPending} onClick={() => edit.mutate({ mid: q.id, content: q.content })}>{edit.isPending ? "Trying…" : "Try again"}</Button> : null; })()}
               <Sources sources={m.sources} />
             </div>
           </div>))}
         {pending && (<>
-          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-2xl bg-brand px-4 py-2.5 text-sm text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
+          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 text-sm text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
           <div className="flex gap-3" role="status" aria-label="Thinking"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div><div className="flex items-center gap-2 rounded-xl border border-line px-4 py-3 text-sm text-muted"><Spinner />Searching your knowledge base…</div></div></>)}
         <div ref={end} />
       </div>

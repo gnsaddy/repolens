@@ -54,7 +54,7 @@ export default function Profile() {
           <CardTitle><Moon className="mr-1.5 inline h-4 w-4" />Appearance</CardTitle>
           <div role="radiogroup" aria-label="Colour theme" className="inline-flex rounded-lg bg-slate-100 p-1 text-sm">
             {([["system", "Match my device", Monitor], ["light", "Day", Sun], ["dark", "Night", Moon]] as [ThemePref, string, typeof Sun][]).map(([v, label, Icon]) => (
-              <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
+              <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
           </div>
           <p className="mt-2 text-xs text-muted">Saved in this browser only.</p>
         </Card>
@@ -112,7 +112,7 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
       {codes ? (
         <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 text-sm">
           <p className="font-medium text-emerald-900">Save these recovery codes now. Each works once if you lose your phone; they are not shown again.</p>
-          <pre aria-label="Recovery codes" className="rounded bg-white p-2 font-mono text-xs">{codes.join("\n")}</pre>
+          <pre aria-label="Recovery codes" className="rounded-md bg-white p-2 font-mono text-xs">{codes.join("\n")}</pre>
           <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(codes.join("\n")); toast("Copied"); }}><Copy className="h-3.5 w-3.5" />Copy</Button><Button size="sm" onClick={() => setCodes(null)}>I have saved them</Button></div>
         </div>
       ) : enabled ? (off.open ? (
@@ -125,7 +125,7 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
       ) : setup ? (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); confirm.mutate(); }}>
           <p className="text-sm">1. In your app choose “add account” and enter this key (or open the link on your phone):</p>
-          <code aria-label="Setup key" className="block break-all rounded bg-slate-100 p-2 text-sm">{setup.secret}</code>
+          <code aria-label="Setup key" className="block break-all rounded-md bg-slate-100 p-2 text-sm">{setup.secret}</code>
           <a className="text-xs text-brand hover:underline" href={setup.uri}>Open in an authenticator app</a>
           <p className="text-sm">2. Enter the six-digit code it shows:</p>
           <Input aria-label="Six-digit code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />

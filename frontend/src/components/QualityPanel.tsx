@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Plus, Trash2, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import Modal from "@/components/Modal";
@@ -35,7 +35,7 @@ export default function QualityPanel({ canWrite }: { canWrite: boolean }) {
         <CardTitle right={canWrite && <Button size="sm" onClick={() => setAdding(true)}><Plus className="h-4 w-4" />Add a question</Button>}>Quality checks</CardTitle>
         <p className="text-sm text-muted">Save the questions your team expects to be answered well, and what a good answer must be built from. Run them again after changing the model, the skills or the index to see what got better or worse.</p>
         <div className="mt-3 flex flex-wrap items-end gap-3">
-          <label className="text-xs text-muted">Kind of run<select aria-label="Kind of run" value={mode} onChange={(e) => setMode(e.target.value as "retrieval" | "full")} disabled={busy} className="mt-1 block h-9 rounded-md border border-line bg-white px-2 text-sm text-ink">
+          <label className="text-xs text-muted">Kind of run<select aria-label="Kind of run" value={mode} onChange={(e) => setMode(e.target.value as "retrieval" | "full")} disabled={busy} className="mt-1 block h-9 rounded-lg border border-line bg-white px-2 text-sm text-ink">
             <option value="retrieval">Retrieval only (free)</option><option value="full">Full (the model writes each answer, uses tokens)</option></select></label>
           {canWrite && <Button disabled={busy || !d.questions.length} onClick={() => run.mutate()}>{busy ? "Running…" : "Run the checks"}</Button>}
           {mode === "full" && <span className="text-xs text-muted">Up to {d.max_full} questions; one model call each.</span>}
@@ -80,7 +80,7 @@ export default function QualityPanel({ canWrite }: { canWrite: boolean }) {
 function Failure({ r }: { r: GoldenResult }) {
   return (
     <li className="rounded-lg border border-line p-2.5 text-sm"><div className="font-medium">{r.question}</div>
-      <ul className="mt-1 space-y-0.5 text-xs">{r.checks.filter((c) => !c.ok).map((c) => <li key={c.name} className="text-red-700">✗ {c.name}: {c.detail}</li>)}</ul>
+      <ul className="mt-1 space-y-0.5 text-xs">{r.checks.filter((c) => !c.ok).map((c) => <li key={c.name} className="flex items-start gap-1.5 text-red-700"><X className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />{c.name}: {c.detail}</li>)}</ul>
       {r.files.length > 0 && <p className="mt-1 text-xs text-muted">Found instead: {r.files.slice(0, 4).join(", ")}</p>}
     </li>
   );

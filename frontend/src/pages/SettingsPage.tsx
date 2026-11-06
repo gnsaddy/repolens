@@ -52,7 +52,7 @@ export default function SettingsPage() {
       <section aria-label="About RepoLens AI" className="mt-10 flex max-w-4xl flex-wrap items-center gap-4 rounded-xl border border-line p-4">
         <Logo className="h-12 w-12" />
         <div className="min-w-0 flex-1">
-          <div className="font-semibold">RepoLens AI <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{APP_VERSION}</span></div>
+          <div className="font-semibold">RepoLens AI <span className="ml-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">{APP_VERSION}</span></div>
           <p className="text-xs text-muted">A living wiki for your code and docs, with evidence-backed investigations. Beta: expect rough edges. Apache License 2.0.</p>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">

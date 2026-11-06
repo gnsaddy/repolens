@@ -45,7 +45,7 @@ export function RiskResult({ r }: { r: RiskAssessment }) {
                 <div className="text-xs text-muted">{s.detail}</div>
               </button>
               {open === s.key && !!s.evidence.length && (
-                <ul className="mt-2 space-y-1 rounded-md bg-slate-50 p-2 text-xs">{s.evidence.map((e, i) => <li key={i}><code>{Object.entries(e).filter(([k]) => k !== "node_id").map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</code></li>)}</ul>)}
+                <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 text-xs">{s.evidence.map((e, i) => <li key={i}><code>{Object.entries(e).filter(([k]) => k !== "node_id").map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</code></li>)}</ul>)}
             </li>))}
         </ul>
       </Card>
@@ -114,7 +114,7 @@ export default function Risk() {
             {!codeRepos.length ? <Empty>Index a repository first.</Empty> : (
               <form onSubmit={submit} className="space-y-3">
                 <label className="block"><Label>Repository</Label>
-                  <select className="h-9 w-full rounded-md border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => { setRepoId(e.target.value); setResult(null); }}>
+                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => { setRepoId(e.target.value); setResult(null); }}>
                     {codeRepos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
                 <div role="tablist" className="flex gap-1">
                   {([["commit", "Commit"], ["range", "Branch"], ["pr", "PR"], ["files", "Files"]] as const).map(([m, l]) => (
@@ -127,7 +127,7 @@ export default function Risk() {
                 {mode === "pr" && <label className="block"><Label>Pull request number (must be synced)</Label><Input required type="number" min="1" value={f.pr} onChange={(e) => setF({ ...f, pr: e.target.value })} /></label>}
                 {mode === "files" && (
                   <label className="block"><Label>Changed files — one per line: path +added -removed</Label>
-                    <textarea required rows={4} className="w-full rounded-md border border-line p-2 font-mono text-xs" value={f.files} onChange={(e) => setF({ ...f, files: e.target.value })} placeholder={"src/auth/tokens.py +120 -30\nconfig/settings.yaml +2 -1"} /></label>)}
+                    <textarea required rows={4} className="w-full rounded-lg border border-line p-2 font-mono text-xs" value={f.files} onChange={(e) => setF({ ...f, files: e.target.value })} placeholder={"src/auth/tokens.py +120 -30\nconfig/settings.yaml +2 -1"} /></label>)}
                 <ErrorNote error={run.error} />
                 <Button className="w-full" disabled={run.isPending || !writable}>{run.isPending ? "Scoring…" : "Assess risk"}</Button>
                 {!writable && <p className="text-xs text-muted">Viewers can read assessments but not create them.</p>}
