@@ -15,30 +15,30 @@ const FLOWS: [string, string, string][] = [
   ["RepoLens' authors", "Nothing", "There is no analytics, usage ping or crash reporting."],
 ];
 
-const TONE: Record<Status, string> = { built: "bg-emerald-50 text-emerald-700", partly: "bg-amber-50 text-amber-700", "not-yet": "bg-slate-100 text-slate-600" };
+const TONE: Record<Status, string> = { built: "bg-emerald-50 text-emerald-700", partly: "bg-amber-50 text-amber-700", "not-yet": "bg-l-sunk text-l-muted" };
 
 export default function Security() {
   return (
     <PublicLayout title="Security" intro="Short statements you can check against the code, including what we do not do. RepoLens is a beta, so we say plainly where it falls short.">
       <Section id="status" title="Where each control stands">
         <p>Each control is marked <b>Built</b>, <b>Partly</b> or <b>Not yet</b>. A page that rounds these up is worth less than none, so the gaps are listed too.</p>
-        <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-left text-sm" aria-label="Control status">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted"><tr><th className="px-3 py-2 font-medium">Control</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">In plain words</th></tr></thead>
+        <div className="overflow-x-auto rounded-lg border border-l-line">
+          <table className="w-full text-left body-6" aria-label="Control status">
+            <thead className="bg-l-sunk caption-4 text-l-muted"><tr><th className="px-3 py-2 font-medium">Control</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2 font-medium">In plain words</th></tr></thead>
             <tbody>{CONTROLS.map((c) => (
-              <tr key={c.name} className="border-t border-line align-top"><td className="px-3 py-2 font-medium">{c.name}</td>
-                <td className="px-3 py-2"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${TONE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
-                <td className="px-3 py-2 text-slate-600">{c.note}</td></tr>))}</tbody>
+              <tr key={c.name} className="border-t border-l-line align-top"><td className="px-3 py-2 font-medium">{c.name}</td>
+                <td className="px-3 py-2"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 caption-4 ${TONE[c.status]}`}>{STATUS_LABEL[c.status]}</span></td>
+                <td className="px-3 py-2 text-l-muted">{c.note}</td></tr>))}</tbody>
           </table>
         </div>
       </Section>
 
       <Section id="data" title="Where your data goes">
         <p>Your code and documents are indexed and stored on the server you run RepoLens on. These are the only ways anything leaves it:</p>
-        <div className="overflow-x-auto rounded-lg border border-line">
-          <table className="w-full text-left text-sm" aria-label="Where data can go">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted"><tr><th className="px-3 py-2 font-medium">Destination</th><th className="px-3 py-2 font-medium">What is sent</th><th className="px-3 py-2 font-medium">When</th></tr></thead>
-            <tbody>{FLOWS.map(([a, b, c]) => <tr key={a} className="border-t border-line align-top"><td className="px-3 py-2 font-medium">{a}</td><td className="px-3 py-2">{b}</td><td className="px-3 py-2 text-muted">{c}</td></tr>)}</tbody>
+        <div className="overflow-x-auto rounded-lg border border-l-line">
+          <table className="w-full text-left body-6" aria-label="Where data can go">
+            <thead className="bg-l-sunk caption-4 text-l-muted"><tr><th className="px-3 py-2 font-medium">Destination</th><th className="px-3 py-2 font-medium">What is sent</th><th className="px-3 py-2 font-medium">When</th></tr></thead>
+            <tbody>{FLOWS.map(([a, b, c]) => <tr key={a} className="border-t border-l-line align-top"><td className="px-3 py-2 font-medium">{a}</td><td className="px-3 py-2">{b}</td><td className="px-3 py-2 text-l-muted">{c}</td></tr>)}</tbody>
           </table>
         </div>
         <p>Signed in, <b>Settings → AI &amp; search → What leaves this server</b> shows the live list for your workspace.</p>
@@ -79,10 +79,10 @@ export default function Security() {
 
       <Section id="verify" title="Check it yourself">
         <Points items={[
-          <>The source is open under the Apache License 2.0: <a className="text-brand hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer">github.com/gnsaddy/repolens</a>.</>,
+          <>The source is open under the Apache License 2.0: <a className="text-l-link hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer">github.com/gnsaddy/repolens</a>.</>,
           "An automated test fails the build if any endpoint works without signing in, if a state-changing endpoint skips the policy check, or if a viewer can change anything.",
           "Every change runs lint, type checks, the test suites on two databases, browser tests, and a vulnerability scan of the container images.",
-          <>The controls, and where each is implemented, are listed in <a className="text-brand hover:underline" href={SECURITY_MD_URL} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</>,
+          <>The controls, and where each is implemented, are listed in <a className="text-l-link hover:underline" href={SECURITY_MD_URL} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</>,
         ]} />
       </Section>
 
@@ -99,13 +99,13 @@ export default function Security() {
       <Section id="report" title="Reporting a problem">
         <p>Please report vulnerabilities privately and do not open a public issue. Use <b>Report a vulnerability</b> on the repository's Security tab (GitHub's private reporting), or contact the maintainer through their GitHub profile. We will confirm receipt, fix it, and credit you if you wish.</p>
         <p>
-          <a className="text-brand hover:underline" href={`${REPO_URL}/security/advisories/new`} target="_blank" rel="noopener noreferrer">Report a vulnerability privately</a>
-          <span className="text-muted"> · opens GitHub in a new tab</span>
+          <a className="text-l-link hover:underline" href={`${REPO_URL}/security/advisories/new`} target="_blank" rel="noopener noreferrer">Report a vulnerability privately</a>
+          <span className="text-l-muted"> · opens GitHub in a new tab</span>
         </p>
       </Section>
 
       <Section id="official" title="Official channels">
-        <p>The official source is <code>github.com/gnsaddy/repolens</code>. Copies on other sites or under other names are not affiliated with it, so install only from there. <Link className="text-brand hover:underline" to="/about">About RepoLens AI</Link> · <Link className="text-brand hover:underline" to="/faq">Questions about trust</Link></p>
+        <p>The official source is <code>github.com/gnsaddy/repolens</code>. Copies on other sites or under other names are not affiliated with it, so install only from there. <Link className="text-l-link hover:underline" to="/about">About RepoLens AI</Link> · <Link className="text-l-link hover:underline" to="/faq">Questions about trust</Link></p>
       </Section>
     </PublicLayout>
   );

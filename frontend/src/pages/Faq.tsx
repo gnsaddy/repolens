@@ -1,3 +1,4 @@
+import { CaretDown } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import PublicLayout from "@/components/PublicLayout";
 import { FAQ } from "@/lib/trust";
@@ -8,14 +9,14 @@ export default function Faq() {
       <section aria-label="Frequently asked questions">
         <ul className="space-y-2">
           {FAQ.map((f, i) => (
-            <li key={f.id} id={f.id} className="scroll-mt-6 rounded-lg border border-dashed border-line">
+            <li key={f.id} id={f.id} className="scroll-mt-6 rounded-lg border border-l-line">
               <details open={i === 0} className="group p-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium"><span>{f.q}</span><span aria-hidden className="text-muted group-open:hidden">+</span><span aria-hidden className="hidden text-muted group-open:inline">−</span></summary>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{f.a}</p>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium"><span>{f.q}</span><CaretDown size={20} aria-hidden className="shrink-0 text-l-muted transition-transform duration-500 ease-land group-open:rotate-180" /></summary>
+                <p className="mt-2 body-6 text-l-muted">{f.a}</p>
               </details>
             </li>))}
         </ul>
-        <p className="mt-6 text-sm text-slate-600">More detail: <Link className="text-brand hover:underline" to="/security">the Security page</Link>, with where each control stands, and <Link className="text-brand hover:underline" to="/about">About</Link>.</p>
+        <p className="mt-6 body-6 text-l-muted">More detail: <Link className="text-l-link hover:underline" to="/security">the Security page</Link>, with where each control stands, and <Link className="text-l-link hover:underline" to="/about">About</Link>.</p>
       </section>
     </PublicLayout>
   );

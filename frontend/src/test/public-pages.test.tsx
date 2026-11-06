@@ -64,18 +64,18 @@ describe("About page", () => {
 describe("how people reach them", () => {
   it("are one click from the sign-in page", async () => {
     open("/login");
-    const nav = await screen.findByRole("navigation", { name: "More about RepoLens AI" });
+    const nav = await screen.findByRole("navigation", { name: "Trust" }); // the footer of the landing page
     await userEvent.click(within(nav).getByRole("link", { name: "Security" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument();
-    await userEvent.click(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "About" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "About" }));
     expect(await screen.findByRole("heading", { level: 1, name: "About RepoLens AI" })).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   });
 
   it("stay readable while signed in, and offer the way back into the app", async () => {
     open("/security", true);
     expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument();
-    expect(await within(screen.getByRole("navigation", { name: "Public pages" })).findByRole("link", { name: "Open the app" })).toHaveAttribute("href", "/"); // waits for the signed-in user to load
+    expect(await within(screen.getByRole("navigation", { name: "Main" })).findByRole("link", { name: "Open the app" })).toHaveAttribute("href", "/"); // waits for the signed-in user to load
   });
 });
 
@@ -111,14 +111,25 @@ describe("FAQ page", () => {
 
   it("opens and closes an answer, and is linked from the sign-in page, the navigation and the footer", async () => {
     open("/login");
-    await userEvent.click(within(await screen.findByRole("navigation", { name: "More about RepoLens AI" })).getByRole("link", { name: "FAQ" }));
+    await userEvent.click(within(await screen.findByRole("navigation", { name: "Product" })).getByRole("link", { name: "FAQ" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Questions about trust" })).toBeInTheDocument();
     const second = screen.getByText("Does RepoLens send my code or documents anywhere?").closest("details")!;
     expect(second.open).toBe(false);
     await userEvent.click(screen.getByText("Does RepoLens send my code or documents anywhere?"));
     expect(second.open).toBe(true);
-    expect(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
     expect(within(screen.getByRole("navigation", { name: "Product" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
+  });
+});
+
+describe("links to a section of a page", () => {
+  it("scroll to the section, which the router does not do by itself", async () => {
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    open("/security#report");
+    await screen.findByRole("heading", { level: 1, name: "Security" });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    expect(spy.mock.instances.at(-1)).toHaveProperty("id", "report");
   });
 });
 
@@ -145,7 +156,7 @@ describe("day and night mode before signing in", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("repolens.theme")).toBe("dark");
     expect(screen.getByRole("button", { name: "Switch to day mode" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(within(screen.getByRole("navigation", { name: "More about RepoLens AI" })).getByRole("link", { name: "About" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Product" })).getByRole("link", { name: "About" }));
     await screen.findByRole("heading", { level: 1, name: "About RepoLens AI" });
     expect(document.documentElement.classList.contains("dark")).toBe(true); // the choice follows you to the next page
     await userEvent.click(screen.getByRole("button", { name: "Switch to day mode" })); // the same switch in the public header

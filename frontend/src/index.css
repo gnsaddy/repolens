@@ -74,3 +74,89 @@ body { @apply bg-canvas text-ink antialiased; }
 .reader .prose-wiki { font-size: var(--reader-size, 16px); line-height: 1.75; }
 .reader .prose-wiki h1 { font-size: 1.6em; } .reader .prose-wiki h2 { font-size: 1.3em; } .reader .prose-wiki h3 { font-size: 1.1em; }
 .reader .prose-wiki code, .reader .prose-wiki pre { font-size: 0.85em; }
+
+/* Landing page (the sign-in screen). It follows the landing-page-design skill: Geist only, named text styles on the Tailwind
+   type scale, spacing from the 2/4/8/12/16/24/32/40/48/64/80/96 table, flat backgrounds, one motion curve. */
+@theme {
+  --color-l-bg: #ffffff;
+  --color-l-sunk: #f6f6f6;
+  --color-l-card: #ffffff;
+  --color-l-line: #e4e4e7;
+  --color-l-text: #000000;
+  --color-l-muted: #52525b;
+  --color-l-link: #4338ca;
+  --ease-land: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dark {
+  --color-l-bg: #181818; --color-l-sunk: #1f1f1f; --color-l-card: #272727; --color-l-line: #313131;
+  --color-l-text: #ffffff; --color-l-muted: #a1a1aa; --color-l-link: #a5b4fc;
+}
+.landing { font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif; background: var(--color-l-bg); color: var(--color-l-text); }
+.landing h1, .landing h2, .landing h3, .landing h4 { text-wrap: balance; }
+.landing p, .landing li, .landing summary { text-wrap: pretty; }
+.landing *:focus-visible { outline: 2px solid var(--color-l-link); outline-offset: 2px; }
+
+@utility heading-1 { font-size: 3.75rem; line-height: 1; font-weight: 600; }
+@utility heading-2 { font-size: 3rem; line-height: 1; font-weight: 600; }
+@utility heading-3 { font-size: 2.25rem; line-height: 2.5rem; font-weight: 600; }
+@utility heading-4 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 600; }
+@utility heading-5 { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
+@utility heading-6 { font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; }
+@utility title-1 { font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; }
+@utility title-2 { font-size: 1.125rem; line-height: 1.75rem; font-weight: 500; }
+@utility title-3 { font-size: 1rem; line-height: 1.5rem; font-weight: 500; }
+@utility title-4 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; }
+@utility title-5 { font-size: 0.75rem; line-height: 1rem; font-weight: 500; }
+@utility body-1 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
+@utility body-2 { font-size: 1rem; line-height: 1.5rem; font-weight: 500; }
+@utility body-3 { font-size: 1rem; line-height: 1.5rem; font-weight: 400; }
+@utility body-4 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; }
+@utility body-5 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; }
+@utility body-6 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; }
+@utility button-lg { font-size: 1.125rem; line-height: 1.75rem; font-weight: 600; }
+@utility button-md { font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
+@utility button-sm { font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; }
+@utility button-xsm { font-size: 0.75rem; line-height: 1rem; font-weight: 600; }
+@utility caption-1 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; }
+@utility caption-2 { font-size: 0.875rem; line-height: 1.25rem; font-weight: 400; }
+@utility caption-3 { font-size: 0.75rem; line-height: 1rem; font-weight: 600; }
+@utility caption-4 { font-size: 0.75rem; line-height: 1rem; font-weight: 500; }
+@utility caption-5 { font-size: 0.75rem; line-height: 1rem; font-weight: 400; }
+
+/* The hero heading is the one place a gradient is allowed, and only on the text. */
+.land-hero-title { background: linear-gradient(to right, #000000, #666666); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.dark .land-hero-title { background: linear-gradient(to right, #ffffff, #9b9b9b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Scroll reveal: rise 32px and fade in, once. Without motion, only the fade. */
+.land-reveal { opacity: 0; transform: translateY(2rem); transition: opacity 700ms var(--ease-land), transform 700ms var(--ease-land); }
+.land-reveal.is-in { opacity: 1; transform: none; }
+/* Tagline: each word goes from a muted tone to full colour as it crosses the trigger line. */
+.land-word { opacity: 0.3; transition: opacity 500ms var(--ease-land); }
+.land-word.is-on { opacity: 1; }
+/* Menu links rise 24px one after another. */
+.land-menu-link { opacity: 0; transform: translateY(1.5rem); transition: opacity 500ms var(--ease-land), transform 500ms var(--ease-land); }
+.land-menu-open .land-menu-link { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .land-reveal, .land-menu-link { transform: none; }
+  .land-menu-link { transition-delay: 0ms !important; }
+}
+
+/* Ask pipeline, risk bars and blast radius: only transform and opacity move, on the same curve. */
+.land-step, .land-answer, .land-cite { opacity: 0; transform: translateY(1.5rem); transition: opacity 600ms var(--ease-land), transform 600ms var(--ease-land); }
+.land-flow.is-in .land-step, .land-flow.is-in .land-answer, .land-flow.is-in .land-cite { opacity: 1; transform: none; }
+.land-flow-dot { opacity: 0; transform: scaleX(0); transform-origin: left; }
+.land-flow.is-in .land-flow-dot { animation: land-travel 3.6s var(--ease-land) 1s infinite; }
+@keyframes land-travel { 0% { opacity: 1; transform: scaleX(0); } 75% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1); } }
+.land-bar { transform: scaleX(0); transform-origin: left; transition: transform 900ms var(--ease-land); }
+.land-intel.is-in .land-bar { transform: scaleX(var(--v)); }
+.land-node { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center; transition: opacity 600ms var(--ease-land), transform 600ms var(--ease-land); }
+.land-intel.is-in .land-node { opacity: 1; transform: none; }
+.land-ring { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.land-intel.is-in .land-ring { animation: land-ring 3.6s var(--ease-land) infinite; }
+@keyframes land-ring { 0% { opacity: 0.7; transform: scale(0.5); } 100% { opacity: 0; transform: scale(4.2); } }
+@media (prefers-reduced-motion: reduce) {
+  .land-step, .land-answer, .land-cite, .land-node { transform: none; transition: opacity 300ms linear; }
+  .land-bar { transform: scaleX(var(--v)); transition: none; }
+  .land-flow-dot, .land-ring { animation: none !important; }
+  .land-ring { opacity: 0.3; transform: scale(2); }
+}

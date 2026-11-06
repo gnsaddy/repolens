@@ -62,6 +62,7 @@ Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 - **A badge says something unusual** (failed, needs attention, shared). The normal state is plain text or a `StatusDot`: do not badge "ready", "done", "private" or "connected".
 - **Icons are lucide icons**, passed as the `icon` of `CardTitle`/`Section` or placed beside the label. Do not use text characters such as ✓, ✗ or ▾ as icons.
 - **The sidebar is grouped** (Work, Knowledge, Sources, Monitor); a new page goes in the group of what people do with it.
+- **The landing page is the exception to the sidebar's look.** The sign-in screen (`components/Landing.tsx`) follows the landing page design rules instead: Geist only, the named text styles in `index.css` (`heading-1` to `caption-5`), spacing and radius from the Tailwind steps, Phosphor icons, no hyphens in its copy. Keep new landing copy to facts the code backs.
 - **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
 
 ## How a version is made (maintainers)
