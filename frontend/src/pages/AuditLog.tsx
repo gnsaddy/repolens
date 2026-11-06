@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 
 const PAGE = 50;
-const sel = "h-9 rounded-lg border border-line bg-white px-2 text-sm";
+const sel = "h-9 rounded-lg border border-line bg-white px-2 body-6";
 
 /** Who did what, and what was refused. Admins only. */
 export default function AuditLog() {
@@ -46,20 +46,20 @@ export default function AuditLog() {
       <ErrorNote error={log.error} />
       {log.isLoading ? <Spinner /> : !log.data?.items.length ? <Empty>Nothing matches.</Empty> : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm" aria-label="Audit events">
-            <thead className="bg-slate-50 text-left text-xs text-muted"><tr><th className="px-3 py-2 font-medium">When</th><th className="font-medium">Who</th><th className="font-medium">Action</th><th className="font-medium">Target</th><th className="font-medium">Outcome</th></tr></thead>
+          <table className="w-full body-6" aria-label="Audit events">
+            <thead className="bg-slate-50 text-left caption-5 text-muted"><tr><th className="px-3 py-2 font-medium">When</th><th className="font-medium">Who</th><th className="font-medium">Action</th><th className="font-medium">Target</th><th className="font-medium">Outcome</th></tr></thead>
             <tbody>{log.data.items.map((e) => (
               <tr key={e.id} className="border-t border-line align-top">
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-muted" title={new Date(e.at).toLocaleString()}>{timeAgo(e.at)}</td>
+                <td className="whitespace-nowrap px-3 py-2 caption-5 text-muted" title={new Date(e.at).toLocaleString()}>{timeAgo(e.at)}</td>
                 <td className="py-2">{e.actor}</td>
-                <td className="py-2"><code className="text-xs">{e.action}</code></td>
+                <td className="py-2"><code className="caption-5">{e.action}</code></td>
                 <td className="max-w-xs py-2"><div className="truncate" title={e.target}>{e.target || "—"}</div>
-                  {!e.allowed && e.detail.reason && <div className="text-xs text-red-700">{e.detail.reason}</div>}
-                  {Object.keys(e.detail).filter((k) => k !== "reason").length > 0 && <details className="text-xs text-muted"><summary className="cursor-pointer">details</summary>{Object.entries(e.detail).filter(([k]) => k !== "reason").map(([k, v]) => <div key={k}>{k}: {v}</div>)}</details>}</td>
+                  {!e.allowed && e.detail.reason && <div className="caption-5 text-red-700">{e.detail.reason}</div>}
+                  {Object.keys(e.detail).filter((k) => k !== "reason").length > 0 && <details className="caption-5 text-muted"><summary className="cursor-pointer">details</summary>{Object.entries(e.detail).filter(([k]) => k !== "reason").map(([k, v]) => <div key={k}>{k}: {v}</div>)}</details>}</td>
                 <td className="py-2">{e.allowed ? <Badge tone="green">allowed</Badge> : <Badge tone="red"><ShieldAlert className="mr-1 inline h-3 w-3" />refused</Badge>}</td>
               </tr>))}</tbody>
           </table>
-          <div className="flex items-center justify-between border-t border-line px-3 py-2 text-xs text-muted">
+          <div className="flex items-center justify-between border-t border-line px-3 py-2 caption-5 text-muted">
             <span>{page * PAGE + 1}–{Math.min(total, (page + 1) * PAGE)} of {total.toLocaleString()}</span>
             <span className="flex gap-2"><Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Newer</Button><Button size="sm" variant="outline" disabled={(page + 1) * PAGE >= total} onClick={() => setPage(page + 1)}>Older</Button></span>
           </div>

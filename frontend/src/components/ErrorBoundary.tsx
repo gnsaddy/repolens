@@ -8,7 +8,7 @@ export default class ErrorBoundary extends Component<{ children: ReactNode; rese
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div role="alert" className="mx-auto mt-10 max-w-lg rounded-xl border border-red-200 bg-red-50 p-5 text-sm">
+      <div role="alert" className="mx-auto mt-10 max-w-lg rounded-xl border border-red-200 bg-red-50 p-5 body-6">
         <h2 className="font-semibold text-red-800">This page hit an error</h2>
         <p className="mt-1 text-red-700">{this.state.error.message}</p>
         <button className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-red-800 hover:bg-red-100" onClick={() => this.setState({ error: null })}>Try again</button>

@@ -24,23 +24,23 @@ export default function AccessPanel({ repoId, repoName }: { repoId: string; repo
   return (
     <Card>
       <CardTitle right={access.data?.visibility === "restricted" && <Badge tone="amber"><Lock className="mr-1 h-3 w-3" />restricted</Badge>}>Access</CardTitle>
-      <div role="radiogroup" aria-label={`Visibility of ${repoName}`} className="space-y-2 text-sm">
+      <div role="radiogroup" aria-label={`Visibility of ${repoName}`} className="space-y-2 body-6">
         <label className="flex items-start gap-2"><input type="radio" name="vis" checked={visibility === "org"} onChange={() => setVisibility("org")} />
-          <span><b>Everyone in the organisation</b><span className="block text-xs text-muted">Default. Roles (admin / member / viewer) still apply.</span></span></label>
+          <span><b>Everyone in the organisation</b><span className="block caption-5 text-muted">Default. Roles (admin / member / viewer) still apply.</span></span></label>
         <label className="flex items-start gap-2"><input type="radio" name="vis" checked={visibility === "restricted"} onChange={() => setVisibility("restricted")} />
-          <span><b>Restricted</b><span className="block text-xs text-muted">Hidden — including its code, history, graph nodes, search results and investigations — from everyone not listed below. Admins always have access.</span></span></label>
+          <span><b>Restricted</b><span className="block caption-5 text-muted">Hidden — including its code, history, graph nodes, search results and investigations — from everyone not listed below. Admins always have access.</span></span></label>
       </div>
       {visibility === "restricted" && (
         <fieldset className="mt-3 space-y-1.5 border-t border-line pt-3">
-          <legend className="mb-1 text-xs font-medium text-muted">Users with access</legend>
-          {!members.length && <p className="text-xs text-muted">No non-admin users yet.</p>}
+          <legend className="mb-1 caption-4 text-muted">Users with access</legend>
+          {!members.length && <p className="caption-5 text-muted">No non-admin users yet.</p>}
           {members.map((u) => (
-            <label key={u.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggle(u.id)} />
+            <label key={u.id} className="flex items-center gap-2 body-6"><input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggle(u.id)} />
               {u.email}<Badge>{u.role}</Badge></label>))}
         </fieldset>)}
       <ErrorNote error={save.error ?? access.error} />
       <div className="mt-3"><Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>Save access</Button>
-        {save.isSuccess && <span role="status" className="ml-3 text-xs text-emerald-700">Saved</span>}</div>
+        {save.isSuccess && <span role="status" className="ml-3 caption-5 text-emerald-700">Saved</span>}</div>
     </Card>
   );
 }

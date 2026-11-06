@@ -32,17 +32,17 @@ export default function Ownership() {
       <PageHeader title="Ownership" subtitle="Who maintains which code, and who to ask. Based on recent commit history, so a hint rather than a verdict." />
       {!code.length ? <Empty>Index a code repository first. Ownership is computed from its commit history.</Empty> : (<>
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setSel(e.target.value)}>
+          <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 body-6" value={repoId} onChange={(e) => setSel(e.target.value)}>
             {code.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
           <div className="ml-auto w-72"><Input aria-label="Look up a file or folder" placeholder="Who owns… e.g. src/billing" value={path} onChange={(e) => setPath(e.target.value)} /></div>
         </div>
         {path.trim().length > 1 && (
           <Card className="mb-4">
-            <CardTitle>Owners of <code className="text-xs">{path.trim()}</code></CardTitle>
-            {lookup.isLoading ? <Spinner /> : !lookup.data?.owners.length ? <p className="text-sm text-muted">No commit history for that path.</p> : (
-              <ul className="space-y-2 text-sm">{lookup.data.owners.map((o) => (
+            <CardTitle>Owners of <code className="caption-5">{path.trim()}</code></CardTitle>
+            {lookup.isLoading ? <Spinner /> : !lookup.data?.owners.length ? <p className="body-6 text-muted">No commit history for that path.</p> : (
+              <ul className="space-y-2 body-6">{lookup.data.owners.map((o) => (
                 <li key={o.author} className="flex items-center gap-3"><span className="w-40 truncate font-medium">{o.author}</span><span className="w-12 text-muted">{Math.round(o.share * 100)}%</span>
-                  <span className="text-xs text-muted">{o.commits} commits · last {timeAgo(o.last_commit_at)}</span></li>))}</ul>)}
+                  <span className="caption-5 text-muted">{o.commits} commits · last {timeAgo(o.last_commit_at)}</span></li>))}</ul>)}
           </Card>)}
         {data.isLoading ? <Spinner /> : data.error ? <ErrorNote error={data.error} /> : d && (<>
           <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -57,21 +57,21 @@ export default function Ownership() {
               {!d.areas.length ? <Empty>No commits indexed yet.</Empty> : (
                 <ul className="divide-y divide-line">{d.areas.map((a) => (
                   <li key={a.area} className="py-3">
-                    <div className="mb-1.5 flex flex-wrap items-center gap-2 text-sm"><code className="font-medium">{a.area}</code>
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2 body-6"><code className="font-medium">{a.area}</code>
                       <Badge tone={RISK[a.risk][0]}>{a.risk !== "ok" && <AlertTriangle className="mr-1 h-3 w-3" />}{RISK[a.risk][1]}</Badge>
-                      <span className="ml-auto text-xs text-muted">{a.commits} commits · active {timeAgo(a.last_activity)}</span></div>
+                      <span className="ml-auto caption-5 text-muted">{a.commits} commits · active {timeAgo(a.last_activity)}</span></div>
                     <ShareBar owners={a.owners} />
-                    <div className="mt-1.5 flex flex-wrap gap-x-4 text-xs text-muted">{a.owners.map((o, i) => <span key={o.author}><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{o.author} {Math.round(o.share * 100)}%</span>)}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 caption-5 text-muted">{a.owners.map((o, i) => <span key={o.author}><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{o.author} {Math.round(o.share * 100)}%</span>)}</div>
                   </li>))}</ul>)}
             </Card>
             <Card>
               <CardTitle right={<Users className="h-4 w-4 text-muted" />}>People</CardTitle>
-              <ul className="space-y-3 text-sm">{d.people.map((p) => (
-                <li key={p.author}><div className="flex justify-between"><span className="font-medium">{p.author}</span><span className="text-xs text-muted">{Math.round(p.share * 100)}% · {p.commits} commits</span></div>
-                  <div className="text-xs text-muted">{p.areas.join(", ")} · last {timeAgo(p.last_commit_at)}</div></li>))}</ul>
+              <ul className="space-y-3 body-6">{d.people.map((p) => (
+                <li key={p.author}><div className="flex justify-between"><span className="font-medium">{p.author}</span><span className="caption-5 text-muted">{Math.round(p.share * 100)}% · {p.commits} commits</span></div>
+                  <div className="caption-5 text-muted">{p.areas.join(", ")} · last {timeAgo(p.last_commit_at)}</div></li>))}</ul>
             </Card>
           </div>
-          <p className="mt-3 text-xs text-muted">Recent work counts more than old work (half-life 6 months), bigger changes count more, and bots are ignored. It only sees indexed commits.</p>
+          <p className="mt-3 caption-5 text-muted">Recent work counts more than old work (half-life 6 months), bigger changes count more, and bots are ignored. It only sees indexed commits.</p>
         </>)}
       </>)}
     </div>

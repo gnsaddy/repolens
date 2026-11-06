@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNo
 import { cn } from "@/lib/utils";
 
 const button = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:pointer-events-none",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg button-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:pointer-events-none",
   {
     variants: {
       variant: {
@@ -29,7 +29,7 @@ export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
 export function CardTitle({ children, right, icon: Icon }: { children: ReactNode; right?: ReactNode; icon?: LucideIcon }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-2">
-      <h3 className="flex items-center gap-2 text-sm font-semibold">{Icon && <Icon className="h-4 w-4 text-slate-400" aria-hidden />}{children}</h3>{right}
+      <h3 className="flex items-center gap-2 body-4">{Icon && <Icon className="h-4 w-4 text-slate-400" aria-hidden />}{children}</h3>{right}
     </div>
   );
 }
@@ -44,7 +44,7 @@ export function Section({ title, icon: Icon, right, children, className }: { tit
   return (
     <section className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">{Icon && <Icon className="h-4 w-4 text-slate-400" aria-hidden />}{title}</h3>{right}
+        <h3 className="flex items-center gap-2 body-4">{Icon && <Icon className="h-4 w-4 text-slate-400" aria-hidden />}{title}</h3>{right}
       </div>
       {children}
     </section>
@@ -58,7 +58,7 @@ export function StatusDot({ status, label }: { status: string; label?: string })
   return <span title={label ?? status} className="inline-flex items-center"><span className={cn("inline-block h-2 w-2 rounded-full", DOT[tone])} aria-hidden /><span className="sr-only">{label ?? status}</span></span>;
 }
 
-const badge = cva("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", {
+const badge = cva("inline-flex items-center rounded-full px-2 py-0.5 caption-4", {
   variants: {
     tone: {
       gray: "bg-slate-100 text-slate-600", green: "bg-emerald-50 text-emerald-700",
@@ -78,21 +78,21 @@ export const statusTone = (s: string) =>
     rejected: "red" })[s] as "green" | "blue" | "amber" | "red" | undefined ?? "gray";
 
 export function Input({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn("h-9 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-indigo-100", className)} {...p} />;
+  return <input className={cn("h-9 w-full rounded-lg border border-line bg-white px-3 body-6 outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-indigo-100", className)} {...p} />;
 }
 export function Textarea({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn("w-full rounded-lg border border-line bg-white p-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-indigo-100", className)} {...p} />;
+  return <textarea className={cn("w-full rounded-lg border border-line bg-white p-3 body-6 outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-indigo-100", className)} {...p} />;
 }
 export function Label({ children }: { children: ReactNode }) {
-  return <span className="mb-1 block text-xs font-medium text-muted">{children}</span>;
+  return <span className="mb-1 block caption-4 text-muted">{children}</span>;
 }
 
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
     <Card className="p-4">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
+      <div className="caption-5 text-muted">{label}</div>
+      <div className="mt-1 heading-5 tracking-tight">{value}</div>
+      {hint && <div className="mt-1 caption-5 text-muted">{hint}</div>}
     </Card>
   );
 }
@@ -103,9 +103,9 @@ export function StatGroup({ items, className }: { items: { label: string; value:
     <div className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line lg:grid-cols-4", className)}>
       {items.map((s) => (
         <div key={s.label} className="bg-surface p-4">
-          <div className="text-xs text-muted">{s.label}</div>
-          <div className="mt-1 text-2xl font-semibold tracking-tight">{s.value}</div>
-          {s.hint && <div className="mt-1 text-xs text-muted">{s.hint}</div>}
+          <div className="caption-5 text-muted">{s.label}</div>
+          <div className="mt-1 heading-5 tracking-tight">{s.value}</div>
+          {s.hint && <div className="mt-1 caption-5 text-muted">{s.hint}</div>}
         </div>
       ))}
     </div>
@@ -117,7 +117,7 @@ export function ConfidenceBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-3" role="meter" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Confidence">
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={cn("h-full rounded-full", color)} style={{ width: `${Math.round(value * 100)}%` }} /></div>
-      <span className="w-10 text-right text-sm font-semibold">{Math.round(value * 100)}%</span>
+      <span className="w-10 text-right body-4">{Math.round(value * 100)}%</span>
     </div>
   );
 }
@@ -125,17 +125,17 @@ export function ConfidenceBar({ value }: { value: number }) {
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-xl font-semibold tracking-tight">{title}</h1>{subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}</div>
+      <div><h1 className="heading-6 tracking-tight">{title}</h1>{subtitle && <p className="mt-0.5 body-6 text-muted">{subtitle}</p>}</div>
       {actions}
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg bg-slate-50 p-8 text-center text-sm text-muted">{children}</div>;
+  return <div className="rounded-lg bg-slate-50 p-8 text-center body-6 text-muted">{children}</div>;
 }
 export function ErrorNote({ error }: { error: unknown }) {
-  return error ? <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{String((error as Error).message ?? error)}</div> : null;
+  return error ? <div role="alert" className="rounded-lg bg-red-50 px-3 py-2 body-6 text-red-700">{String((error as Error).message ?? error)}</div> : null;
 }
 export function Spinner() {
   return <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand" aria-label="Loading" />;
@@ -143,7 +143,7 @@ export function Spinner() {
 
 export function CodeBlock({ code, startLine = 1, highlight }: { code: string; startLine?: number; highlight?: [number, number] }) {
   return (
-    <pre className="overflow-x-auto rounded-lg border border-line bg-slate-50 py-2 font-mono text-xs leading-5">
+    <pre className="overflow-x-auto rounded-lg border border-line bg-slate-50 py-2 font-mono caption-5">
       {code.split("\n").map((l, i) => {
         const n = startLine + i;
         const hot = highlight && n >= highlight[0] && n <= highlight[1];

@@ -1,4 +1,3 @@
-import "@fontsource-variable/geist";
 import {
   ArrowRight, ArrowsClockwise, BookOpenText, Bug, CaretDown, ChatCircleText, ClipboardText, ClockCounterClockwise, FileMagnifyingGlass, FolderOpen, GitPullRequest, Graph, Key,
   ListChecks, Lock, MagnifyingGlass, Paperclip, Question, Scroll, SealCheck, ShieldCheck, Sparkle, Stack, Target, UserCheck, UsersThree, Warning,

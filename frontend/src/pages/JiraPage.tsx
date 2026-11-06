@@ -31,13 +31,13 @@ export default function JiraPage() {
       <PageHeader title="Jira" subtitle="Find tickets, read them with their comments, analyse one or several together, and investigate the cause in your code and docs." />
       {!conn.isLoading && !conn.data ? (
         <Card className="mx-auto max-w-xl text-center">
-          <h2 className="text-base font-semibold">Connect Jira first</h2>
-          <p className="mt-1 text-sm text-muted">Add your Jira site and an API token in Settings, then come back to browse tickets, investigate them and publish approved reports.</p>
-          <Link to="/settings" className="mt-4 inline-flex h-9 items-center rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-600">Open Settings</Link>
+          <h2 className="body-1">Connect Jira first</h2>
+          <p className="mt-1 body-6 text-muted">Add your Jira site and an API token in Settings, then come back to browse tickets, investigate them and publish approved reports.</p>
+          <Link to="/settings" className="mt-4 inline-flex h-9 items-center rounded-lg bg-brand px-4 body-5 text-white hover:bg-brand-600">Open Settings</Link>
         </Card>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-muted">Connected to <span className="font-medium text-ink">{conn.data?.base_url}</span>. <Link to="/settings" className="text-brand hover:underline">Manage connection</Link></p>
+          <p className="body-6 text-muted">Connected to <span className="font-medium text-ink">{conn.data?.base_url}</span>. <Link to="/settings" className="text-brand hover:underline">Manage connection</Link></p>
           {conn.data && <JiraIssueBrowser canInvestigate={canWrite(user)} onOpen={setOpenKey} onAnalyzed={setBatch} onInvestigated={done} />}
         </div>)}
       {openKey && <JiraIssuePanel issueKey={openKey} canInvestigate={canWrite(user)} onClose={() => setOpenKey(null)} />}

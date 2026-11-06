@@ -17,7 +17,7 @@ export default function Modal({ title, subtitle, onClose, children, icon, wide }
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-xl bg-white shadow-2xl`} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 border-b border-line p-5">
           {icon}
-          <div className="min-w-0 flex-1"><h2 id="modal-title" className="text-lg font-semibold">{title}</h2>{subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}</div>
+          <div className="min-w-0 flex-1"><h2 id="modal-title" className="title-2">{title}</h2>{subtitle && <p className="mt-0.5 body-6 text-muted">{subtitle}</p>}</div>
           <button aria-label="Close" onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-slate-100"><X className="h-5 w-5" /></button>
         </div>
         <div className="max-h-[70vh] overflow-auto p-5">{children}</div>

@@ -43,12 +43,12 @@ export default function Dashboard() {
       </form>
       {!finished && data && (
         <Card className="mb-6" aria-label="Getting started">
-          <CardTitle icon={Rocket} right={<span className="text-xs text-muted">{doneCount} of {steps.length} done</span>}>Getting started</CardTitle>
+          <CardTitle icon={Rocket} right={<span className="caption-5 text-muted">{doneCount} of {steps.length} done</span>}>Getting started</CardTitle>
           <div role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} className="mb-4 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
           <ol className="grid gap-1 md:grid-cols-2 xl:grid-cols-3">{steps.map((s) => (
-            <li key={s.label}><Link to={s.to} aria-current={s === next ? "step" : undefined} className={cn("flex h-full gap-2.5 rounded-lg p-3 text-sm hover:bg-slate-50", s === next && "bg-indigo-50 hover:bg-indigo-50", s.done && "text-muted")}>
+            <li key={s.label}><Link to={s.to} aria-current={s === next ? "step" : undefined} className={cn("flex h-full gap-2.5 rounded-lg p-3 body-6 hover:bg-slate-50", s === next && "bg-indigo-50 hover:bg-indigo-50", s.done && "text-muted")}>
               {s.done ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
-              <span><span className="block font-medium">{s.label}</span><span className="text-xs text-muted">{s.hint}</span>{s === next && <span className="mt-1 block text-xs font-medium text-brand">Next: {s.cta} →</span>}</span></Link></li>))}</ol>
+              <span><span className="block font-medium">{s.label}</span><span className="caption-5 text-muted">{s.hint}</span>{s === next && <span className="mt-1 block caption-4 text-brand">Next: {s.cta} →</span>}</span></Link></li>))}</ol>
         </Card>)}
       {more.data?.attention && <Attention items={more.data.attention} />}
       <StatGroup className="mb-6" items={[
@@ -60,15 +60,15 @@ export default function Dashboard() {
       {more.data?.ai && <Insights d={more.data} />}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardTitle icon={Bug} right={<Link to="/investigations" className="text-xs text-brand hover:underline">View all</Link>}>Recent investigations</CardTitle>
+          <CardTitle icon={Bug} right={<Link to="/investigations" className="caption-5 text-brand hover:underline">View all</Link>}>Recent investigations</CardTitle>
           {!data?.recent.length ? <Empty>No investigations yet. Add a repository, then describe a bug above.</Empty> : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Issue / Query</th><th className="font-medium">Repository</th><th className="font-medium">Status</th><th className="text-right font-medium">Time</th></tr></thead>
+            <table className="w-full body-6">
+              <thead className="text-left caption-5 text-muted"><tr><th className="pb-2 font-medium">Issue / Query</th><th className="font-medium">Repository</th><th className="font-medium">Status</th><th className="text-right font-medium">Time</th></tr></thead>
               <tbody>{data.recent.map((i) => (
                 <tr key={i.id} className="border-t border-line">
                   <td className="max-w-xs truncate py-2"><Link className="text-brand hover:underline" to={`/investigations/${i.id}`}>{i.title}</Link></td>
                   <td className="text-muted">{i.repo}</td>
-                  <td><span className="inline-flex items-center gap-1.5 text-xs text-muted"><StatusDot status={i.status} label="" />{i.status}</span></td>
+                  <td><span className="inline-flex items-center gap-1.5 caption-5 text-muted"><StatusDot status={i.status} label="" />{i.status}</span></td>
                   <td className="text-right text-muted">{timeAgo(i.created_at)}</td>
                 </tr>))}</tbody>
             </table>)}
@@ -77,14 +77,14 @@ export default function Dashboard() {
           <CardTitle icon={FolderGit2}>Top investigated repositories</CardTitle>
           {!data?.top_repositories.length ? <Empty>Nothing yet.</Empty> : (
             <ul className="space-y-3">{data.top_repositories.map((r) => (
-              <li key={r.name} className="text-sm"><div className="mb-1 flex justify-between"><span>{r.name}</span><span className="text-muted">{r.count}</span></div>
+              <li key={r.name} className="body-6"><div className="mb-1 flex justify-between"><span>{r.name}</span><span className="text-muted">{r.count}</span></div>
                 <div className="h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand" style={{ width: `${(r.count / max) * 100}%` }} /></div></li>))}</ul>)}
         </Card>
       </div>
       {!!more.data?.activity?.length && (
         <Card className="mt-4" aria-label="Recent activity"><CardTitle icon={Activity}>Recent activity</CardTitle>
-          <ul className="divide-y divide-line text-sm">{more.data.activity.map((a, i) => (
-            <li key={i} className="flex items-baseline gap-2 py-2"><span className="font-medium">{a.who}</span>{" "}<span className="text-muted">{a.what}</span>{a.target && <> <code className="truncate text-xs text-muted">{a.target}</code></>}<span className="ml-auto shrink-0 text-xs text-muted">{timeAgo(a.at)}</span></li>))}</ul>
+          <ul className="divide-y divide-line body-6">{more.data.activity.map((a, i) => (
+            <li key={i} className="flex items-baseline gap-2 py-2"><span className="font-medium">{a.who}</span>{" "}<span className="text-muted">{a.what}</span>{a.target && <> <code className="truncate caption-5 text-muted">{a.target}</code></>}<span className="ml-auto shrink-0 caption-5 text-muted">{timeAgo(a.at)}</span></li>))}</ul>
         </Card>)}
     </div>
   );
@@ -96,13 +96,13 @@ const SEV = { high: ["text-red-700", ShieldAlert], medium: ["text-amber-700", Al
 /** What needs a person's attention, most serious first, each with the place to fix it. */
 function Attention({ items }: { items: DashInsights["attention"] }) {
   if (!items.length) return (
-    <Card className="mb-6 p-4" aria-label="Needs attention"><p className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />Nothing needs your attention right now.</p></Card>);
+    <Card className="mb-6 p-4" aria-label="Needs attention"><p className="flex items-center gap-2 body-6 text-emerald-700"><CheckCircle2 className="h-4 w-4" />Nothing needs your attention right now.</p></Card>);
   return (
     <Card className="mb-6" aria-label="Needs attention">
-      <CardTitle right={<span className="text-xs text-muted">{items.length} thing{items.length === 1 ? "" : "s"}</span>}>Needs attention</CardTitle>
+      <CardTitle right={<span className="caption-5 text-muted">{items.length} thing{items.length === 1 ? "" : "s"}</span>}>Needs attention</CardTitle>
       <ul className="divide-y divide-line">{items.map((a) => {
         const [tone, Icon] = SEV[a.severity];
-        return <li key={a.text}><Link to={a.to} className="flex items-start gap-2.5 py-2 text-sm hover:text-brand"><Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} /><span>{a.text}</span></Link></li>;
+        return <li key={a.text}><Link to={a.to} className="flex items-start gap-2.5 py-2 body-6 hover:text-brand"><Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} /><span>{a.text}</span></Link></li>;
       })}</ul>
     </Card>
   );
@@ -114,23 +114,23 @@ function Insights({ d }: { d: DashInsights }) {
   const busy = days.some((x) => x.completed + x.failed > 0);
   return (
     <div className="mb-6 grid gap-4 lg:grid-cols-3" aria-label="Trends">
-      <Card><CardTitle icon={BarChart3} right={<span className="text-xs text-muted">{d.week.started} this week</span>}>Investigations, last 14 days</CardTitle>
+      <Card><CardTitle icon={BarChart3} right={<span className="caption-5 text-muted">{d.week.started} this week</span>}>Investigations, last 14 days</CardTitle>
         {!busy ? <Empty>No investigations in the last two weeks.</Empty> : (
           <div className="h-36"><ResponsiveContainer width="100%" height="100%"><BarChart data={days}><XAxis dataKey="day" fontSize={10} tickLine={false} axisLine={false} /><Tooltip /><Bar dataKey="completed" stackId="a" fill="#4f46e5" name="finished" radius={[0, 0, 0, 0]} /><Bar dataKey="failed" stackId="a" fill="#f87171" name="failed" radius={[3, 3, 0, 0]} /></BarChart></ResponsiveContainer></div>)}
-        <p className="mt-1 text-xs text-muted">{d.week.confirmed} confirmed by a person this week{d.week.failed ? `; ${d.week.failed} failed` : ""}.</p></Card>
+        <p className="mt-1 caption-5 text-muted">{d.week.confirmed} confirmed by a person this week{d.week.failed ? `; ${d.week.failed} failed` : ""}.</p></Card>
       <Card><CardTitle icon={Coins}>AI use, last 30 days</CardTitle>
-        <div className="flex items-baseline gap-2"><span className="text-2xl font-semibold">{fmtTokens(d.ai.tokens)}</span><span className="text-xs text-muted">tokens used</span></div>
-        {d.ai.avoided > 0 && <p className="text-sm text-emerald-700">{fmtTokens(d.ai.avoided)} avoided ({Math.round(d.ai.savings_rate * 100)}% saved)</p>}
+        <div className="flex items-baseline gap-2"><span className="heading-5">{fmtTokens(d.ai.tokens)}</span><span className="caption-5 text-muted">tokens used</span></div>
+        {d.ai.avoided > 0 && <p className="body-6 text-emerald-700">{fmtTokens(d.ai.avoided)} avoided ({Math.round(d.ai.savings_rate * 100)}% saved)</p>}
         <Spark data={d.ai.daily.map((x) => ({ v: x.tokens }))} format={fmtTokens} />
-        <p className="text-xs text-muted">{d.ai.requests} model requests{d.ai.helpful_rate != null ? ` · ${Math.round(d.ai.helpful_rate * 100)}% of ${d.ai.ratings} rated answers were helpful` : ""}. <Link to="/insights" className="text-brand hover:underline">More in Insights</Link></p></Card>
+        <p className="caption-5 text-muted">{d.ai.requests} model requests{d.ai.helpful_rate != null ? ` · ${Math.round(d.ai.helpful_rate * 100)}% of ${d.ai.ratings} rated answers were helpful` : ""}. <Link to="/insights" className="text-brand hover:underline">More in Insights</Link></p></Card>
       <Card><CardTitle icon={BookOpen}>Knowledge base</CardTitle>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div><dt className="text-xs text-muted">Wiki pages</dt><dd className="font-semibold">{d.knowledge.pages.toLocaleString()}</dd></div>
-          <div><dt className="text-xs text-muted">Searchable chunks</dt><dd className="font-semibold">{d.knowledge.chunks.toLocaleString()}</dd></div>
-          <div><dt className="text-xs text-muted">Graph</dt><dd className="font-semibold">{d.knowledge.graph_nodes.toLocaleString()} nodes</dd></div>
-          <div><dt className="text-xs text-muted">Code explained by docs</dt><dd className="font-semibold">{d.knowledge.documented_ratio != null ? `${Math.round(d.knowledge.documented_ratio * 100)}%` : "—"}</dd></div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 body-6">
+          <div><dt className="caption-5 text-muted">Wiki pages</dt><dd className="font-semibold">{d.knowledge.pages.toLocaleString()}</dd></div>
+          <div><dt className="caption-5 text-muted">Searchable chunks</dt><dd className="font-semibold">{d.knowledge.chunks.toLocaleString()}</dd></div>
+          <div><dt className="caption-5 text-muted">Graph</dt><dd className="font-semibold">{d.knowledge.graph_nodes.toLocaleString()} nodes</dd></div>
+          <div><dt className="caption-5 text-muted">Code explained by docs</dt><dd className="font-semibold">{d.knowledge.documented_ratio != null ? `${Math.round(d.knowledge.documented_ratio * 100)}%` : "—"}</dd></div>
         </dl>
-        <p className="mt-2 text-xs text-muted">{d.knowledge.wiki_issues ? <><Link to="/wiki?tab=health" className="text-brand hover:underline">{d.knowledge.wiki_issues} wiki issue{d.knowledge.wiki_issues === 1 ? "" : "s"}</Link> to fix</> : "No wiki issues found"}{d.knowledge.drift_open ? ` · ${d.knowledge.drift_open} pages may be out of date` : ""}.</p></Card>
+        <p className="mt-2 caption-5 text-muted">{d.knowledge.wiki_issues ? <><Link to="/wiki?tab=health" className="text-brand hover:underline">{d.knowledge.wiki_issues} wiki issue{d.knowledge.wiki_issues === 1 ? "" : "s"}</Link> to fix</> : "No wiki issues found"}{d.knowledge.drift_open ? ` · ${d.knowledge.drift_open} pages may be out of date` : ""}.</p></Card>
     </div>
   );
 }

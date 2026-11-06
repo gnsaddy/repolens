@@ -35,38 +35,38 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
       <ConnectionCard icon={Layers} tint="indigo" title="Models and routing" status={<StatusPill on={data.active > 0} onLabel={`${data.active} model${data.active === 1 ? "" : "s"} active`} offLabel="No model" />}
         description="Add several models, even from different providers. Each task uses the cheapest one that can do it, and moves up only when it is hard."
         footer={admin ? <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Add models</Button> : undefined}>
-        {data.connections.length === 0 ? <p className="text-sm text-muted">{admin ? "Add a model to get AI-written answers; everything also works without one." : "No models configured."}</p> : (
+        {data.connections.length === 0 ? <p className="body-6 text-muted">{admin ? "Add a model to get AI-written answers; everything also works without one." : "No models configured."}</p> : (
           <div className="space-y-4">
             {data.connections.map((c) => (
               <section key={c.id} aria-label={`${providerLabel(c.provider)} models`} className="rounded-lg border border-line">
-                <header className="flex items-center justify-between bg-slate-50 px-3 py-2 text-sm">
-                  <span className="font-medium">{providerLabel(c.provider)}{c.base_url && <span className="ml-2 text-xs text-muted">{c.base_url}</span>}</span>
-                  {admin && !c.legacy && <button className="text-xs text-red-600 hover:underline" onClick={async () => { if (await ask({ title: `Remove ${providerLabel(c.provider)}?`, message: "Its key and its models are deleted. Tasks move to your other models.", confirmLabel: "Remove", danger: true })) delConn.mutate(c.id); }}>Remove provider</button>}
+                <header className="flex items-center justify-between bg-slate-50 px-3 py-2 body-6">
+                  <span className="font-medium">{providerLabel(c.provider)}{c.base_url && <span className="ml-2 caption-5 text-muted">{c.base_url}</span>}</span>
+                  {admin && !c.legacy && <button className="caption-5 text-red-600 hover:underline" onClick={async () => { if (await ask({ title: `Remove ${providerLabel(c.provider)}?`, message: "Its key and its models are deleted. Tasks move to your other models.", confirmLabel: "Remove", danger: true })) delConn.mutate(c.id); }}>Remove provider</button>}
                 </header>
                 <ul className="divide-y divide-line">
                   {c.models.map((m) => (
-                    <li key={m.id} className={cn("flex flex-wrap items-center gap-3 px-3 py-2 text-sm", !m.enabled && "opacity-60")}>
-                      <code className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-medium">{m.model}</code>
+                    <li key={m.id} className={cn("flex flex-wrap items-center gap-3 px-3 py-2 body-6", !m.enabled && "opacity-60")}>
+                      <code className="rounded-md bg-slate-100 px-1.5 py-0.5 caption-4">{m.model}</code>
                       {admin && !c.legacy ? (<>
-                        <select aria-label={`Tier for ${m.model}`} className={cn(selectCls, "h-8 w-auto text-xs")} value={m.tier} onChange={(e) => patch.mutate({ id: m.id, tier: e.target.value as Tier })}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-                        <label className="flex items-center gap-1.5 text-xs text-muted"><input type="checkbox" checked={m.enabled} onChange={(e) => patch.mutate({ id: m.id, enabled: e.target.checked })} />In use</label>
+                        <select aria-label={`Tier for ${m.model}`} className={cn(selectCls, "h-8 w-auto caption-5")} value={m.tier} onChange={(e) => patch.mutate({ id: m.id, tier: e.target.value as Tier })}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                        <label className="flex items-center gap-1.5 caption-5 text-muted"><input type="checkbox" checked={m.enabled} onChange={(e) => patch.mutate({ id: m.id, enabled: e.target.checked })} />In use</label>
                         <button aria-label={`Remove ${m.model}`} className="ml-auto text-muted hover:text-red-600" onClick={() => del.mutate(m.id)}><Trash2 className="h-4 w-4" /></button>
                       </>) : <Badge tone={tierTone(m.tier)}>{m.tier}</Badge>}
                     </li>))}
                 </ul>
               </section>))}
-            <label className="flex items-start gap-3 rounded-lg bg-emerald-50 p-3 text-sm">
+            <label className="flex items-start gap-3 rounded-lg bg-emerald-50 p-3 body-6">
               <input type="checkbox" className="mt-1" checked={data.savings_mode} disabled={!admin || savings.isPending} onChange={(e) => savings.mutate(e.target.checked)} />
-              <span><span className="font-medium">Savings mode</span><span className="block text-xs text-muted">Plain tasks use the next cheaper tier. Long, multi-repository or low-confidence work moves up. Off: every task uses its normal tier.</span></span>
+              <span><span className="font-medium">Savings mode</span><span className="block caption-5 text-muted">Plain tasks use the next cheaper tier. Long, multi-repository or low-confidence work moves up. Off: every task uses its normal tier.</span></span>
             </label>
-            <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+            <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 body-6">
               <input type="checkbox" className="mt-1" aria-label="Independent review of investigations" checked={!!data.independent_review} disabled={!admin || review.isPending} onChange={(e) => review.mutate(e.target.checked)} />
-              <span><span className="font-medium">Independent review of investigations</span><span className="block text-xs text-muted">Off by default. When on, each investigation gets a second model pass that sees only the evidence, not the conclusion, and the report shows whether it agrees. It costs one extra model call per investigation and never changes the confidence score.</span></span>
+              <span><span className="font-medium">Independent review of investigations</span><span className="block caption-5 text-muted">Off by default. When on, each investigation gets a second model pass that sees only the evidence, not the conclusion, and the report shows whether it agrees. It costs one extra model call per investigation and never changes the confidence score.</span></span>
             </label>
             {data.active > 1 && (
-              <table className="w-full text-sm" aria-label="Routing plan">
-                <thead><tr className="text-left text-xs text-muted"><th className="py-1 font-normal">Task</th><th className="font-normal">Model now</th><th className="font-normal">Why</th></tr></thead>
-                <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-1.5">{r.label}</td><td><code className="text-xs">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="text-xs text-muted">{r.why}</td></tr>)}</tbody>
+              <table className="w-full body-6" aria-label="Routing plan">
+                <thead><tr className="text-left caption-5 text-muted"><th className="py-1 font-normal">Task</th><th className="font-normal">Model now</th><th className="font-normal">Why</th></tr></thead>
+                <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-1.5">{r.label}</td><td><code className="caption-5">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="caption-5 text-muted">{r.why}</td></tr>)}</tbody>
               </table>)}
           </div>)}
         <ErrorNote error={patch.error ?? del.error ?? savings.error ?? review.error} />
@@ -117,19 +117,19 @@ function AddModels({ data, onDone }: { data: ModelRegistry; onDone: (d: ModelReg
       <label className="block"><Label>API key {stored && <span className="text-emerald-700">(stored — leave blank to keep)</span>}</Label>
         <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => { setApiKey(e.target.value); reset(); }} placeholder={stored ? "••••••••••••" : "Paste your API key"} /></label>
       <Button type="button" variant={models ? "outline" : "primary"} disabled={check.isPending || (!apiKey && !stored)} onClick={() => check.mutate()}>{check.isPending ? "Testing…" : "Test connection"}</Button>
-      {err && <p role="alert" className="text-sm text-red-600">{err}</p>}
+      {err && <p role="alert" className="body-6 text-red-600">{err}</p>}
       {models && (
         <div className="space-y-2 border-t border-line pt-3">
-          <p role="status" className="text-sm text-emerald-700">Key accepted. Tick the models to use, then test them.</p>
+          <p role="status" className="body-6 text-emerald-700">Key accepted. Tick the models to use, then test them.</p>
           <Input aria-label="Filter models" placeholder="Filter models…" className="h-8" value={filter} onChange={(e) => setFilter(e.target.value)} />
           <ul className="max-h-56 space-y-1 overflow-auto">{shown.map((m) => (
-            <li key={m} className="flex items-center gap-2 text-sm">
-              <label className="flex flex-1 items-center gap-2"><input type="checkbox" checked={m in picked} onChange={(e) => { setPicked((p) => { const n = { ...p }; if (e.target.checked) n[m] = guessTier(m); else delete n[m]; return n; }); setResults((x) => { const n = { ...x }; delete n[m]; return n; }); }} /><code className="text-xs">{m}</code></label>
-              {results[m] && <span role="status" className={cn("text-xs", results[m].ok ? "text-emerald-700" : "text-red-600")}>{results[m].ok ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : <X className="mr-1 inline h-3 w-3" aria-hidden />}{results[m].text}</span>}
-              {m in picked && <select aria-label={`Tier for ${m}`} className={cn(selectCls, "h-7 w-auto text-xs")} value={picked[m]} onChange={(e) => setPicked((p) => ({ ...p, [m]: e.target.value as Tier }))}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
+            <li key={m} className="flex items-center gap-2 body-6">
+              <label className="flex flex-1 items-center gap-2"><input type="checkbox" checked={m in picked} onChange={(e) => { setPicked((p) => { const n = { ...p }; if (e.target.checked) n[m] = guessTier(m); else delete n[m]; return n; }); setResults((x) => { const n = { ...x }; delete n[m]; return n; }); }} /><code className="caption-5">{m}</code></label>
+              {results[m] && <span role="status" className={cn("caption-5", results[m].ok ? "text-emerald-700" : "text-red-600")}>{results[m].ok ? <Check className="mr-1 inline h-3 w-3" aria-hidden /> : <X className="mr-1 inline h-3 w-3" aria-hidden />}{results[m].text}</span>}
+              {m in picked && <select aria-label={`Tier for ${m}`} className={cn(selectCls, "h-7 w-auto caption-5")} value={picked[m]} onChange={(e) => setPicked((p) => ({ ...p, [m]: e.target.value as Tier }))}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
             </li>))}</ul>
           {count > 0 && <Button type="button" variant={allOk ? "outline" : "primary"} disabled={testing || allOk} onClick={testAll}>{testing ? "Testing…" : allOk ? "All models work" : `Test ${count} selected model${count === 1 ? "" : "s"}`}</Button>}
-          <p className="text-xs text-muted">Tiers are guessed from the name; change them if needed. Cheap models take simple tasks, strong ones take hard tasks.</p>
+          <p className="caption-5 text-muted">Tiers are guessed from the name; change them if needed. Cheap models take simple tasks, strong ones take hard tasks.</p>
         </div>)}
       <ErrorNote error={save.error} />
       <div className="flex justify-end"><Button disabled={!allOk || save.isPending} title={allOk ? "" : "Test the selected models first"}>{count ? `Add ${count} model${count === 1 ? "" : "s"}` : "Add models"}</Button></div>
@@ -149,14 +149,14 @@ export function MemoryCard({ admin }: { admin: boolean }) {
     <ConnectionCard icon={Brain} tint="violet" title="Answer memory" status={<StatusPill on={data.enabled} onLabel="On" offLabel="Off" />}
       description="Answers are remembered on this server. A repeated or re-worded question is answered from memory, with no model call and no tokens, until the underlying docs or code change."
       footer={data.entries > 0 ? (<>
-        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-medium text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
+        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 body-5 text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
         {admin && <Button size="sm" variant="outline" onClick={async () => { if (await ask({ title: "Forget all remembered answers?", message: "Questions will be sent to the model again.", confirmLabel: "Forget", danger: true })) clear.mutate(); }}>Clear memory</Button>}</>) : undefined}>
-      <dl className="grid gap-4 text-sm sm:grid-cols-3">
-        <div><dt className="text-xs text-muted">Remembered answers</dt><dd className="font-medium">{data.entries}</dd></div>
-        <div><dt className="text-xs text-muted">Times reused</dt><dd className="font-medium">{data.hits}</dd></div>
-        <div><dt className="text-xs text-muted">Tokens saved</dt><dd className="font-medium">{data.tokens_saved.toLocaleString()}</dd></div>
+      <dl className="grid gap-4 body-6 sm:grid-cols-3">
+        <div><dt className="caption-5 text-muted">Remembered answers</dt><dd className="font-medium">{data.entries}</dd></div>
+        <div><dt className="caption-5 text-muted">Times reused</dt><dd className="font-medium">{data.hits}</dd></div>
+        <div><dt className="caption-5 text-muted">Tokens saved</dt><dd className="font-medium">{data.tokens_saved.toLocaleString()}</dd></div>
       </dl>
-      <p className="mt-2 text-xs text-muted">Matches questions that are {Math.round(data.threshold * 100)}% similar, kept {data.ttl_hours} hours, never shared between people with different repository access.</p>
+      <p className="mt-2 caption-5 text-muted">Matches questions that are {Math.round(data.threshold * 100)}% similar, kept {data.ttl_hours} hours, never shared between people with different repository access.</p>
     </ConnectionCard>
   );
 }

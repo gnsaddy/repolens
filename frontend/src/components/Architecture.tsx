@@ -48,7 +48,7 @@ export function ExportBar({ ids }: { ids: string }) {
   };
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label="Export">
-      <span className="text-xs text-muted">Export</span>
+      <span className="caption-5 text-muted">Export</span>
       <Button size="sm" variant="outline" onClick={asSvg}><Download className="h-4 w-4" />SVG</Button>
       <Button size="sm" variant="outline" onClick={asPng}><Download className="h-4 w-4" />PNG</Button>
       <Button size="sm" variant="outline" disabled={text.isPending} onClick={() => text.mutate("mermaid")}><Download className="h-4 w-4" />Mermaid</Button>
@@ -72,29 +72,29 @@ export default function ArchitectureCard({ groupId, repos, write }: { groupId: s
   });
   const remove = useMutation({ mutationFn: (id: string) => api(`/groups/${groupId}/rules/${id}`, { method: "DELETE" }), onSuccess: () => { done(); toast("Rule removed"); } });
   const a = q.data;
-  const select = "h-8 rounded-lg border border-line bg-white px-2 text-sm text-ink";
+  const select = "h-8 rounded-lg border border-line bg-white px-2 body-6 text-ink";
   const bad = !!a && (a.broken > 0 || a.cycles.length > 0);
   return (
     <Card aria-label="Architecture rules">
       <CardTitle right={a && <Badge tone={bad ? "red" : "green"}>{bad ? `${a.broken} broken, ${a.cycles.length} loop${a.cycles.length === 1 ? "" : "s"}` : "all kept"}</Badge>}>Architecture rules</CardTitle>
       {q.isLoading ? <Spinner /> : !a ? <ErrorNote error={q.error} /> : (<>
-        {!a.rules.length ? <p className="text-sm text-muted">No rules yet. A rule says one repository must not depend on another; it is checked against the dependencies RepoLens can prove.</p> : (
-          <ul className="space-y-2 text-sm">{a.rules.map((r) => (
+        {!a.rules.length ? <p className="body-6 text-muted">No rules yet. A rule says one repository must not depend on another; it is checked against the dependencies RepoLens can prove.</p> : (
+          <ul className="space-y-2 body-6">{a.rules.map((r) => (
             <li key={r.id} className="rounded-lg border border-line p-2">
               <div className="flex items-center gap-2"><span className="font-medium">{r.src_name} must not depend on {r.dst_name}</span>
                 <Badge tone={r.broken ? "red" : "green"}>{r.broken ? "broken" : "kept"}</Badge>
                 {write && <Button size="sm" variant="ghost" aria-label={`Remove rule ${r.src_name} to ${r.dst_name}`} className="ml-auto" onClick={() => remove.mutate(r.id)}><Trash2 className="h-4 w-4" /></Button>}</div>
-              {r.note && <p className="text-xs text-muted">{r.note}</p>}
+              {r.note && <p className="caption-5 text-muted">{r.note}</p>}
               {r.violation && (
-                <ul className="mt-1 space-y-1 text-xs">
+                <ul className="mt-1 space-y-1 caption-5">
                   {r.violation.examples.map((e, i) => <li key={i}><code>{e.from}</code> → <code>{e.to}</code>{e.evidence && <span className="text-muted"> — {e.evidence}</span>}</li>)}
                   <li className="text-muted">{r.violation.links} proven link{r.violation.links === 1 ? "" : "s"}, {r.violation.trust === "fact" ? "found in the code" : r.violation.trust}</li>
                 </ul>)}
             </li>))}</ul>)}
-        {a.hidden_rules > 0 && <p className="mt-2 text-xs text-muted">{a.hidden_rules} more rule{a.hidden_rules > 1 ? "s" : ""} about repositories you cannot access.</p>}
+        {a.hidden_rules > 0 && <p className="mt-2 caption-5 text-muted">{a.hidden_rules} more rule{a.hidden_rules > 1 ? "s" : ""} about repositories you cannot access.</p>}
         {write && repos.length > 1 && (
           <form className="mt-3 space-y-2 border-t border-line pt-3" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 body-6">
               <select aria-label="Repository that must not depend" value={src || repos[0].id} onChange={(e) => setSrc(e.target.value)} className={select}>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
               <span>must not depend on</span>
               <select aria-label="Repository it must not depend on" value={dst || repos[1].id} onChange={(e) => setDst(e.target.value)} className={select}>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
@@ -103,11 +103,11 @@ export default function ArchitectureCard({ groupId, repos, write }: { groupId: s
             <ErrorNote error={add.error} />
             <Button size="sm" type="submit" disabled={add.isPending}><Plus className="h-4 w-4" />Add rule</Button>
           </form>)}
-        <h4 className="mt-4 text-sm font-medium">Loops</h4>
-        {!a.cycles.length ? <p className="text-sm text-muted">No repositories depend on each other in a loop.</p> : (
-          <ul className="mt-1 space-y-2 text-sm">{a.cycles.map((c, i) => (
+        <h4 className="mt-4 body-5">Loops</h4>
+        {!a.cycles.length ? <p className="body-6 text-muted">No repositories depend on each other in a loop.</p> : (
+          <ul className="mt-1 space-y-2 body-6">{a.cycles.map((c, i) => (
             <li key={i} className="rounded-lg border border-line p-2"><div className="font-medium">{c.names.join(" ⇄ ")}</div>
-              <ul className="mt-1 space-y-0.5 text-xs">{c.edges.map((e) => <li key={`${e.src}${e.dst}`}>{c.names[c.repos.indexOf(e.src)]} → {c.names[c.repos.indexOf(e.dst)]}{e.proof && <span className="text-muted"> — {e.proof}</span>}</li>)}</ul></li>))}</ul>)}
+              <ul className="mt-1 space-y-0.5 caption-5">{c.edges.map((e) => <li key={`${e.src}${e.dst}`}>{c.names[c.repos.indexOf(e.src)]} → {c.names[c.repos.indexOf(e.dst)]}{e.proof && <span className="text-muted"> — {e.proof}</span>}</li>)}</ul></li>))}</ul>)}
       </>)}
     </Card>
   );

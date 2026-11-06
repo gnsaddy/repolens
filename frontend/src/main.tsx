@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { FeedbackProvider } from "./components/feedback";
 import { AuthProvider } from "./lib/auth";
+import "@fontsource-variable/geist";
 import "./index.css";
 import { initTheme } from "./lib/theme";
 

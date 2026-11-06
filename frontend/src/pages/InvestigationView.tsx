@@ -51,11 +51,11 @@ export default function InvestigationView() {
 
   return (
     <div>
-      <div className="mb-1 text-xs text-muted"><Link to="/investigations" className="hover:underline">Investigations</Link> / {inv.id.slice(0, 8)}</div>
+      <div className="mb-1 caption-5 text-muted"><Link to="/investigations" className="hover:underline">Investigations</Link> / {inv.id.slice(0, 8)}</div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">{inv.title}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+          <h1 className="heading-6 tracking-tight">{inv.title}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 caption-5 text-muted">
             <Badge tone={statusTone(inv.status)}>{inv.status}</Badge>
             {inv.jira_issue_key && <Badge tone="brand"><Ticket className="mr-1 h-3 w-3" />{inv.jira_issue_key}</Badge>}
             <span>Started {timeAgo(inv.created_at)}</span>
@@ -76,48 +76,48 @@ export default function InvestigationView() {
       {pub && (
         <Modal title="Publish to Jira" subtitle="The RCA report is posted as a comment on the issue." onClose={() => setPub(false)}>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (key.trim()) publish.mutate(key.trim().toUpperCase()); }}>
-            <label className="block text-sm font-medium">Jira issue key
+            <label className="block body-5">Jira issue key
               <Input aria-label="Jira issue key" className="mt-1" value={key} onChange={(e) => setKey(e.target.value)} placeholder="e.g. REP-1" autoFocus /></label>
-            {jira.data === null && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Jira is not connected. Connect it in Settings → Integrations first.</p>}
-            {jira.data && jira.data.allow_publish === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">Publishing is switched off for this Jira connection. Turn on “Allow publishing” in Settings → Integrations → Jira.</p>}
-            {inv.verification && inv.verification.valid === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">This report failed citation verification, so it cannot be published.</p>}
+            {jira.data === null && <p role="alert" className="rounded-lg bg-amber-50 p-2 body-6 text-amber-900">Jira is not connected. Connect it in Settings → Integrations first.</p>}
+            {jira.data && jira.data.allow_publish === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 body-6 text-amber-900">Publishing is switched off for this Jira connection. Turn on “Allow publishing” in Settings → Integrations → Jira.</p>}
+            {inv.verification && inv.verification.valid === false && <p role="alert" className="rounded-lg bg-amber-50 p-2 body-6 text-amber-900">This report failed citation verification, so it cannot be published.</p>}
             <ErrorNote error={publish.error} />
             <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setPub(false)}>Cancel</Button><Button disabled={!key.trim() || publish.isPending}>{publish.isPending ? "Publishing…" : "Publish"}</Button></div>
           </form>
         </Modal>)}
       {inv.status === "failed" && (
-        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 body-6 text-red-800">
           <span className="min-w-0 flex-1">{inv.error ?? "Investigation failed"}</span>
           {canWrite(user) && <Button size="sm" variant="outline" disabled={rerun.isPending} onClick={() => rerun.mutate()}>{rerun.isPending ? "Starting…" : "Run again"}</Button>}
         </div>)}
-      {running && Date.now() - new Date(inv.created_at).getTime() > 3 * 60_000 && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">This is taking longer than usual. It stops by itself after a few minutes and can then be run again.</p>}
+      {running && Date.now() - new Date(inv.created_at).getTime() > 3 * 60_000 && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 caption-5 text-amber-800">This is taking longer than usual. It stops by itself after a few minutes and can then be run again.</p>}
       <ErrorNote error={rerun.error} />
 
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {TABS.map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={cn("-mb-px border-b-2 px-3 py-2 text-sm", tab === t ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>{t}</button>))}
+            className={cn("-mb-px border-b-2 px-3 py-2 body-6", tab === t ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>{t}</button>))}
       </div>
 
       {tab === "Overview" && (
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
-            <div className="mb-3 flex items-center gap-2"><h2 className="text-sm font-semibold">Root cause</h2><Badge tone={statusTone(inv.root_cause_status)}>{inv.root_cause_status}</Badge></div>
-            {running ? <p className="text-sm text-muted">Investigating… steps appear in the Timeline tab.</p> : (<>
-              <p className="text-sm">{inv.root_cause || "No root cause identified."}</p>
-              {top && <div className="mt-4"><div className="mb-1 text-xs text-muted">Confidence (heuristic score, not a probability)</div><ConfidenceBar value={top.confidence} /></div>}
-              {top && <p className="mt-4 text-sm text-slate-700">{top.explanation}</p>}
-              {inv.suggested_fix && <div className="mt-4 rounded-lg bg-indigo-50 p-3 text-sm"><div className="mb-1 font-medium text-indigo-900">Suggested next steps</div>{inv.suggested_fix}</div>}
+            <div className="mb-3 flex items-center gap-2"><h2 className="body-4">Root cause</h2><Badge tone={statusTone(inv.root_cause_status)}>{inv.root_cause_status}</Badge></div>
+            {running ? <p className="body-6 text-muted">Investigating… steps appear in the Timeline tab.</p> : (<>
+              <p className="body-6">{inv.root_cause || "No root cause identified."}</p>
+              {top && <div className="mt-4"><div className="mb-1 caption-5 text-muted">Confidence (heuristic score, not a probability)</div><ConfidenceBar value={top.confidence} /></div>}
+              {top && <p className="mt-4 body-6 text-slate-700">{top.explanation}</p>}
+              {inv.suggested_fix && <div className="mt-4 rounded-lg bg-indigo-50 p-3 body-6"><div className="mb-1 font-medium text-indigo-900">Suggested next steps</div>{inv.suggested_fix}</div>}
             </>)}
             {canWrite(user) && inv.status === "completed" && inv.root_cause_status === "unconfirmed" && (
               <div className="mt-5 flex items-center gap-2 border-t border-line pt-4">
-                <span className="text-xs text-muted">Was this the real root cause?</span>
+                <span className="caption-5 text-muted">Was this the real root cause?</span>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("confirmed")}><ThumbsUp className="h-3.5 w-3.5" />Confirm</Button>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("rejected")}><ThumbsDown className="h-3.5 w-3.5" />Reject</Button>
               </div>)}
             {canWrite(user) && inv.status === "completed" && inv.root_cause_status === "confirmed" && (
               <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-                <span className="text-xs text-muted">Confirmed. Capture it so the next person finds the answer fast.</span>
+                <span className="caption-5 text-muted">Confirmed. Capture it so the next person finds the answer fast.</span>
                 <Button size="sm" variant="outline" disabled={runbook.isPending} onClick={() => runbook.mutate()}><FileText className="h-3.5 w-3.5" />Draft a runbook</Button>
                 <ErrorNote error={runbook.error} />
               </div>)}
@@ -126,21 +126,21 @@ export default function InvestigationView() {
             {inv.status === "completed" && inv.root_cause_status === "confirmed" && <FixProposals investigationId={inv.id} canAct={canWrite(user)} />}
             <Card>
               <CardTitle>Verification</CardTitle>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 body-6">
                 {inv.verification.valid ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <CircleDot className="h-4 w-4 text-amber-600" />}
                 {inv.verification.valid ? `${inv.verification.checked_evidence} citations checked` : "Pending / issues found"}
               </div>
-              {inv.verification.problems?.map((p) => <p key={p} className="mt-1 text-xs text-red-600">{p}</p>)}
-              <p className="mt-2 text-xs text-muted">{inv.verification.note}</p>
+              {inv.verification.problems?.map((p) => <p key={p} className="mt-1 caption-5 text-red-600">{p}</p>)}
+              <p className="mt-2 caption-5 text-muted">{inv.verification.note}</p>
             </Card>
             {!!inv.evidence.memory?.length && (
               <Card><CardTitle>Similar past incidents</CardTitle>
-                <ul className="space-y-2 text-sm">{inv.evidence.memory.map((m) => (
-                  <li key={m.id}><div className="line-clamp-2">{m.title}</div><div className="text-xs text-muted">{Math.round(m.similarity * 100)}% similar · {m.verified ? "verified" : "unverified"}</div></li>))}</ul></Card>)}
+                <ul className="space-y-2 body-6">{inv.evidence.memory.map((m) => (
+                  <li key={m.id}><div className="line-clamp-2">{m.title}</div><div className="caption-5 text-muted">{Math.round(m.similarity * 100)}% similar · {m.verified ? "verified" : "unverified"}</div></li>))}</ul></Card>)}
             {!!inv.evidence.callers?.length && (
               <Card><CardTitle>Affected callers <span className="font-normal text-muted">(static analysis)</span></CardTitle>
-                <ul className="space-y-1 text-sm">{inv.evidence.callers.slice(0, 6).map((c, i) => (
-                  <li key={i} className="flex items-center gap-2"><Network className="h-3.5 w-3.5 text-muted" /><code className="text-xs">{c.caller}</code><span className="truncate text-xs text-muted">{c.file}</span></li>))}</ul></Card>)}
+                <ul className="space-y-1 body-6">{inv.evidence.callers.slice(0, 6).map((c, i) => (
+                  <li key={i} className="flex items-center gap-2"><Network className="h-3.5 w-3.5 text-muted" /><code className="caption-5">{c.caller}</code><span className="truncate caption-5 text-muted">{c.file}</span></li>))}</ul></Card>)}
           </div>
         </div>)}
 
@@ -150,8 +150,8 @@ export default function InvestigationView() {
             <ol className="relative space-y-4 border-l border-line pl-6">
               {inv.timeline.map((s, i) => (
                 <li key={i}><span className="absolute -left-1.5 mt-1 h-3 w-3 rounded-full bg-brand" />
-                  <div className="flex items-center gap-2 text-sm font-medium capitalize">{s.step}<Badge>{s.agent}</Badge><span className="text-xs font-normal text-muted">{s.duration_ms} ms</span></div>
-                  <p className="text-sm text-slate-600">{s.summary}</p></li>))}
+                  <div className="flex items-center gap-2 body-5 capitalize">{s.step}<Badge>{s.agent}</Badge><span className="caption-5 font-normal text-muted">{s.duration_ms} ms</span></div>
+                  <p className="body-6 text-slate-600">{s.summary}</p></li>))}
             </ol>)}
         </Card>)}
 
@@ -160,10 +160,10 @@ export default function InvestigationView() {
           {!inv.hypotheses.length ? <Empty>No hypotheses — retrieval found no relevant code.</Empty> : inv.hypotheses.map((h) => (
             <Card key={h.id}>
               <div className="mb-2 flex items-start justify-between gap-3">
-                <div className="text-sm font-medium">{h.rank}. {h.title}</div><Badge tone={statusTone(h.status)}>{h.status}</Badge>
+                <div className="body-5">{h.rank}. {h.title}</div><Badge tone={statusTone(h.status)}>{h.status}</Badge>
               </div>
               <ConfidenceBar value={h.confidence} />
-              <p className="mt-2 text-sm text-slate-600">{h.explanation}</p>
+              <p className="mt-2 body-6 text-slate-600">{h.explanation}</p>
             </Card>))}
         </div>)}
 
@@ -187,15 +187,15 @@ function EvidenceCard({ e }: { e: EvidenceItem }) {
   if (e.type === "code")
     return (
       <Card>
-        <CardTitle right={<Badge>{e.provenance}</Badge>}><ExtLink href={safeHref(e.url)}><code className="text-xs">{e.repo}:{e.file}</code></ExtLink> <span className="font-normal text-muted">lines {e.start_line}–{e.end_line}{e.symbol ? ` · ${e.symbol}` : ""}</span></CardTitle>
+        <CardTitle right={<Badge>{e.provenance}</Badge>}><ExtLink href={safeHref(e.url)}><code className="caption-5">{e.repo}:{e.file}</code></ExtLink> <span className="font-normal text-muted">lines {e.start_line}–{e.end_line}{e.symbol ? ` · ${e.symbol}` : ""}</span></CardTitle>
         <CodeBlock code={e.snippet ?? ""} startLine={e.start_line} />
       </Card>);
   if (e.type === "commit")
     return (
       <Card>
-        <CardTitle right={<Badge>{e.provenance}</Badge>}><span className="flex items-center gap-2"><GitCommit className="h-4 w-4" /><ExtLink href={safeHref(e.url)}><code className="text-xs">{e.sha?.slice(0, 10)}</code></ExtLink> {e.message?.split("\n")[0]}</span></CardTitle>
-        <div className="mb-2 text-xs text-muted">{e.author} · {timeAgo(e.committed_at)} · {e.files?.map((f) => `${f.path} (+${f.additions}/-${f.deletions})`).join(", ")}</div>
-        {e.diff_excerpt && <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs leading-5">{e.diff_excerpt.split("\n").map((l, i) => (
+        <CardTitle right={<Badge>{e.provenance}</Badge>}><span className="flex items-center gap-2"><GitCommit className="h-4 w-4" /><ExtLink href={safeHref(e.url)}><code className="caption-5">{e.sha?.slice(0, 10)}</code></ExtLink> {e.message?.split("\n")[0]}</span></CardTitle>
+        <div className="mb-2 caption-5 text-muted">{e.author} · {timeAgo(e.committed_at)} · {e.files?.map((f) => `${f.path} (+${f.additions}/-${f.deletions})`).join(", ")}</div>
+        {e.diff_excerpt && <pre className="max-h-72 overflow-auto rounded-lg border border-line bg-slate-50 p-3 font-mono caption-5">{e.diff_excerpt.split("\n").map((l, i) => (
           <div key={i} className={l.startsWith("+") && !l.startsWith("+++") ? "bg-emerald-100/70" : l.startsWith("-") && !l.startsWith("---") ? "bg-red-100/70" : ""}>{l || " "}</div>))}</pre>}
       </Card>);
   if (e.type === "pr")
@@ -203,17 +203,17 @@ function EvidenceCard({ e }: { e: EvidenceItem }) {
       <Card>
         <CardTitle right={<div className="flex gap-1">{e.jira_keys?.map((k) => <Badge key={k} tone="brand">{k}</Badge>)}<Badge tone={statusTone(e.state === "merged" ? "completed" : "queued")}>{e.state}</Badge></div>}>
           <span className="flex items-center gap-2"><GitPullRequest className="h-4 w-4" />PR #{e.number}: {e.title}</span></CardTitle>
-        <div className="mb-2 text-xs text-muted">by {e.author} · <Badge>{e.provenance}</Badge>{e.url && <> · <a className="text-brand hover:underline" href={safeHref(e.url)} target="_blank" rel="noreferrer">open on GitHub</a></>}</div>
-        {e.body && <p className="whitespace-pre-wrap text-sm text-slate-700">{e.body.slice(0, 500)}</p>}
+        <div className="mb-2 caption-5 text-muted">by {e.author} · <Badge>{e.provenance}</Badge>{e.url && <> · <a className="text-brand hover:underline" href={safeHref(e.url)} target="_blank" rel="noreferrer">open on GitHub</a></>}</div>
+        {e.body && <p className="whitespace-pre-wrap body-6 text-slate-700">{e.body.slice(0, 500)}</p>}
       </Card>);
   if (e.type === "doc")
     return (
       <Card>
         <CardTitle right={<Badge tone="blue">{e.relation?.toLowerCase().replace("_", " ")}</Badge>}><span className="flex items-center gap-2"><FileText className="h-4 w-4" />Documentation: {e.title}</span></CardTitle>
-        <div className="mb-2 text-xs text-muted"><ExtLink href={safeHref(e.url)}><code>{e.repo}:{e.file}</code></ExtLink> lines {e.start_line}–{e.end_line} · mentions <code>{e.symbol}</code></div>
+        <div className="mb-2 caption-5 text-muted"><ExtLink href={safeHref(e.url)}><code>{e.repo}:{e.file}</code></ExtLink> lines {e.start_line}–{e.end_line} · mentions <code>{e.symbol}</code></div>
         <CodeBlock code={e.snippet ?? ""} startLine={e.start_line} />
       </Card>);
   if (e.type === "test")
-    return <Card><span className="flex items-center gap-2 text-sm"><FlaskConical className="h-4 w-4" />Covered by test file <code className="text-xs">{e.file}</code> <Badge>{e.provenance}</Badge></span></Card>;
-  return <Card><span className="text-sm">Called by <code className="text-xs">{e.caller}</code> in <code className="text-xs">{e.file}</code> <Badge>{e.provenance}</Badge></span></Card>;
+    return <Card><span className="flex items-center gap-2 body-6"><FlaskConical className="h-4 w-4" />Covered by test file <code className="caption-5">{e.file}</code> <Badge>{e.provenance}</Badge></span></Card>;
+  return <Card><span className="body-6">Called by <code className="caption-5">{e.caller}</code> in <code className="caption-5">{e.file}</code> <Badge>{e.provenance}</Badge></span></Card>;
 }

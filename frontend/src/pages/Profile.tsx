@@ -38,11 +38,11 @@ export default function Profile() {
         <Card>
           <CardTitle><UserRound className="mr-1.5 inline h-4 w-4" />Account</CardTitle>
           <div className="mb-4 flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-brand text-lg font-semibold text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</div>
-            <div className="min-w-0"><div className="truncate font-medium">{user.name || "No name set"}</div><div className="truncate text-sm text-muted">{user.email}</div></div>
+            <div className="grid h-12 w-12 place-items-center rounded-full bg-brand title-2 text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</div>
+            <div className="min-w-0"><div className="truncate font-medium">{user.name || "No name set"}</div><div className="truncate body-6 text-muted">{user.email}</div></div>
             <Badge tone={user.role === "admin" ? "brand" : "gray"}>{user.role}</Badge>
           </div>
-          <p className="mb-4 text-xs text-muted">{ROLE_HELP[user.role]}</p>
+          <p className="mb-4 caption-5 text-muted">{ROLE_HELP[user.role]}</p>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (name.trim()) rename.mutate(); }}>
             <label className="block"><Label>Display name</Label><Input value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></label>
             <ErrorNote error={rename.error} />
@@ -52,39 +52,39 @@ export default function Profile() {
 
         <Card className="lg:col-span-2">
           <CardTitle><Moon className="mr-1.5 inline h-4 w-4" />Appearance</CardTitle>
-          <div role="radiogroup" aria-label="Colour theme" className="inline-flex rounded-lg bg-slate-100 p-1 text-sm">
+          <div role="radiogroup" aria-label="Colour theme" className="inline-flex rounded-lg bg-slate-100 p-1 body-6">
             {([["system", "Match my device", Monitor], ["light", "Day", Sun], ["dark", "Night", Moon]] as [ThemePref, string, typeof Sun][]).map(([v, label, Icon]) => (
               <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
           </div>
-          <p className="mt-2 text-xs text-muted">Saved in this browser only.</p>
+          <p className="mt-2 caption-5 text-muted">Saved in this browser only.</p>
         </Card>
 
         <Card>
           <CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Password</CardTitle>
-          {user.auth_source && user.auth_source !== "password" ? <p className="text-sm text-muted">You sign in through single sign-on, so there is no password here.</p> : (
+          {user.auth_source && user.auth_source !== "password" ? <p className="body-6 text-muted">You sign in through single sign-on, so there is no password here.</p> : (
             <form className="space-y-3" onSubmit={submit}>
               <label className="block"><Label>Current password</Label><Input type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></label>
               <label className="block"><Label>New password</Label><Input type="password" autoComplete="new-password" minLength={8} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></label>
               <label className="block"><Label>Repeat new password</Label><Input type="password" autoComplete="new-password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></label>
-              {mismatch && <p role="alert" className="text-sm text-red-600">The passwords do not match.</p>}
+              {mismatch && <p role="alert" className="body-6 text-red-600">The passwords do not match.</p>}
               <ErrorNote error={change.error} />
               <Button disabled={!pw.current || pw.next.length < 8 || mismatch || !pw.again || change.isPending}>Change password</Button>
-              <p className="text-xs text-muted">Changing your password signs you out everywhere else.</p>
+              <p className="caption-5 text-muted">Changing your password signs you out everywhere else.</p>
             </form>)}
         </Card>
 
         {user.auth_source === "password" && <TwoFactor enabled={!!user.totp_enabled} onChange={(on) => setUser({ ...user, totp_enabled: on })} />}
 
-        <Card className="lg:col-span-2"><CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Access tokens and editor setup</CardTitle><p className="text-sm text-muted">Tokens for scripts, CI and editors now live in <Link className="text-brand hover:underline" to="/settings?tab=mcp">Settings → MCP &amp; tokens</Link>.</p></Card>
+        <Card className="lg:col-span-2"><CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Access tokens and editor setup</CardTitle><p className="body-6 text-muted">Tokens for scripts, CI and editors now live in <Link className="text-brand hover:underline" to="/settings?tab=mcp">Settings → MCP &amp; tokens</Link>.</p></Card>
 
         <Card className="lg:col-span-2">
           <CardTitle right={(sessions.data?.length ?? 0) > 1 ? <Button size="sm" variant="outline" disabled={others.isPending} onClick={async () => { if (await ask({ title: "Sign out everywhere else?", message: "Every other browser and device is signed out. This one stays signed in.", confirmLabel: "Sign out others", danger: true })) others.mutate(); }}>Sign out other devices</Button> : undefined}><ShieldCheck className="mr-1.5 inline h-4 w-4" />Where you are signed in</CardTitle>
           {!sessions.data?.length ? <Empty>No active sessions.</Empty> : (
             <ul aria-label="Sessions" className="divide-y divide-line">{sessions.data.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+              <li key={s.id} className="flex flex-wrap items-center gap-3 py-3 body-6">
                 <Laptop className="h-5 w-5 text-muted" />
                 <div className="min-w-0 flex-1"><div className="font-medium">{s.device}{s.current && <Badge tone="green" className="ml-2">this device</Badge>}</div>
-                  <div className="text-xs text-muted">{s.ip || "unknown address"} · signed in {timeAgo(s.created_at)} · last active {timeAgo(s.last_seen_at)}{s.method === "sso" ? " · single sign-on" : ""}</div></div>
+                  <div className="caption-5 text-muted">{s.ip || "unknown address"} · signed in {timeAgo(s.created_at)} · last active {timeAgo(s.last_seen_at)}{s.method === "sso" ? " · single sign-on" : ""}</div></div>
                 {!s.current && <Button size="sm" variant="ghost" disabled={end.isPending} onClick={() => end.mutate(s.id)}>End session</Button>}
               </li>))}</ul>)}
           <ErrorNote error={end.error ?? others.error} />
@@ -108,11 +108,11 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
   return (
     <Card>
       <CardTitle right={enabled ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}><Smartphone className="mr-1.5 inline h-4 w-4" />Authenticator app</CardTitle>
-      <p className="mb-3 text-sm text-muted">Ask for a six-digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
+      <p className="mb-3 body-6 text-muted">Ask for a six-digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
       {codes ? (
-        <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 text-sm">
+        <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 body-6">
           <p className="font-medium text-emerald-900">Save these recovery codes now. Each works once if you lose your phone; they are not shown again.</p>
-          <pre aria-label="Recovery codes" className="rounded-md bg-white p-2 font-mono text-xs">{codes.join("\n")}</pre>
+          <pre aria-label="Recovery codes" className="rounded-md bg-white p-2 font-mono caption-5">{codes.join("\n")}</pre>
           <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { void navigator.clipboard?.writeText(codes.join("\n")); toast("Copied"); }}><Copy className="h-3.5 w-3.5" />Copy</Button><Button size="sm" onClick={() => setCodes(null)}>I have saved them</Button></div>
         </div>
       ) : enabled ? (off.open ? (
@@ -124,10 +124,10 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
         </form>) : <Button variant="outline" size="sm" onClick={() => setOff({ ...off, open: true })}>Turn off…</Button>
       ) : setup ? (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); confirm.mutate(); }}>
-          <p className="text-sm">1. In your app choose “add account” and enter this key (or open the link on your phone):</p>
-          <code aria-label="Setup key" className="block break-all rounded-md bg-slate-100 p-2 text-sm">{setup.secret}</code>
-          <a className="text-xs text-brand hover:underline" href={setup.uri}>Open in an authenticator app</a>
-          <p className="text-sm">2. Enter the six-digit code it shows:</p>
+          <p className="body-6">1. In your app choose “add account” and enter this key (or open the link on your phone):</p>
+          <code aria-label="Setup key" className="block break-all rounded-md bg-slate-100 p-2 body-6">{setup.secret}</code>
+          <a className="caption-5 text-brand hover:underline" href={setup.uri}>Open in an authenticator app</a>
+          <p className="body-6">2. Enter the six-digit code it shows:</p>
           <Input aria-label="Six-digit code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
           <ErrorNote error={confirm.error} />
           <div className="flex gap-2"><Button size="sm" disabled={code.replace(/\D/g, "").length !== 6 || confirm.isPending}>Turn on</Button><Button size="sm" type="button" variant="outline" onClick={() => setSetup(null)}>Cancel</Button></div>

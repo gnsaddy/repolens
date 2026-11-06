@@ -9,7 +9,7 @@
   --color-line: #e7e9f0;
   --color-surface: #ffffff;
   --color-canvas: #f7f8fb;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
 }
 
@@ -41,25 +41,25 @@
 .dark .recharts-text, .dark .recharts-cartesian-axis-tick-value { fill: #94a3b8; }
 
 body { @apply bg-canvas text-ink antialiased; }
-.prose-report h2 { @apply text-lg font-semibold mt-0 mb-2; }
-.prose-report h3 { @apply text-sm font-semibold mt-4 mb-1; }
-.prose-report p, .prose-report li { @apply text-sm text-slate-700; }
+.prose-report h2 { @apply title-2 mt-0 mb-2; }
+.prose-report h3 { @apply body-4 mt-4 mb-1; }
+.prose-report p, .prose-report li { @apply body-6 text-slate-700; }
 .prose-report ul { @apply list-disc pl-5; }
 .prose-report ol { @apply list-decimal pl-5; }
-.prose-report code { @apply font-mono text-xs bg-slate-100 px-1 rounded-md; }
+.prose-report code { @apply font-mono caption-5 bg-slate-100 px-1 rounded-md; }
 
-.prose-wiki { @apply text-sm leading-6 text-slate-800; }
-.prose-wiki h1 { @apply mt-0 mb-3 text-2xl font-semibold tracking-tight; }
-.prose-wiki h2 { @apply mt-6 mb-2 border-b border-line pb-1 text-lg font-semibold; }
-.prose-wiki h3 { @apply mt-4 mb-1 text-base font-semibold; }
+.prose-wiki { @apply body-6 text-slate-800; }
+.prose-wiki h1 { @apply mt-0 mb-3 heading-5 tracking-tight; }
+.prose-wiki h2 { @apply mt-6 mb-2 border-b border-line pb-1 title-2; }
+.prose-wiki h3 { @apply mt-4 mb-1 body-1; }
 .prose-wiki p { @apply my-2; }
 .prose-wiki ul { @apply my-2 list-disc pl-5; }
 .prose-wiki ol { @apply my-2 list-decimal pl-5; }
-.prose-wiki code { @apply rounded-md bg-slate-100 px-1 font-mono text-xs; }
+.prose-wiki code { @apply rounded-md bg-slate-100 px-1 font-mono caption-5; }
 .prose-wiki pre { @apply my-3 overflow-x-auto rounded-lg border border-line bg-slate-50 p-3; }
 .prose-wiki pre code { @apply bg-transparent p-0; }
 .prose-wiki blockquote { @apply my-3 border-l-4 border-indigo-200 bg-indigo-50/50 px-3 py-1; }
-.prose-wiki table { @apply my-3 w-full border-collapse text-xs; }
+.prose-wiki table { @apply my-3 w-full border-collapse caption-5; }
 .prose-wiki th, .prose-wiki td { @apply border border-line px-2 py-1 text-left; }
 .prose-wiki th { @apply bg-slate-50 font-medium; }
 .prose-wiki a { @apply text-brand hover:underline; }

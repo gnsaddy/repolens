@@ -69,13 +69,13 @@ export default function Ask() {
       <Card className="flex min-h-0 flex-col gap-3 p-3" aria-label="Chat history">
         <Button onClick={() => nav("/ask")} className="w-full"><MessageSquarePlus className="h-4 w-4" />New chat</Button>
         <Input aria-label="Search chats" placeholder="Search chats…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <div role="tablist" aria-label="Chat list" className="flex gap-1 text-sm">
+        <div role="tablist" aria-label="Chat list" className="flex gap-1 body-6">
           {(["chats", "archived", "gaps"] as const).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn("rounded-lg px-3 py-1", tab === t ? "bg-indigo-50 font-medium text-brand" : "text-muted hover:bg-slate-50")}>{t === "chats" ? "Chats" : t === "archived" ? "Archived" : "Gaps"}</button>))}
         </div>
         <div className="min-h-0 flex-1 overflow-auto" aria-label={tab === "chats" ? "Chats" : tab === "archived" ? "Archived chats" : "Gaps"}>
-          {tab === "gaps" ? <ChatGaps /> : list.isLoading ? <Spinner /> : !groups.length ? <p className="p-2 text-sm text-muted">{search ? "No chats match that search." : tab === "archived" ? "No archived chats." : "No chats yet. Ask a question to start one."}</p> : groups.map(([name, items]) => (
-            <section key={name} className="mb-3"><h3 className="mb-1 px-2 text-xs font-medium uppercase tracking-wide text-muted">{name}</h3>
+          {tab === "gaps" ? <ChatGaps /> : list.isLoading ? <Spinner /> : !groups.length ? <p className="p-2 body-6 text-muted">{search ? "No chats match that search." : tab === "archived" ? "No archived chats." : "No chats yet. Ask a question to start one."}</p> : groups.map(([name, items]) => (
+            <section key={name} className="mb-3"><h3 className="mb-1 px-2 caption-4 uppercase tracking-wide text-muted">{name}</h3>
               <ul className="space-y-0.5">{items.map((c) => (
                 <li key={c.id} className={cn("group relative rounded-lg", c.id === id ? "bg-indigo-50" : "hover:bg-slate-50")}>
                   {renaming === c.id ? (
@@ -83,14 +83,14 @@ export default function Ask() {
                       <button aria-label="Save title" className="p-1 text-emerald-600" onClick={saveRename}><Check className="h-4 w-4" /></button></div>
                   ) : (
                     <div className="flex items-center">
-                      <Link to={`/ask/${c.id}`} className="min-w-0 flex-1 px-2 py-1.5 text-sm" aria-current={c.id === id ? "page" : undefined}>
+                      <Link to={`/ask/${c.id}`} className="min-w-0 flex-1 px-2 py-1.5 body-6" aria-current={c.id === id ? "page" : undefined}>
                         <span className={cn("block truncate", c.id === id && "font-medium text-brand")}>{c.title}</span>
-                        {c.preview && <span className="block truncate text-xs text-muted">{c.preview}</span>}
+                        {c.preview && <span className="block truncate caption-5 text-muted">{c.preview}</span>}
                       </Link>
                       <button aria-label={`Options for ${c.title}`} aria-haspopup="menu" className="mr-1 rounded-md p-1 text-muted opacity-60 hover:bg-white hover:opacity-100 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); setMenu(menu === c.id ? null : c.id); }}><MoreVertical className="h-4 w-4" /></button>
                     </div>)}
                   {menu === c.id && (
-                    <div role="menu" aria-label={`Actions for ${c.title}`} className="absolute right-1 top-9 z-20 w-40 rounded-lg border border-line bg-white p-1 text-sm shadow-lg" onClick={(e) => e.stopPropagation()}>
+                    <div role="menu" aria-label={`Actions for ${c.title}`} className="absolute right-1 top-9 z-20 w-40 rounded-lg border border-line bg-white p-1 body-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
                       <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => startRename(c)}><Pencil className="h-3.5 w-3.5" />Rename</button>
                       <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(null); patch.mutate({ id: c.id, body: { archived: !c.archived } }); toast(c.archived ? "Chat restored" : "Chat archived"); }}>{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{c.archived ? "Restore" : "Archive"}</button>
                       <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); void removeChat(c); }}><Trash2 className="h-3.5 w-3.5" />Delete</button>
@@ -165,14 +165,14 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
   return (
     <Card className="flex min-h-0 flex-col p-0" aria-label="Conversation panel">
       <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
-        <label className="flex items-center gap-2 text-sm"><GitBranch className="h-4 w-4 text-muted" /><span className="text-muted">Scope:</span>
-          <select aria-label="Scope" value={scope} onChange={(e) => (thread ? onChange({ repo_ids: e.target.value ? [e.target.value] : [] }) : draft.setScope(e.target.value))} className="h-9 max-w-[16rem] rounded-lg border border-line bg-white px-2 text-sm font-medium">
+        <label className="flex items-center gap-2 body-6"><GitBranch className="h-4 w-4 text-muted" /><span className="text-muted">Scope:</span>
+          <select aria-label="Scope" value={scope} onChange={(e) => (thread ? onChange({ repo_ids: e.target.value ? [e.target.value] : [] }) : draft.setScope(e.target.value))} className="h-9 max-w-[16rem] rounded-lg border border-line bg-white px-2 body-5">
             <option value="">All repositories &amp; knowledge base</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
         <span className="ml-auto flex items-center gap-1">
-          <label className={cn("flex items-center gap-2 text-sm", !modelAvailable && "opacity-60")} title={modelAvailable ? undefined : "Needs a connected language model (Settings → AI & search)"}>
+          <label className={cn("flex items-center gap-2 body-6", !modelAvailable && "opacity-60")} title={modelAvailable ? undefined : "Needs a connected language model (Settings → AI & search)"}>
             <input type="checkbox" checked={fallback} disabled={!modelAvailable} onChange={(e) => (thread ? onChange({ fallback: e.target.checked }) : draft.setFallback(e.target.checked))} />Allow fallback knowledge</label>
           <InfoTip label="About fallback knowledge">
-            <strong className="block text-sm">Fallback knowledge</strong>
+            <strong className="block body-6">Fallback knowledge</strong>
             <span className="mt-1 block">Normally answers come only from your repositories and documents, with citations.</span>
             <span className="mt-1 block">With this on, a connected model may answer from its general knowledge when your sources do not cover the question. Those parts start with “Not from your documents:”, have no citations, and can be wrong or out of date.</span>
             <span className="mt-1 block">Your question and any attached file are sent to your model provider even when nothing matched. Off by default. Needs a connected model.</span>
@@ -186,11 +186,11 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
       </div>
 
       <div role="log" aria-label="Conversation" className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-5">
-        {thread?.archived && <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900">This chat is archived. Writing in it brings it back.</p>}
+        {thread?.archived && <p className="rounded-lg bg-amber-50 p-2.5 caption-5 text-amber-900">This chat is archived. Writing in it brings it back.</p>}
         {loading ? <Spinner /> : error ? <ErrorNote error={error} /> : !items.length && !pending && (
           <div className="flex gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div>
-            <div className="rounded-xl border border-line p-4 text-sm leading-6">Ask anything about your connected repositories and documents: how a flow works, where something lives, or what depends on what. Answers cite the sources they used. Attach a <b>.txt</b> or <b>.log</b> file to debug an error.
-              <div className="mt-3 flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} className="rounded-full border border-line px-3 py-1 text-xs hover:bg-slate-50" onClick={() => setText(x)}>{x}</button>)}</div></div></div>)}
+            <div className="rounded-xl border border-line p-4 body-6">Ask anything about your connected repositories and documents: how a flow works, where something lives, or what depends on what. Answers cite the sources they used. Attach a <b>.txt</b> or <b>.log</b> file to debug an error.
+              <div className="mt-3 flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} className="rounded-full border border-line px-3 py-1 caption-5 hover:bg-slate-50" onClick={() => setText(x)}>{x}</button>)}</div></div></div>)}
         {items.map((m) => m.role === "user" ? (
           <div key={m.id} className="group flex justify-end gap-2">
             {editing === m.id ? (
@@ -199,9 +199,9 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
                 <ErrorNote error={edit.error} /></div>
             ) : (<>
               <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded-md p-1.5 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
-              <div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 text-sm text-white">
+              <div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 body-6 text-white">
                 <p className="whitespace-pre-wrap">{m.content}</p>
-                {m.attachment && <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 text-xs"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
+                {m.attachment && <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 caption-5"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
                 {m.edited_at && <p className="mt-1 text-right text-[10px] opacity-70">edited</p>}</div></>)}
           </div>
         ) : (
@@ -211,24 +211,24 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
               <div className="mb-2 flex items-center gap-2"><Badge tone={m.mode === "llm" ? "brand" : m.mode === "general" ? "amber" : m.mode === "failed" ? "red" : "gray"}>{m.mode === "llm" ? "AI answer" : m.mode === "general" ? "general knowledge" : m.mode === "failed" ? "AI unavailable" : m.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
                 {m.mode === "llm" && /\(Check these names, not found/.test(m.content) && <Badge tone="amber" title="The answer names files, routes or functions that were not found in your indexed repositories">Check these names</Badge>}
                 {m.mode === "llm" && /^\s*Not from your documents:/m.test(m.content) && <Badge tone="amber" title="Part of this answer is not backed by your sources and has no citations">Not from your documents</Badge>}
-                <span className="text-xs text-muted">{timeAgo(m.created_at)}</span>
+                <span className="caption-5 text-muted">{timeAgo(m.created_at)}</span>
                 {items[items.indexOf(m) - 1]?.role === "user" && m.mode !== "failed" && <button aria-label="Save as a test" title="Save as a quality check" className="ml-auto rounded-md p-1 text-muted hover:bg-slate-100" onClick={() => void saveTest(items.indexOf(m))}><ClipboardCheck className="h-4 w-4" /></button>}
                 <button aria-label="Copy answer" title="Copy" className={cn("rounded-md p-1 text-muted hover:bg-slate-100", items[items.indexOf(m) - 1]?.role !== "user" && "ml-auto")} onClick={() => void copy(m)}>{copied === m.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}</button></div>
-              <div className="text-sm leading-6"><Markdown text={m.content} onOpen={() => {}} /></div>
+              <div className="body-6"><Markdown text={m.content} onOpen={() => {}} /></div>
               {m.mode === "failed" && (() => { const i = items.indexOf(m); const q = items[i - 1]; return q?.role === "user" && i === items.length - 1 ? <Button size="sm" variant="outline" className="mt-3" disabled={edit.isPending} onClick={() => edit.mutate({ mid: q.id, content: q.content })}>{edit.isPending ? "Trying…" : "Try again"}</Button> : null; })()}
               <Sources sources={m.sources} />
             </div>
           </div>))}
         {pending && (<>
-          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 text-sm text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
-          <div className="flex gap-3" role="status" aria-label="Thinking"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div><div className="flex items-center gap-2 rounded-xl border border-line px-4 py-3 text-sm text-muted"><Spinner />Searching your knowledge base…</div></div></>)}
+          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 body-6 text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
+          <div className="flex gap-3" role="status" aria-label="Thinking"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div><div className="flex items-center gap-2 rounded-xl border border-line px-4 py-3 body-6 text-muted"><Spinner />Searching your knowledge base…</div></div></>)}
         <div ref={end} />
       </div>
 
       <div className="border-t border-line p-3">
         <ErrorNote error={send.error} />
-        {(fileError || attached?.cut) && <p role="alert" className="mb-2 text-xs text-amber-700">{fileError || `${attached!.name} is very large, so only the first ${MAX_ATTACH_CHARS.toLocaleString()} characters are sent.`}</p>}
-        {attached && <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-2.5 py-1 text-xs"><FileText className="h-3.5 w-3.5 text-brand" /><span className="font-medium">{attached.name}</span><span className="text-muted">{Math.max(1, Math.round(attached.text.length / 1024))} KB</span>
+        {(fileError || attached?.cut) && <p role="alert" className="mb-2 caption-5 text-amber-700">{fileError || `${attached!.name} is very large, so only the first ${MAX_ATTACH_CHARS.toLocaleString()} characters are sent.`}</p>}
+        {attached && <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-2.5 py-1 caption-5"><FileText className="h-3.5 w-3.5 text-brand" /><span className="font-medium">{attached.name}</span><span className="text-muted">{Math.max(1, Math.round(attached.text.length / 1024))} KB</span>
           <button aria-label="Remove attachment" className="text-muted hover:text-red-600" onClick={() => setAttached(null)}><X className="h-3.5 w-3.5" /></button></div>}
         <div className="flex items-end gap-2">
           <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-muted hover:bg-slate-50" title="Attach a .txt or .log file to debug">
@@ -248,7 +248,7 @@ function Sources({ sources }: { sources: ChatSource[] }) {
   if (!sources.length) return null;
   const href = (s: ChatSource) => (s.kind === "doc" ? `/wiki?tab=browse&repo=${encodeURIComponent(s.repo_id)}&path=${encodeURIComponent(s.file)}` : s.node_id ? `/knowledge?tab=graph&node=${encodeURIComponent(s.node_id)}` : null);
   return (
-    <details className="mt-3 border-t border-line pt-2 text-xs">
+    <details className="mt-3 border-t border-line pt-2 caption-5">
       <summary className="cursor-pointer font-medium text-muted">Sources ({sources.length})</summary>
       <ul className="mt-2 space-y-1.5">{sources.map((s) => {
         const to = href(s), ext = safeHref(s.url);

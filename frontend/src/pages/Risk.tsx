@@ -15,7 +15,7 @@ export function Gauge({ score, level }: { score: number; level: RiskAssessment["
     <div className="flex items-center gap-4" role="meter" aria-label="Risk score" aria-valuenow={Math.round(score)} aria-valuemin={0} aria-valuemax={100}>
       <div className="text-4xl font-semibold tabular-nums">{Math.round(score)}</div>
       <div className="flex-1">
-        <div className="mb-1 flex items-center gap-2"><Badge tone={TONE[level]}>{level}</Badge><span className="text-xs text-muted">of 100 · a prioritisation score, not a probability of failure</span></div>
+        <div className="mb-1 flex items-center gap-2"><Badge tone={TONE[level]}>{level}</Badge><span className="caption-5 text-muted">of 100 · a prioritisation score, not a probability of failure</span></div>
         <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100">
           <div className={cn("h-full rounded-full", BAR[level])} style={{ width: `${Math.min(100, score)}%` }} />
           {[25, 50, 75].map((t) => <span key={t} className="absolute top-0 h-full w-px bg-white" style={{ left: `${t}%` }} />)}
@@ -31,7 +31,7 @@ export function RiskResult({ r }: { r: RiskAssessment }) {
   return (
     <div className="space-y-4">
       <Card>
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm"><Badge>{r.ref_type}</Badge><span className="font-medium">{r.title || r.ref}</span><code className="text-xs text-muted">{r.ref.slice(0, 24)}</code></div>
+        <div className="mb-3 flex flex-wrap items-center gap-2 body-6"><Badge>{r.ref_type}</Badge><span className="font-medium">{r.title || r.ref}</span><code className="caption-5 text-muted">{r.ref.slice(0, 24)}</code></div>
         <Gauge score={r.score} level={r.level} />
       </Card>
       <Card>
@@ -40,32 +40,32 @@ export function RiskResult({ r }: { r: RiskAssessment }) {
           {[...r.signals].sort((x, y) => y.points - x.points).map((s) => (
             <li key={s.key}>
               <button className="w-full text-left" onClick={() => setOpen(open === s.key ? null : s.key)} aria-expanded={open === s.key}>
-                <div className="flex items-center justify-between text-sm"><span className="font-medium">{s.label}</span><span className="tabular-nums text-muted">{s.points.toFixed(1)} / {(s.weight * 100).toFixed(0)}</span></div>
+                <div className="flex items-center justify-between body-6"><span className="font-medium">{s.label}</span><span className="tabular-nums text-muted">{s.points.toFixed(1)} / {(s.weight * 100).toFixed(0)}</span></div>
                 <div className="my-1 h-1.5 rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand" style={{ width: `${s.value * 100}%` }} /></div>
-                <div className="text-xs text-muted">{s.detail}</div>
+                <div className="caption-5 text-muted">{s.detail}</div>
               </button>
               {open === s.key && !!s.evidence.length && (
-                <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 text-xs">{s.evidence.map((e, i) => <li key={i}><code>{Object.entries(e).filter(([k]) => k !== "node_id").map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</code></li>)}</ul>)}
+                <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 caption-5">{s.evidence.map((e, i) => <li key={i}><code>{Object.entries(e).filter(([k]) => k !== "node_id").map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</code></li>)}</ul>)}
             </li>))}
         </ul>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle>Affected components{!a.symbol_level && <span className="ml-2 text-xs font-normal text-muted">(file level)</span>}</CardTitle>
+          <CardTitle>Affected components{!a.symbol_level && <span className="ml-2 caption-5 font-normal text-muted">(file level)</span>}</CardTitle>
           {!!a.symbols.length && <div className="mb-3 flex flex-wrap gap-1">{a.symbols.map((s) => <Badge key={s.name + s.path} tone="brand">{s.name}</Badge>)}</div>}
           {!a.dependents.length ? <Empty>No dependents found in the graph.</Empty> : (
-            <ul className="space-y-1.5 text-sm">{a.dependents.slice(0, 12).map((d) => (
-              <li key={d.node_id + d.rel} title={d.evidence}><code className="text-xs">{d.name}</code> <span className="text-muted">{d.rel === "CALLS" ? "calls" : "imports"} {d.target}</span>
-                <div className="text-xs text-muted">{d.repo}:{d.path}{d.cross_repo && <Badge tone="amber" className="ml-2">other repo</Badge>}</div></li>))}</ul>)}
+            <ul className="space-y-1.5 body-6">{a.dependents.slice(0, 12).map((d) => (
+              <li key={d.node_id + d.rel} title={d.evidence}><code className="caption-5">{d.name}</code> <span className="text-muted">{d.rel === "CALLS" ? "calls" : "imports"} {d.target}</span>
+                <div className="caption-5 text-muted">{d.repo}:{d.path}{d.cross_repo && <Badge tone="amber" className="ml-2">other repo</Badge>}</div></li>))}</ul>)}
         </Card>
         <div className="space-y-4">
           <Card><CardTitle><span className="flex items-center gap-2"><FlaskConical className="h-4 w-4" />Tests to run</span></CardTitle>
-            {!a.tests_to_run.length ? <p className="text-sm text-amber-700">No tests reference this code.</p> : <ul className="space-y-1 text-xs">{a.tests_to_run.map((t) => <li key={t.node_id}><code>{t.path}</code></li>)}</ul>}</Card>
+            {!a.tests_to_run.length ? <p className="body-6 text-amber-700">No tests reference this code.</p> : <ul className="space-y-1 caption-5">{a.tests_to_run.map((t) => <li key={t.node_id}><code>{t.path}</code></li>)}</ul>}</Card>
           <Card><CardTitle><span className="flex items-center gap-2"><FileText className="h-4 w-4" />Docs that may need updating</span></CardTitle>
-            {!a.docs_to_update.length ? <p className="text-sm text-muted">None found.</p> : <ul className="space-y-1 text-xs">{a.docs_to_update.map((d) => <li key={d.node_id}>{d.name} <span className="text-muted">— {d.path}</span></li>)}</ul>}</Card>
+            {!a.docs_to_update.length ? <p className="body-6 text-muted">None found.</p> : <ul className="space-y-1 caption-5">{a.docs_to_update.map((d) => <li key={d.node_id}>{d.name} <span className="text-muted">— {d.path}</span></li>)}</ul>}</Card>
         </div>
       </div>
-      <p className="text-xs text-muted">Model {r.model_version}. Known limitations: {r.limitations.join(" ")}</p>
+      <p className="caption-5 text-muted">Model {r.model_version}. Known limitations: {r.limitations.join(" ")}</p>
     </div>
   );
 }
@@ -114,11 +114,11 @@ export default function Risk() {
             {!codeRepos.length ? <Empty>Index a repository first.</Empty> : (
               <form onSubmit={submit} className="space-y-3">
                 <label className="block"><Label>Repository</Label>
-                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => { setRepoId(e.target.value); setResult(null); }}>
+                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 body-6" value={repoId} onChange={(e) => { setRepoId(e.target.value); setResult(null); }}>
                     {codeRepos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
                 <div role="tablist" className="flex gap-1">
                   {([["commit", "Commit"], ["range", "Branch"], ["pr", "PR"], ["files", "Files"]] as const).map(([m, l]) => (
-                    <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 text-xs", mode === m ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted")}>{l}</button>))}
+                    <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cn("rounded-full border px-3 py-1 caption-5", mode === m ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted")}>{l}</button>))}
                 </div>
                 {mode === "commit" && <label className="block"><Label>Commit SHA</Label><Input required pattern="[0-9a-fA-F]{4,64}" value={f.sha} onChange={(e) => setF({ ...f, sha: e.target.value })} placeholder="ef7278db" /></label>}
                 {mode === "range" && (<>
@@ -127,10 +127,10 @@ export default function Risk() {
                 {mode === "pr" && <label className="block"><Label>Pull request number (must be synced)</Label><Input required type="number" min="1" value={f.pr} onChange={(e) => setF({ ...f, pr: e.target.value })} /></label>}
                 {mode === "files" && (
                   <label className="block"><Label>Changed files — one per line: path +added -removed</Label>
-                    <textarea required rows={4} className="w-full rounded-lg border border-line p-2 font-mono text-xs" value={f.files} onChange={(e) => setF({ ...f, files: e.target.value })} placeholder={"src/auth/tokens.py +120 -30\nconfig/settings.yaml +2 -1"} /></label>)}
+                    <textarea required rows={4} className="w-full rounded-lg border border-line p-2 font-mono caption-5" value={f.files} onChange={(e) => setF({ ...f, files: e.target.value })} placeholder={"src/auth/tokens.py +120 -30\nconfig/settings.yaml +2 -1"} /></label>)}
                 <ErrorNote error={run.error} />
                 <Button className="w-full" disabled={run.isPending || !writable}>{run.isPending ? "Scoring…" : "Assess risk"}</Button>
-                {!writable && <p className="text-xs text-muted">Viewers can read assessments but not create them.</p>}
+                {!writable && <p className="caption-5 text-muted">Viewers can read assessments but not create them.</p>}
               </form>)}
           </Card>
           <Card>
@@ -139,12 +139,12 @@ export default function Risk() {
               <ul className="space-y-2">{scan.data.map((c) => (
                 <li key={c.sha}><button className="flex w-full items-start gap-2 text-left hover:bg-slate-50" onClick={() => { setMode("commit"); setF({ ...f, sha: c.sha }); run.mutate({ sha: c.sha }); }}>
                   <Badge tone={TONE[c.level]} className="mt-0.5 w-10 justify-center tabular-nums">{Math.round(c.score)}</Badge>
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm">{c.title}</span><span className="text-xs text-muted">{c.sha.slice(0, 8)} · {c.top_signals.join(", ") || "no notable signals"}</span></span></button></li>))}</ul>)}
+                  <span className="min-w-0 flex-1"><span className="block truncate body-6">{c.title}</span><span className="caption-5 text-muted">{c.sha.slice(0, 8)} · {c.top_signals.join(", ") || "no notable signals"}</span></span></button></li>))}</ul>)}
           </Card>
           {!!history.data?.length && (
             <Card><CardTitle>Saved assessments</CardTitle>
-              <ul className="space-y-1.5 text-sm">{history.data.map((h) => (
-                <li key={h.id}><button className="flex w-full items-center gap-2 text-left hover:underline" onClick={() => open.mutate(h.id)}><Badge tone={TONE[h.level]}>{Math.round(h.score)}</Badge><span className="truncate">{h.title || h.ref}</span><span className="ml-auto text-xs text-muted">{timeAgo(h.created_at)}</span></button></li>))}</ul></Card>)}
+              <ul className="space-y-1.5 body-6">{history.data.map((h) => (
+                <li key={h.id}><button className="flex w-full items-center gap-2 text-left hover:underline" onClick={() => open.mutate(h.id)}><Badge tone={TONE[h.level]}>{Math.round(h.score)}</Badge><span className="truncate">{h.title || h.ref}</span><span className="ml-auto caption-5 text-muted">{timeAgo(h.created_at)}</span></button></li>))}</ul></Card>)}
         </div>
         <div>{result ? <RiskResult r={result} /> : <Empty>Pick a commit, branch, PR or file list to see its risk breakdown.</Empty>}</div>
       </div>

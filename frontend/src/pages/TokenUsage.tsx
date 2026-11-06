@@ -16,8 +16,8 @@ function Table({ rows: all, label }: { rows: UsageGroup[]; label: string }) {
   const rows = all.filter(used);
   if (!rows.length) return <Empty>No usage recorded yet.</Empty>;
   return (
-    <table className="w-full text-sm">
-      <thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">{label}</th><th className="text-right font-medium">Input</th><th className="text-right font-medium">Output</th><th className="text-right font-medium">Requests</th><th className="text-right font-medium">Latency</th><th className="text-right font-medium">Cost</th></tr></thead>
+    <table className="w-full body-6">
+      <thead className="text-left caption-5 text-muted"><tr><th className="pb-2 font-medium">{label}</th><th className="text-right font-medium">Input</th><th className="text-right font-medium">Output</th><th className="text-right font-medium">Requests</th><th className="text-right font-medium">Latency</th><th className="text-right font-medium">Cost</th></tr></thead>
       <tbody>{rows.map((r) => (
         <tr key={r.name} className="border-t border-line"><td className="py-2">{r.name}</td>
           <td className="text-right">{fmtTokens(r.input_tokens)}</td><td className="text-right">{fmtTokens(r.output_tokens)}</td>
@@ -35,7 +35,7 @@ export default function TokenUsage() {
   return (
     <div>
       <PageHeader title="Token Usage & Cost" subtitle="Measured usage per model, agent and workflow. Local operations are recorded but cost nothing."
-        actions={<select aria-label="Period" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={days} onChange={(e) => setDays(+e.target.value)}>
+        actions={<select aria-label="Period" className="h-9 rounded-lg border border-line bg-white px-2 body-6" value={days} onChange={(e) => setDays(+e.target.value)}>
           {[7, 30, 90].map((d) => <option key={d} value={d}>Last {d} days</option>)}</select>} />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Total tokens" value={t ? fmtTokens(t.input_tokens + t.output_tokens) : "—"} hint={delta(data?.vs_previous.tokens ?? null)} />
@@ -43,7 +43,7 @@ export default function TokenUsage() {
         <Stat label="Cache hit rate" value={pct(t?.cache_hit_rate)} hint={t ? `~${fmtTokens(t.tokens_avoided)} tokens avoided (estimate)` : undefined} />
         <Stat label="Cost / successful RCA" value={t?.cost_per_successful_rca != null ? fmtCost(t.cost_per_successful_rca) : "—"} hint={t ? `${t.successful_investigations} completed · ${pct(t.error_rate)} errors` : undefined} />
       </div>
-      {unpriced && <div className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Costs show $0.00 because no price is set for these models. Add each model's price per 1M tokens in <Link className="font-medium underline" to="/settings?tab=ai">Settings → AI &amp; search</Link>, or ask whoever runs the server to set <code>REPOLENS_PRICING_JSON</code>. Prices apply to new usage from then on.</div>}
+      {unpriced && <div className="mb-4 rounded-lg bg-amber-50 px-3 py-2 body-6 text-amber-800">Costs show $0.00 because no price is set for these models. Add each model's price per 1M tokens in <Link className="font-medium underline" to="/settings?tab=ai">Settings → AI &amp; search</Link>, or ask whoever runs the server to set <code>REPOLENS_PRICING_JSON</code>. Prices apply to new usage from then on.</div>}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardTitle>Tokens per day</CardTitle>
           {!data?.daily.length ? <Empty>No data yet.</Empty> : (
@@ -53,7 +53,7 @@ export default function TokenUsage() {
           {!data?.by_model.filter(used).length ? <Empty>No data yet.</Empty> : (<>
             <div className="h-40"><ResponsiveContainer><PieChart><Pie data={data.by_model.filter(used).map((m) => ({ name: m.name, value: m.input_tokens + m.output_tokens }))} dataKey="value" innerRadius={40} outerRadius={65}>
               {data.by_model.filter(used).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip formatter={(v) => fmtTokens(Number(v))} /></PieChart></ResponsiveContainer></div>
-            <ul className="mt-2 space-y-1 text-xs">{data.by_model.filter(used).map((m, i) => <li key={m.name} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} /><span className="truncate" title={m.name}>{m.name}</span><span className="ml-auto shrink-0 text-muted">{fmtTokens(m.input_tokens + m.output_tokens)}{m.cost > 0 ? ` · ${fmtCost(m.cost)}` : ""}</span></li>)}</ul></>)}
+            <ul className="mt-2 space-y-1 caption-5">{data.by_model.filter(used).map((m, i) => <li key={m.name} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} /><span className="truncate" title={m.name}>{m.name}</span><span className="ml-auto shrink-0 text-muted">{fmtTokens(m.input_tokens + m.output_tokens)}{m.cost > 0 ? ` · ${fmtCost(m.cost)}` : ""}</span></li>)}</ul></>)}
         </Card>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
@@ -62,7 +62,7 @@ export default function TokenUsage() {
         <Card><CardTitle>By workflow</CardTitle><Table rows={data?.by_workflow ?? []} label="Workflow" /></Card>
       </div>
       {data && (data.budgets.daily > 0 || data.budgets.monthly > 0) && (
-        <p className="mt-4 text-xs text-muted">Budgets: {data.budgets.daily > 0 && `daily ${fmtCost(data.budgets.daily)}`} {data.budgets.monthly > 0 && `monthly ${fmtCost(data.budgets.monthly)}`} — optional inference stops when exceeded.</p>)}
+        <p className="mt-4 caption-5 text-muted">Budgets: {data.budgets.daily > 0 && `daily ${fmtCost(data.budgets.daily)}`} {data.budgets.monthly > 0 && `monthly ${fmtCost(data.budgets.monthly)}`} — optional inference stops when exceeded.</p>)}
     </div>
   );
 }

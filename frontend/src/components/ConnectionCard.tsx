@@ -9,7 +9,7 @@ export const TINTS = {
 
 export function StatusPill({ on, onLabel = "Connected", offLabel = "Not connected" }: { on: boolean; onLabel?: string; offLabel?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", on ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600")}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 caption-4", on ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600")}>
       <span className={cn("h-1.5 w-1.5 rounded-full", on ? "bg-emerald-500" : "bg-slate-400")} aria-hidden />{on ? onLabel : offLabel}</span>
   );
 }
@@ -22,7 +22,7 @@ export function ConnectionCard({ icon: Icon, tint = "indigo", title, description
     <section id={id} aria-label={title} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
       <header className="flex items-start gap-4 p-5">
         <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl ring-1", TINTS[tint])}><Icon className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1"><h3 className="text-base font-semibold leading-6">{title}</h3><p className="mt-0.5 text-sm text-muted">{description}</p></div>
+        <div className="min-w-0 flex-1"><h3 className="body-1">{title}</h3><p className="mt-0.5 body-6 text-muted">{description}</p></div>
         {status}
       </header>
       {children && <div className="border-t border-line/70 px-5 py-4">{children}</div>}
@@ -31,4 +31,4 @@ export function ConnectionCard({ icon: Icon, tint = "indigo", title, description
   );
 }
 
-export const selectCls = "h-9 w-full rounded-lg border border-line bg-white px-2.5 text-sm shadow-sm focus-visible:outline-2 focus-visible:outline-brand";
+export const selectCls = "h-9 w-full rounded-lg border border-line bg-white px-2.5 body-6 shadow-sm focus-visible:outline-2 focus-visible:outline-brand";

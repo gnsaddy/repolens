@@ -90,7 +90,7 @@ function Shell() {
         <div className="mb-5 flex items-center gap-2 px-2 pt-2">
           <Logo className="h-7 w-7" /><span className="font-semibold tracking-tight">RepoLens AI</span>
         </div>
-        <button onClick={() => setPalette(true)} className="mb-4 flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-left text-xs text-muted hover:bg-slate-50">
+        <button onClick={() => setPalette(true)} className="mb-4 flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-left caption-5 text-muted hover:bg-slate-50">
           <Search className="h-3.5 w-3.5" />Jump to…<kbd className="ml-auto rounded-lg border border-line px-1 text-slate-400">Ctrl K</kbd>
         </button>
         <nav className="flex flex-1 flex-col" aria-label="Main">
@@ -102,10 +102,10 @@ function Shell() {
                 <div className="flex flex-col gap-0.5">
                   {items.map(({ to, label, icon: Icon, end }) => (
                     <NavLink key={to} to={to} end={end}
-                      className={({ isActive }) => cn("group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-ink", isActive && "bg-indigo-50 font-medium text-brand hover:bg-indigo-50 hover:text-brand")}>
+                      className={({ isActive }) => cn("group flex items-center gap-2.5 rounded-lg px-3 py-1.5 body-6 text-slate-600 hover:bg-slate-100 hover:text-ink", isActive && "bg-indigo-50 font-medium text-brand hover:bg-indigo-50 hover:text-brand")}>
                       {({ isActive }) => (<>
                         <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-brand" : "text-slate-400 group-hover:text-slate-600")} aria-hidden />{label}
-                        {to === "/wiki" && !!drift.data?.open && <span title="Pages that may be out of date" className="ml-auto rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-700">{drift.data.open}</span>}
+                        {to === "/wiki" && !!drift.data?.open && <span title="Pages that may be out of date" className="ml-auto rounded-full bg-amber-100 px-1.5 caption-4 text-amber-700">{drift.data.open}</span>}
                       </>)}
                     </NavLink>
                   ))}
@@ -114,9 +114,9 @@ function Shell() {
             );
           })}
         </nav>
-        <div className="mt-4 border-t border-line pt-3 text-xs">
+        <div className="mt-4 border-t border-line pt-3 caption-5">
           <NavLink to="/profile" className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100", isActive && "bg-slate-100")} title="Your profile and sessions">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-xs font-semibold text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand caption-3 text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</span>
             <span className="min-w-0"><span className="block truncate text-ink">{user.name || user.email}</span><span className="block truncate text-muted">{user.role}</span></span>
           </NavLink>
           <button onClick={theme.toggle} aria-label={theme.dark ? "Switch to day mode" : "Switch to night mode"} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100">
@@ -132,7 +132,7 @@ function Shell() {
       <main className="min-w-0 flex-1 p-4 md:p-8">
         <nav className="mb-4 flex gap-2 overflow-x-auto md:hidden" aria-label="Mobile">
           {nav.filter((n) => !n.adminOnly || user.role === "admin").map(({ to, label, end }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("whitespace-nowrap rounded-full border border-line px-3 py-1 text-xs", isActive && "bg-brand text-white")}>{label}</NavLink>
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => cn("whitespace-nowrap rounded-full border border-line px-3 py-1 caption-5", isActive && "bg-brand text-white")}>{label}</NavLink>
           ))}
         </nav>
         <ErrorBoundary resetKey={loc.pathname + loc.search}><Suspense fallback={<div className="py-10"><Spinner /></div>}><Outlet /></Suspense></ErrorBoundary>

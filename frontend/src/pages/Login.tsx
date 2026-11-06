@@ -86,7 +86,7 @@ export function SsoComplete() {
   return (
     <div className="grid min-h-screen place-items-center bg-canvas p-4">
       <Card className="w-full max-w-sm text-center">
-        {err ? (<><p role="alert" className="mb-3 text-sm text-red-600">{(err as Error).message}</p><a className="text-sm text-brand hover:underline" href="/login">Back to sign in</a></>) : <p className="text-sm text-muted">Signing you in…</p>}
+        {err ? (<><p role="alert" className="mb-3 body-6 text-red-600">{(err as Error).message}</p><a className="body-6 text-brand hover:underline" href="/login">Back to sign in</a></>) : <p className="body-6 text-muted">Signing you in…</p>}
       </Card>
     </div>
   );

@@ -62,17 +62,17 @@ export default function Repositories() {
       <form onSubmit={search} className="mb-6 flex flex-wrap gap-2">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
           <Input className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files and symbols, or ask a question…" aria-label="Search code" /></div>
-        <select aria-label="Search in" value={scope} onChange={(e) => setScope(e.target.value as "all" | "repo")} className="h-9 rounded-lg border border-line bg-white px-2 text-sm">
+        <select aria-label="Search in" value={scope} onChange={(e) => setScope(e.target.value as "all" | "repo")} className="h-9 rounded-lg border border-line bg-white px-2 body-6">
           <option value="all">All repositories</option>{repo && <option value="repo">{repo.name}</option>}</select>
         <Button type="submit">Search</Button>
       </form>
       {searchQ && (
-        <Card className="mb-6"><CardTitle right={<button className="text-xs text-muted" onClick={() => { setSearchQ(""); setQ(""); }}>Clear</button>}>Results for “{searchQ}”</CardTitle>
+        <Card className="mb-6"><CardTitle right={<button className="caption-5 text-muted" onClick={() => { setSearchQ(""); setQ(""); }}>Clear</button>}>Results for “{searchQ}”</CardTitle>
           {!hits.data?.length ? <Empty>{hits.isLoading ? "Searching…" : "No matches."}</Empty> : (
             <ul className="space-y-3">{hits.data.map((h, i) => (
-              <li key={i}><button className="text-left text-sm font-medium text-brand hover:underline" onClick={() => { setSel(h.repo_id); setFile({ path: h.file, line: [h.start_line, h.end_line] }); }}>
-                {h.repo}:{h.file}</button><span className="ml-2 text-xs text-muted">{h.parent ? `${h.parent}.` : ""}{h.symbol} · lines {h.start_line}–{h.end_line}{h.symbol_match && " · symbol match"}</span>
-                <pre className="mt-1 max-h-24 overflow-hidden rounded-md bg-slate-50 p-2 font-mono text-xs">{h.snippet}</pre></li>))}</ul>)}
+              <li key={i}><button className="text-left body-5 text-brand hover:underline" onClick={() => { setSel(h.repo_id); setFile({ path: h.file, line: [h.start_line, h.end_line] }); }}>
+                {h.repo}:{h.file}</button><span className="ml-2 caption-5 text-muted">{h.parent ? `${h.parent}.` : ""}{h.symbol} · lines {h.start_line}–{h.end_line}{h.symbol_match && " · symbol match"}</span>
+                <pre className="mt-1 max-h-24 overflow-hidden rounded-md bg-slate-50 p-2 font-mono caption-5">{h.snippet}</pre></li>))}</ul>)}
         </Card>)}
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <div className="space-y-4">
@@ -84,8 +84,8 @@ export default function Repositories() {
                   className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-slate-50 ${sel === r.id ? "bg-indigo-50 hover:bg-indigo-50" : ""}`}>
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500" aria-hidden>{r.source === "docs" ? <BookOpen className="h-4 w-4" /> : <FolderGit2 className="h-4 w-4" />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5"><span className="truncate text-sm font-medium">{r.name}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}</span>
-                    <span className="block truncate text-xs text-muted">{r.file_count} files · updated {timeAgo(r.updated_at)}</span>
+                    <span className="flex items-center gap-1.5"><span className="truncate body-5">{r.name}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}</span>
+                    <span className="block truncate caption-5 text-muted">{r.file_count} files · updated {timeAgo(r.updated_at)}</span>
                   </span>
                   {r.status !== "ready" && <Badge tone={statusTone(r.status)}>{r.status}</Badge>}
                 </button></li>))}</ul>)}
@@ -97,7 +97,7 @@ export default function Repositories() {
               <form onSubmit={submit} className="space-y-3">
                 <label className="block"><Label>Name</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="user-service" /></label>
                 <label className="block"><Label>Source</Label>
-                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 text-sm" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                  <select className="h-9 w-full rounded-lg border border-line bg-white px-2 body-6" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
                     <option value="local">Local path (server)</option><option value="git">Git URL (https/ssh)</option></select></label>
                 <label className="block"><Label>{form.source === "local" ? "Path" : "Clone URL"}</Label><Input required value={form.url} onChange={(e) => { setForm({ ...form, url: e.target.value }); branchList.reset(); setPicked([]); }} placeholder={form.source === "local" ? "/srv/repos/user-service" : "https://github.com/org/repo.git"} /></label>
                 <div>
@@ -105,11 +105,11 @@ export default function Repositories() {
                   <ErrorNote error={branchList.error} />
                   {branchList.data && (
                     <fieldset className="mt-2 max-h-40 space-y-1 overflow-auto rounded-lg border border-line p-2">
-                      <legend className="px-1 text-xs text-muted">Each selected branch is indexed separately (max 8)</legend>
+                      <legend className="px-1 caption-5 text-muted">Each selected branch is indexed separately (max 8)</legend>
                       {branchList.data.branches.map((b) => (
-                        <label key={b} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={picked.includes(b)} onChange={() => togglePick(b)} />{b}{b === branchList.data.default && <Badge>default</Badge>}</label>))}
+                        <label key={b} className="flex items-center gap-2 body-6"><input type="checkbox" checked={picked.includes(b)} onChange={() => togglePick(b)} />{b}{b === branchList.data.default && <Badge>default</Badge>}</label>))}
                     </fieldset>)}
-                  {!branchList.data && <p className="mt-1 text-xs text-muted">Without a choice, the default branch is indexed.</p>}
+                  {!branchList.data && <p className="mt-1 caption-5 text-muted">Without a choice, the default branch is indexed.</p>}
                 </div>
                 <ErrorNote error={add.error} />
                 <Button className="w-full" disabled={add.isPending}>Add &amp; index</Button>
@@ -123,49 +123,49 @@ export default function Repositories() {
                 {repo.source !== "docs" && <Button size="sm" variant="outline" onClick={() => setMeasuring(true)} disabled={repo.status !== "ready"}><Gauge className="h-3.5 w-3.5" />Measure</Button>}
                 <Button size="sm" variant="outline" onClick={() => reindex.mutate(repo.id)} disabled={repo.status === "indexing"}><RefreshCw className="h-3.5 w-3.5" />Re-index</Button>
                 {user?.role === "admin" && <Button size="sm" variant="ghost" aria-label="Delete repository" onClick={async () => { if (await ask({ title: `Delete ${repo.name}?`, message: "Its index, graph, investigations and clone are removed. The source repository is not touched.", confirmLabel: "Delete repository", danger: true })) remove.mutate(repo.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>)}>{repo.name}</CardTitle>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 caption-5 text-muted">
                 <span>{repo.file_count} files</span><span>{repo.chunk_count} chunks</span><span>branch {repo.branch || repo.default_branch}</span>{lastRun?.finished_at && <span>last index {Math.max(1, Math.round((+new Date(lastRun.finished_at) - +new Date(lastRun.started_at)) / 1000))}s</span>}
                 <span>revision {repo.indexed_sha?.slice(0, 10) ?? "—"}</span><span>updated {timeAgo(repo.updated_at)}</span></div>
-              {!!runs.data?.[0]?.secrets_redacted && <p className="mt-2 text-xs text-amber-700">The last index removed {runs.data[0].secrets_redacted} apparent secret(s) from stored code, diffs and docs.</p>}
+              {!!runs.data?.[0]?.secrets_redacted && <p className="mt-2 caption-5 text-amber-700">The last index removed {runs.data[0].secrets_redacted} apparent secret(s) from stored code, diffs and docs.</p>}
               {repo.status === "error" && (
-                <div className="mt-2 text-sm text-red-600">
+                <div className="mt-2 body-6 text-red-600">
                   <p>Indexing failed{repo.last_error ? `: ${repo.last_error}` : " — check the path/URL and re-index."}</p>
-                  <p className="text-xs text-muted">A failure that can pass by itself, such as a timeout, is tried again automatically. Anything else needs the path, address or credentials fixed, then Re-index.</p>
+                  <p className="caption-5 text-muted">A failure that can pass by itself, such as a timeout, is tried again automatically. Anything else needs the path, address or credentials fixed, then Re-index.</p>
                 </div>)}
-              {repo.status === "ready" && repo.source !== "docs" && <p className="mt-2 text-xs text-muted">Checked once a day: if the repository changed, it is indexed again automatically.</p>}
+              {repo.status === "ready" && repo.source !== "docs" && <p className="mt-2 caption-5 text-muted">Checked once a day: if the repository changed, it is indexed again automatically.</p>}
             </Card>
             {user?.role === "admin" && <AccessPanel key={repo.id} repoId={repo.id} repoName={repo.name} />}
             <div className="grid gap-4 xl:grid-cols-[260px_1fr]">
               <Card className="max-h-[32rem] overflow-auto p-3">
                 <CardTitle>Files</CardTitle>
                 <ul className="space-y-0.5">{tree.data?.map((f) => (
-                  <li key={f.path}><button onClick={() => setFile({ path: f.path })} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-slate-50 ${file?.path === f.path ? "bg-indigo-50" : ""}`}>
+                  <li key={f.path}><button onClick={() => setFile({ path: f.path })} className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left caption-5 hover:bg-slate-50 ${file?.path === f.path ? "bg-indigo-50" : ""}`}>
                     <File className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="truncate">{f.path}</span></button></li>))}</ul>
               </Card>
               <div className="min-w-0 space-y-4">
                 {file && (<Card>
                   <CardTitle>{file.path}</CardTitle>
-                  {!!owners.data?.owners.length && <p className="-mt-2 mb-3 text-xs text-muted">Maintained by {owners.data.owners.map((o) => `${o.author} (${Math.round(o.share * 100)}%)`).join(", ")}</p>}
+                  {!!owners.data?.owners.length && <p className="-mt-2 mb-3 caption-5 text-muted">Maintained by {owners.data.owners.map((o) => `${o.author} (${Math.round(o.share * 100)}%)`).join(", ")}</p>}
                   {fileQ.error ? <ErrorNote error={fileQ.error} /> : fileQ.data && (<div className="max-h-[32rem] overflow-auto"><CodeBlock code={fileQ.data.content} highlight={file.line} /></div>)}
                 </Card>)}
                 {repo.source !== "docs" && (
                   <Card>
                     <CardTitle right={canWrite(user) && gh.data?.connected && (
                       <div className="flex items-center gap-2">
-                        <Input className="h-8 w-44 text-xs" placeholder="owner/name (if not detected)" value={ghRepo} onChange={(e) => setGhRepo(e.target.value)} aria-label="GitHub repository" />
+                        <Input className="h-8 w-44 caption-5" placeholder="owner/name (if not detected)" value={ghRepo} onChange={(e) => setGhRepo(e.target.value)} aria-label="GitHub repository" />
                         <Button size="sm" variant="outline" disabled={syncPrs.isPending || prRun?.status === "running"} onClick={() => syncPrs.mutate()}><GitPullRequest className="h-3.5 w-3.5" />Sync PRs</Button></div>)}>Pull requests</CardTitle>
                     <ErrorNote error={syncPrs.error} />
-                    {prRun?.status === "failed" && <p className="mb-2 text-xs text-red-600">Last sync failed: {prRun.error}</p>}
-                    {!gh.data?.connected && <p className="text-xs text-muted">Connect GitHub under Settings to ingest pull requests.</p>}
+                    {prRun?.status === "failed" && <p className="mb-2 caption-5 text-red-600">Last sync failed: {prRun.error}</p>}
+                    {!gh.data?.connected && <p className="caption-5 text-muted">Connect GitHub under Settings to ingest pull requests.</p>}
                     {gh.data?.connected && !pulls.data?.length && <Empty>No pull requests synced yet.</Empty>}
-                    <ul className="space-y-2 text-sm">{pulls.data?.slice(0, 10).map((p) => (
+                    <ul className="space-y-2 body-6">{pulls.data?.slice(0, 10).map((p) => (
                       <li key={p.number} className="flex items-center gap-2"><Badge tone={p.state === "merged" ? "green" : p.state === "open" ? "blue" : "gray"}>{p.state}</Badge>
-                        <span className="text-xs text-muted">#{p.number}</span><a className="flex-1 truncate text-brand hover:underline" href={safeHref(p.url)} target="_blank" rel="noreferrer">{p.title}</a>
-                        {p.jira_keys.map((k) => <Badge key={k} tone="brand">{k}</Badge>)}<span className="text-xs text-muted">{p.files} files</span></li>))}</ul>
+                        <span className="caption-5 text-muted">#{p.number}</span><a className="flex-1 truncate text-brand hover:underline" href={safeHref(p.url)} target="_blank" rel="noreferrer">{p.title}</a>
+                        {p.jira_keys.map((k) => <Badge key={k} tone="brand">{k}</Badge>)}<span className="caption-5 text-muted">{p.files} files</span></li>))}</ul>
                   </Card>)}
                 <Card><CardTitle>Recent commits</CardTitle>
-                  <ul className="space-y-2 text-sm">{commits.data?.map((c) => (
-                    <li key={c.sha} className="flex gap-3"><code className="text-xs text-muted">{c.sha.slice(0, 8)}</code><span className="flex-1 truncate">{c.message.split("\n")[0]}</span><span className="text-xs text-muted">{c.author} · {timeAgo(c.committed_at)}</span></li>))}</ul></Card>
+                  <ul className="space-y-2 body-6">{commits.data?.map((c) => (
+                    <li key={c.sha} className="flex gap-3"><code className="caption-5 text-muted">{c.sha.slice(0, 8)}</code><span className="flex-1 truncate">{c.message.split("\n")[0]}</span><span className="caption-5 text-muted">{c.author} · {timeAgo(c.committed_at)}</span></li>))}</ul></Card>
               </div>
             </div>
           </>)}

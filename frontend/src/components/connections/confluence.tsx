@@ -36,7 +36,7 @@ export function ConfluenceForm({ onDone }: { onDone: () => void }) {
       <div><Label>Deployment</Label><select aria-label="Confluence deployment" className={selectCls} value={f.deployment} onChange={(e) => setF({ ...f, deployment: e.target.value as "cloud" | "datacenter" })}><option value="cloud">Cloud (email + API token)</option><option value="datacenter">Data Center (personal access token)</option></select></div>
       {f.deployment === "cloud" && <div><Label>Account email</Label><Input aria-label="Confluence account email" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>}
       <div><Label>{f.deployment === "cloud" ? "API token" : "Personal access token"}</Label><Input aria-label="Confluence token" type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} />
-        <p className="mt-1 text-xs text-muted">Stored encrypted and never shown again. Use a read-only account.</p></div>
+        <p className="mt-1 caption-5 text-muted">Stored encrypted and never shown again. Use a read-only account.</p></div>
       <ErrorNote error={save.error} />
       {check.message}
       <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button type="button" variant="outline" disabled={!ready || check.pending} onClick={check.run}>Test connection</Button><Button disabled={save.isPending || f.base_url.length < 8 || f.token.length < 4}>Save connection</Button></div>

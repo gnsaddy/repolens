@@ -23,20 +23,20 @@ export default function StoragePanel() {
   return (
     <Card>
       <CardTitle right={<Badge>{fmtBytes(d.total_bytes)}</Badge>}><span className="inline-flex items-center gap-1.5"><HardDrive className="h-4 w-4" />Clone storage</span></CardTitle>
-      {!d.checkouts.length ? <p className="text-xs text-muted">No cloned repositories. Local-path repositories are read in place and use no extra space.</p> : (
-        <ul className="space-y-1.5 text-xs">{d.checkouts.map((c) => (
+      {!d.checkouts.length ? <p className="caption-5 text-muted">No cloned repositories. Local-path repositories are read in place and use no extra space.</p> : (
+        <ul className="space-y-1.5 caption-5">{d.checkouts.map((c) => (
           <li key={c.path} className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate" title={c.repos.join(", ")}>{c.repos.join(", ")}</span>
             {c.partial && <span title="A partial clone: file contents are fetched only when needed, so it takes less disk space"><Badge tone="blue">blob-less</Badge></span>}{!c.exists && <Badge tone="amber">removed</Badge>}
             <span className="text-muted">{c.exists ? fmtBytes(c.bytes) : "—"} · {c.last_used_at ? timeAgo(c.last_used_at) : "never used"}</span></li>))}</ul>)}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-2 caption-5">
         <label htmlFor="ttl" className="whitespace-nowrap">Unused for</label>
         <select id="ttl" className="h-8 rounded-lg border border-line bg-white px-2" value={days} onChange={(e) => setDays(+e.target.value)}>{[0, 7, 30, 90].map((n) => <option key={n} value={n}>{n === 0 ? "any time" : `${n} days`}</option>)}</select>
         <Button size="sm" variant="outline" disabled={clean.isPending} onClick={() => clean.mutate(true)}>Preview</Button>
         <Button size="sm" disabled={clean.isPending} onClick={async () => { if (await ask({ title: "Delete unused clones?", message: "Indexes stay. Clones are re-created the next time you re-index.", confirmLabel: "Delete clones", danger: true })) clean.mutate(false); }}>Free space</Button>
       </div>
-      <p className="mt-1 text-xs text-muted">Automatic cleanup after {d.ttl_days || "∞"} days unused. Deleted clones are re-created on the next index.</p>
+      <p className="mt-1 caption-5 text-muted">Automatic cleanup after {d.ttl_days || "∞"} days unused. Deleted clones are re-created on the next index.</p>
       <ErrorNote error={clean.error} />
-      {clean.data && <p role="status" className="mt-2 text-xs text-emerald-700">{clean.data.dry_run ? "Would free" : "Freed"} {fmtBytes(clean.data.freed_bytes)} from {clean.data.removed.length} clone(s).</p>}
+      {clean.data && <p role="status" className="mt-2 caption-5 text-emerald-700">{clean.data.dry_run ? "Would free" : "Freed"} {fmtBytes(clean.data.freed_bytes)} from {clean.data.removed.length} clone(s).</p>}
     </Card>
   );
 }

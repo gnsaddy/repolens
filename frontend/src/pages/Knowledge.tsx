@@ -32,7 +32,7 @@ export default function Knowledge() {
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => go(k)}
-            className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>
+            className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 body-6", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>
             <Icon className="h-4 w-4" />{label}</button>))}
       </div>
       {tab === "ask" && <AskTab repos={repos.data ?? []} openNode={(id) => go("graph", { node: id })} />}
@@ -51,7 +51,7 @@ function ConnectionChips({ conns, onOpen }: { conns: Connection[]; onOpen: (id: 
     <div className="mt-2 flex flex-wrap gap-1.5">
       {shown.map((c, i) => (
         <button key={i} onClick={() => onOpen(c.node.id)} title={`${c.provenance}${c.evidence ? ` — ${c.evidence}` : ""}`}
-          className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs hover:bg-slate-50">
+          className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 caption-5 hover:bg-slate-50">
           <span className="h-2 w-2 rounded-full" style={{ background: REL_COLORS[c.rel] }} />
           <span className="text-muted">{c.label}</span><span className="max-w-[16rem] truncate font-medium">{c.node.qualname || c.node.name}</span>
         </button>))}
@@ -64,7 +64,7 @@ function MemoryTab({ admin }: { admin: boolean }) {
   const d = stats.data;
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">Everything RepoLens has answered and kept. A repeated or re-worded question is answered from here, with no model call. Search questions and answers, then turn what you find into a skill.</p>
+      <p className="body-6 text-muted">Everything RepoLens has answered and kept. A repeated or re-worded question is answered from here, with no model call. Search questions and answers, then turn what you find into a skill.</p>
       {d?.entries !== undefined && (
         <div className="grid grid-cols-3 gap-4"><Stat label="Remembered answers" value={d.entries} /><Stat label="Times reused" value={d.hits} /><Stat label="Tokens saved" value={d.tokens_saved.toLocaleString()} hint={d.enabled ? "memory is on" : "memory is off"} /></div>)}
       <Card><MemoryBrowser admin={admin} /></Card>
@@ -85,9 +85,9 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
     <div className="space-y-4">
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <Input className="min-w-64 flex-1" value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. How are deleted users handled? Where is get_profile documented?" aria-label="Question" />
-        <select aria-label="Scope" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
+        <select aria-label="Scope" className="h-9 rounded-lg border border-line bg-white px-2 body-6" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
           <option value="">All sources</option>{repos.filter((r) => r.status === "ready").map((r) => <option key={r.id} value={r.id}>{r.name}{r.source === "docs" ? " (docs)" : ""}</option>)}</select>
-        <select aria-label="Kind" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={kind} onChange={(e) => setKind(e.target.value as "" | "doc" | "code" | "pr")}>
+        <select aria-label="Kind" className="h-9 rounded-lg border border-line bg-white px-2 body-6" value={kind} onChange={(e) => setKind(e.target.value as "" | "doc" | "code" | "pr")}>
           <option value="">Docs + code + PRs</option><option value="doc">Docs only</option><option value="code">Code only</option><option value="pr">Pull requests only</option></select>
         <Button disabled={ask.isPending || search.isPending}><Search className="h-4 w-4" />Ask</Button>
       </form>
@@ -99,32 +99,32 @@ function AskTab({ repos, openNode }: { repos: Repo[]; openNode: (id: string) => 
             <Badge tone={a.mode === "llm" ? "brand" : a.mode === "failed" ? "red" : "gray"}>{a.mode === "llm" ? "AI answer" : a.mode === "failed" ? "AI unavailable" : a.mode === "extractive" ? "extracted passages" : "no results"}</Badge>
             {a.memory ? <Badge tone="green" title={`Matched an earlier question: "${a.memory.asked}"`}>From memory · saved ~{a.memory.tokens_saved.toLocaleString()} tokens</Badge> : a.cached && <Badge tone="green">cached</Badge>}
             {a.route && <Badge tone="gray" title={a.route.why}>{a.route.model}</Badge>}</div>}>Answer</CardTitle>
-          <div className="text-sm leading-6"><Markdown text={a.answer} onOpen={() => {}} /></div>
+          <div className="body-6"><Markdown text={a.answer} onOpen={() => {}} /></div>
           <AnswerFeedback key={a.query + a.answer.slice(0, 40)} query={a.query} targetId={a.query.slice(0, 60)} fromMemory={!!a.memory} />
-          {(a.memory || a.cached) && <button type="button" className="mt-2 text-xs text-brand hover:underline" disabled={ask.isPending} onClick={() => ask.mutate(true)}>Answer again with the model</button>}
-          {!!a.unknown_citations?.length && <p className="mt-2 text-xs text-amber-700">The model cited unknown sources ({a.unknown_citations.join(", ")}) — treat those claims as unverified.</p>}
-          {!!a.unsupported_names?.length && <p className="mt-2 text-xs text-amber-700">Check these names: they were not found in your indexed repositories ({a.unsupported_names.join(", ")}).</p>}
-          {!!a.retrieval?.missing.length && a.retrieval.coverage < 0.5 && <p className="mt-2 text-xs text-amber-700">Your sources do not mention: {a.retrieval.missing.slice(0, 6).join(", ")}. The answer may be incomplete.</p>}
+          {(a.memory || a.cached) && <button type="button" className="mt-2 caption-5 text-brand hover:underline" disabled={ask.isPending} onClick={() => ask.mutate(true)}>Answer again with the model</button>}
+          {!!a.unknown_citations?.length && <p className="mt-2 caption-5 text-amber-700">The model cited unknown sources ({a.unknown_citations.join(", ")}) — treat those claims as unverified.</p>}
+          {!!a.unsupported_names?.length && <p className="mt-2 caption-5 text-amber-700">Check these names: they were not found in your indexed repositories ({a.unsupported_names.join(", ")}).</p>}
+          {!!a.retrieval?.missing.length && a.retrieval.coverage < 0.5 && <p className="mt-2 caption-5 text-amber-700">Your sources do not mention: {a.retrieval.missing.slice(0, 6).join(", ")}. The answer may be incomplete.</p>}
           {!!a.connections.length && (<div className="mt-4 border-t border-line pt-3">
-            <div className="mb-1 text-xs font-medium text-muted">Connections found in the graph</div>
-            <ul className="space-y-0.5 text-xs">{a.connections.slice(0, 6).map((c, i) => (
+            <div className="mb-1 caption-4 text-muted">Connections found in the graph</div>
+            <ul className="space-y-0.5 caption-5">{a.connections.slice(0, 6).map((c, i) => (
               <li key={i}><span className="font-medium">{c.from}</span> <span className="text-muted">{c.label}</span> <code>{c.to}</code> <span className="text-muted">({c.provenance.replace("_", " ")})</span></li>))}</ul></div>)}
         </Card>)}
       {search.data && (
         <div className="space-y-3">
-          <div className="text-xs font-medium text-muted">Sources ({search.data.length})</div>
+          <div className="caption-4 text-muted">Sources ({search.data.length})</div>
           {!search.data.length && <Empty>No matching passages.</Empty>}
           {search.data.map((h, i) => (
             <Card key={h.chunk_id} className="p-4">
               <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-muted">S{i + 1}</span>
+                <span className="caption-5 text-muted">S{i + 1}</span>
                 <Badge tone={h.kind === "doc" ? "blue" : h.kind === "pr" ? "green" : "brand"}>{h.kind === "pr" ? "pull request" : h.kind}</Badge>
                 {h.via_graph && <Badge tone="amber" title={`${h.via_graph.relation} ${h.via_graph.from}`}>via graph · {h.via_graph.relation} “{h.via_graph.from.slice(0, 30)}”</Badge>}
-                <span className="text-sm font-medium">{h.title}</span>
-                {h.url && /^https?:\/\//.test(h.url) ? <a href={h.url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand hover:underline">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</a> : <span className="text-xs text-muted">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</span>}
-                {h.node_id && <button className="ml-auto text-xs text-brand hover:underline" onClick={() => openNode(h.node_id!)}>Open in graph</button>}
+                <span className="body-5">{h.title}</span>
+                {h.url && /^https?:\/\//.test(h.url) ? <a href={h.url} target="_blank" rel="noopener noreferrer" className="caption-5 text-brand hover:underline">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</a> : <span className="caption-5 text-muted">{h.repo}:{h.file}:{h.start_line}–{h.end_line}</span>}
+                {h.node_id && <button className="ml-auto caption-5 text-brand hover:underline" onClick={() => openNode(h.node_id!)}>Open in graph</button>}
               </div>
-              <pre className="max-h-32 overflow-hidden whitespace-pre-wrap rounded-md bg-slate-50 p-2 font-mono text-xs">{h.content.slice(0, 500)}</pre>
+              <pre className="max-h-32 overflow-hidden whitespace-pre-wrap rounded-md bg-slate-50 p-2 font-mono caption-5">{h.content.slice(0, 500)}</pre>
               <ConnectionChips conns={h.connections} onOpen={openNode} />
             </Card>))}
         </div>)}
@@ -213,10 +213,10 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
         <Stat label="From docs & semantics" value={s?.edges.filter((e) => ["doc_mention", "doc_link", "semantic"].includes(e.provenance)).reduce((a, e) => a + e.count, 0) ?? "—"} hint="mentions, links, similarity" />
       </div>}
       <div className="flex flex-wrap items-center gap-3">
-        <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 text-sm" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
+        <select aria-label="Repository" className="h-9 rounded-lg border border-line bg-white px-2 body-6" value={repoId} onChange={(e) => setRepoId(e.target.value)}>
           <option value="">All sources</option>{repos.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
         {ALL_TYPES.map((t) => (
-          <label key={t} className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={types.includes(t)} onChange={() => toggle(t)} />
+          <label key={t} className="flex items-center gap-1.5 caption-5"><input type="checkbox" checked={types.includes(t)} onChange={() => toggle(t)} />
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: NODE_COLORS[t] }} />{t}</label>))}
         <div className="ml-auto flex items-center gap-2">
           {full && <Button size="sm" variant="outline" aria-pressed={panelOpen} onClick={() => setPanelOpen((o) => !o)}>{panelOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}{panelOpen ? "Hide details" : "Show details"}</Button>}
@@ -226,10 +226,10 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find a symbol, file or section…" aria-label="Find node" />
           {query.length > 1 && found.data && (
             <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-white shadow-lg">
-              {found.data.map((n) => (<li key={n.id}><button className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-slate-50"
+              {found.data.map((n) => (<li key={n.id}><button className="flex w-full items-center gap-2 px-3 py-1.5 text-left caption-5 hover:bg-slate-50"
                 onClick={() => { pick(n.id); setExtra((x) => ({ nodes: [...x.nodes, n], edges: x.edges })); setQuery(""); }}>
                 <span className="h-2 w-2 rounded-full" style={{ background: NODE_COLORS[n.type] }} /><span className="truncate">{n.qualname || n.name}</span><span className="ml-auto text-muted">{n.type}</span></button></li>))}
-              {!found.data.length && <li className="px-3 py-2 text-xs text-muted">No matches</li>}</ul>)}
+              {!found.data.length && <li className="px-3 py-2 caption-5 text-muted">No matches</li>}</ul>)}
         </div>
       </div>
       {repoId && !full && <StartHere repoId={repoId} />}
@@ -238,7 +238,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
           {overview.isLoading ? <Spinner /> : !merged.nodes.length ? <Empty>The graph is empty. Index a repository or upload documents first.</Empty> : (
             <ForceGraph fill={full} focusArea={colorBy === "community" ? focusArea : null} centerOn={centerOn} byCommunity={colorBy === "community"} heat={!["type", "community"].includes(colorBy) ? (heat.data?.values ?? {}) : undefined} nodes={merged.nodes} edges={shownEdges} selectedId={selected} highlight={pathSet ? new Set([...pathSet.nodes, ...pathSet.edges]) : undefined} onSelect={setSelected} />)}
           {colorBy === "community" && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Areas">
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 caption-5" role="group" aria-label="Areas">
               <button className={`rounded-full border px-2 py-0.5 ${focusArea == null ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted hover:bg-slate-50"}`} aria-pressed={focusArea == null} onClick={() => setFocusArea(null)}>All areas</button>
               {areas.map((a) => (
                 <button key={a.id} aria-pressed={focusArea === a.id} title={`${a.count} shown here`} onClick={() => setFocusArea(focusArea === a.id ? null : a.id)}
@@ -246,7 +246,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: communityColor(a.id) }} />{a.label}</button>))}
               {!areas.length && <span className="text-muted">No areas yet: the graph is small or loosely connected.</span>}
             </div>)}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+          <div className="mt-2 flex flex-wrap items-center gap-3 caption-5">
             <label className="flex items-center gap-1.5"><input type="checkbox" checked={factsOnly} onChange={(e) => setFactsOnly(e.target.checked)} />Facts only <span className="text-muted">(hide inferred and uncertain links)</span></label>
             <label className="flex items-center gap-1.5">Colour by
               <select aria-label="Colour by" className="h-8 rounded-lg border border-line bg-white px-2" value={colorBy} onChange={(e) => setColorBy(e.target.value)}>
@@ -255,7 +255,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
             {!["type", "community"].includes(colorBy) && (<span className="flex items-center gap-2 text-muted" aria-label="Heat legend">
               {heat.isLoading ? "Loading…" : (<><span>cold</span><span className="h-2.5 w-28 rounded-md" style={{ background: HEAT_GRADIENT }} /><span>hot</span><span>· {heat.data?.label}</span>{heat.data && !Object.keys(heat.data.values).length && <span className="text-amber-700">· no data for these nodes</span>}</>)}</span>)}
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 caption-5 text-muted">
             {Object.entries(REL_COLORS).filter(([r]) => r !== "INCLUDES").map(([r, c]) => (
               <label key={r} className="flex items-center gap-1"><input type="checkbox" aria-label={`Show ${r.toLowerCase().replace("_", " ")}`} checked={!hiddenRels.includes(r)} onChange={() => toggleRel(r)} />
                 <span className="h-0.5 w-4" style={{ background: c }} />{r.toLowerCase().replace("_", " ")}</label>))}
@@ -263,24 +263,24 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
         </div>
         <Card className={`${full ? "min-h-0" : "max-h-[36rem]"} overflow-auto${full && !panelOpen ? " hidden" : ""}`}>
           {!selected ? <Empty>Select a node to see what it connects to.</Empty> : !detail.data ? <Spinner /> : (<>
-            <div className="mb-1 flex items-center gap-2"><Badge tone="gray">{detail.data.node.type}</Badge><span className="text-xs text-muted">{detail.data.node.repo}</span></div>
-            <h3 className="break-words text-sm font-semibold">{detail.data.node.qualname || detail.data.node.name}</h3>
+            <div className="mb-1 flex items-center gap-2"><Badge tone="gray">{detail.data.node.type}</Badge><span className="caption-5 text-muted">{detail.data.node.repo}</span></div>
+            <h3 className="break-words body-4">{detail.data.node.qualname || detail.data.node.name}</h3>
             {brief.data?.summary && (
-              <div aria-label="Before you change this" className="mb-3 rounded-lg bg-indigo-50 p-2.5 text-xs">
+              <div aria-label="Before you change this" className="mb-3 rounded-lg bg-indigo-50 p-2.5 caption-5">
                 <div className="mb-1 font-medium text-indigo-900">Before you change this</div>
                 <p className="text-indigo-900">{brief.data.summary}</p>
                 {!!brief.data.notes.length && <ul className="mt-1.5 space-y-1">{brief.data.notes.map((n) => <li key={n} className="text-amber-800">• {n}</li>)}</ul>}
                 {!!brief.data.callers.length && <p className="mt-1.5 text-indigo-900"><b>Used by:</b> {brief.data.callers.map((c) => c.qualname || c.name).join(", ")}{brief.data.callers_total > brief.data.callers.length ? "…" : ""}</p>}
                 {!!brief.data.dependencies.length && <p className="mt-1 text-indigo-900"><b>Depends on:</b> {brief.data.dependencies.map((c) => c.qualname || c.name).join(", ")}</p>}
               </div>)}
-            {detail.data.node.path && <div className="mb-2 text-xs text-muted">{detail.data.node.path}{detail.data.node.start_line ? `:${detail.data.node.start_line}–${detail.data.node.end_line}` : ""}</div>}
+            {detail.data.node.path && <div className="mb-2 caption-5 text-muted">{detail.data.node.path}{detail.data.node.start_line ? `:${detail.data.node.start_line}–${detail.data.node.end_line}` : ""}</div>}
             <div className="mb-3 flex gap-2"><Button size="sm" variant="outline" onClick={expand}>Expand neighbours</Button>
               {pathTarget && <Badge tone="amber">path → {pathTarget.name}</Badge>}</div>
             {detail.data.content && <div className="mb-3 max-h-40 overflow-auto"><CodeBlock code={detail.data.content.split("\n").slice(0, 25).join("\n")} startLine={detail.data.node.start_line || 1} /></div>}
-            <div className="mb-1 text-xs font-medium text-muted">Connections ({detail.data.connections.length})</div>
+            <div className="mb-1 caption-4 text-muted">Connections ({detail.data.connections.length})</div>
             <div className="mb-2 flex flex-wrap gap-1">{Object.entries(detail.data.connections.reduce<Record<string, number>>((m, c) => ({ ...m, [c.label]: (m[c.label] ?? 0) + 1 }), {})).map(([l, n]) => <Badge key={l}>{n} {l}</Badge>)}</div>
             <ul className="space-y-1">{[...detail.data.connections].sort((a, b) => a.label.localeCompare(b.label)).map((c, i) => (
-              <li key={i} className="flex items-center gap-1 text-xs">
+              <li key={i} className="flex items-center gap-1 caption-5">
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: REL_COLORS[c.rel] }} />
                 <span className="w-20 shrink-0 text-muted">{c.label}</span>
                 <button className="truncate text-left font-medium text-brand hover:underline" onClick={() => { setSelected(c.node.id); setExtra((x) => ({ nodes: [...x.nodes, c.node], edges: x.edges })); }}>{c.node.qualname || c.node.name}</button>
@@ -350,7 +350,7 @@ function DocsTab({ repos }: { repos: Repo[] }) {
         <Card><CardTitle>Collections</CardTitle>
           {!collections.length ? <Empty>No document collections yet.</Empty> : (
             <ul className="space-y-1">{collections.map((c) => (
-              <li key={c.id}><button onClick={() => setSel(c.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50", active?.id === c.id && "bg-indigo-50")}>
+              <li key={c.id}><button onClick={() => setSel(c.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2 py-2 text-left body-6 hover:bg-slate-50", active?.id === c.id && "bg-indigo-50")}>
                 <span className="truncate">{c.name}</span><Badge tone={statusTone(c.status)}>{c.status}</Badge></button></li>))}</ul>)}
         </Card>
         {writable && (<Card><CardTitle>New collection</CardTitle>
@@ -360,22 +360,22 @@ function DocsTab({ repos }: { repos: Repo[] }) {
       </div>
       <Card>
         {!active ? <Empty>Create a collection, then upload Markdown, reStructuredText or text files. They are split by heading, linked to your code and added to the graph.</Empty> : (<>
-          <CardTitle right={writable && (<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600">
+          <CardTitle right={writable && (<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand px-3 py-1.5 body-5 text-white hover:bg-brand-600">
             <Upload className="h-4 w-4" />Upload files<input type="file" multiple accept={ACCEPT} className="sr-only" onChange={onFiles} aria-label="Upload documents" /></label>)}>{active.name}
             {user?.role === "admin" && <button aria-label="Delete collection" title="Delete this collection and all its documents" className="ml-2 align-middle text-muted hover:text-red-600"
               onClick={async () => { if (await ask({ title: `Delete the collection "${active.name}"?`, message: `All ${active.file_count} documents, their search entries and graph nodes are removed.`, confirmLabel: "Delete collection", danger: true })) dropCollection.mutate(active.id); }}><Trash2 className="inline h-4 w-4" /></button>}</CardTitle>
-          <div className="mb-3 text-xs text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (text up to 1 MB; Word, PDF, CSV and zip up to 25 MB each). Notion: Export as Markdown &amp; CSV, then upload the .zip. Scanned PDFs are not read (no OCR). Documents up to about 100 pages work best; longer ones import with a warning.</div>
+          <div className="mb-3 caption-5 text-muted">{active.file_count} documents · {active.chunk_count} sections · accepts {ACCEPT.replaceAll(",", " ")} (text up to 1 MB; Word, PDF, CSV and zip up to 25 MB each). Notion: Export as Markdown &amp; CSV, then upload the .zip. Scanned PDFs are not read (no OCR). Documents up to about 100 pages work best; longer ones import with a warning.</div>
           <ErrorNote error={upload.error ?? importer.error ?? remove.error} />
-          {report && (<div role="status" aria-label="Import result" className="mb-2 rounded-lg bg-slate-50 p-3 text-xs">
+          {report && (<div role="status" aria-label="Import result" className="mb-2 rounded-lg bg-slate-50 p-3 caption-5">
             <p className="font-medium">{summarize(report)}</p>
             {!!report.warnings?.length && <ul aria-label="Warnings" className="mt-1 list-disc space-y-0.5 pl-5 text-amber-700">{report.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
             {!!report.skipped.length && <ul className="mt-1 list-disc space-y-0.5 pl-5 text-amber-700">{report.skipped.slice(0, 12).map((x, i) => <li key={i}><b>{x.name}</b>: {x.reason}</li>)}{report.skipped.length > 12 && <li>…and {report.skipped.length - 12} more</li>}</ul>}</div>)}
-          {note && <p className="mb-2 text-xs text-amber-700">{note}</p>}
-          {(upload.isPending || importer.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 text-xs text-muted"><Spinner />Indexing and linking…</div>}
+          {note && <p className="mb-2 caption-5 text-amber-700">{note}</p>}
+          {(upload.isPending || importer.isPending || active.status === "indexing") && <div className="mb-2 flex items-center gap-2 caption-5 text-muted"><Spinner />Indexing and linking…</div>}
           {!docs.data?.length ? <Empty>No documents yet.</Empty> : (
-            <table className="w-full text-sm"><thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Path</th><th className="font-medium">Size</th><th /></tr></thead>
+            <table className="w-full body-6"><thead className="text-left caption-5 text-muted"><tr><th className="pb-2 font-medium">Path</th><th className="font-medium">Size</th><th /></tr></thead>
               <tbody>{docs.data.map((d) => (<tr key={d.id} className="border-t border-line"><td className="py-2"><button className="text-left text-brand hover:underline" title="Read this document here" onClick={() => setReading(d.path)}>{d.path}</button></td><td className="text-muted">{(d.size / 1024).toFixed(1)} KB</td>
-                <td className="whitespace-nowrap text-right"><button aria-label={`Read ${d.path}`} className="mr-3 text-xs text-brand hover:underline" onClick={() => setReading(d.path)}>Read</button>{writable && d.deletable !== false && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "It is removed from search, the graph and the wiki.", confirmLabel: "Delete document", danger: true })) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}{writable && d.deletable === false && <span className="text-xs text-muted" title="Synced from a connected source; remove the source to delete it">synced</span>}</td></tr>))}</tbody></table>)}
+                <td className="whitespace-nowrap text-right"><button aria-label={`Read ${d.path}`} className="mr-3 caption-5 text-brand hover:underline" onClick={() => setReading(d.path)}>Read</button>{writable && d.deletable !== false && <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600" onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "It is removed from search, the graph and the wiki.", confirmLabel: "Delete document", danger: true })) remove.mutate(d.id); }}><Trash2 className="h-4 w-4" /></button>}{writable && d.deletable === false && <span className="caption-5 text-muted" title="Synced from a connected source; remove the source to delete it">synced</span>}</td></tr>))}</tbody></table>)}
         </>)}
       </Card>
     </div>
