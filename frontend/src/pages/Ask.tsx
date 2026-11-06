@@ -201,7 +201,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
               <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded-md p-2 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
               <div className="max-w-2xl rounded-xl bg-brand px-4 py-3 body-6 text-white">
                 <p className="whitespace-pre-wrap">{m.content}</p>
-                {m.attachment && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 caption-5"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
+                {m.attachment && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-surface px-2 py-0.5 caption-5"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
                 {m.edited_at && <p className="mt-1 text-right text-[10px] opacity-70">edited</p>}</div></>)}
           </div>
         ) : (

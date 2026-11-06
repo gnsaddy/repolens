@@ -252,7 +252,7 @@ export default function ForceGraph({ nodes, edges, selectedId, highlight, onSele
 
   return (
     <div className={fill ? "relative min-h-0 flex-1" : "relative"}>
-      <div role="toolbar" aria-label="Graph controls" className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-white/95 p-1 shadow-sm">
+      <div role="toolbar" aria-label="Graph controls" className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-surface/95 p-1 shadow-sm">
         <button className={btn} aria-label="Zoom in" title="Zoom in (+)" onClick={() => zoomAt(1.3)}><Plus className="h-4 w-4" /></button>
         <button className={btn} aria-label="Zoom out" title="Zoom out (-)" onClick={() => zoomAt(1 / 1.3)}><Minus className="h-4 w-4" /></button>
         <span className="w-10 text-center text-[11px] tabular-nums text-muted" aria-label="Zoom level">{Math.round(view.k * 100)}%</span>
