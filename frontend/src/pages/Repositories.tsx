@@ -61,7 +61,7 @@ export default function Repositories() {
       {measuring && repo && <MeasurePanel repo={repo} onClose={() => setMeasuring(false)} />}
       <form onSubmit={search} className="mb-6 flex flex-wrap gap-2">
         <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
-          <Input className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files and symbols, or ask a question…" aria-label="Search code" /></div>
+          <Input className="pl-8" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search files and symbols, or ask a question…" aria-label="Search code" /></div>
         <select aria-label="Search in" value={scope} onChange={(e) => setScope(e.target.value as "all" | "repo")} className="h-9 rounded-lg border border-line bg-white px-2 body-6">
           <option value="all">All repositories</option>{repo && <option value="repo">{repo.name}</option>}</select>
         <Button type="submit">Search</Button>
@@ -81,10 +81,10 @@ export default function Repositories() {
             {!repos.data?.length ? <Empty>No repositories yet.</Empty> : (
               <ul className="space-y-0.5">{repos.data.map((r) => (
                 <li key={r.id}><button onClick={() => { setSel(r.id); setFile(null); }} aria-current={sel === r.id}
-                  className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-slate-50 ${sel === r.id ? "bg-indigo-50 hover:bg-indigo-50" : ""}`}>
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50 ${sel === r.id ? "bg-indigo-50 hover:bg-indigo-50" : ""}`}>
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500" aria-hidden>{r.source === "docs" ? <BookOpen className="h-4 w-4" /> : <FolderGit2 className="h-4 w-4" />}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5"><span className="truncate body-5">{r.name}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}</span>
+                    <span className="flex items-center gap-2"><span className="truncate body-5">{r.name}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="restricted" />}</span>
                     <span className="block truncate caption-5 text-muted">{r.file_count} files · updated {timeAgo(r.updated_at)}</span>
                   </span>
                   {r.status !== "ready" && <Badge tone={statusTone(r.status)}>{r.status}</Badge>}

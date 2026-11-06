@@ -96,7 +96,7 @@ export default function FeaturesPage() {
                       {x.status === "failed" ? <Badge tone="red">failed</Badge> : x.ok === false ? <Badge tone="amber">needs work</Badge> : <span>drafted</span>}
                       {x.shared && <span className="inline-flex items-center gap-1"><Share2 className="h-3 w-3" />shared</span>}</div>
                   </button>
-                  {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "draft"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
+                  {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "draft"}`} className="mt-2" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
                 </li>))}</ul>)}
           </Card>
         </div>
@@ -140,7 +140,7 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
           {d.context.files.length > 0 && (
             <ul className="mt-1 space-y-0.5 caption-5">{d.context.files.map((f) => <li key={`${f.repo_id}${f.path}`}><code>{f.repo}: {f.path}</code> <span className="text-muted">{f.why}</span></li>)}</ul>)}
           {d.context.facts.length > 0 ? (
-            <ul className="mt-2 space-y-1.5 body-6">{d.context.facts.map((f, i) => (
+            <ul className="mt-2 space-y-2 body-6">{d.context.facts.map((f, i) => (
               <li key={i}><code>{f.path}</code> {f.direction === "used_by" ? "is used by" : "depends on"} <strong>{f.repo}</strong>
                 <span className="block caption-5 text-muted"><code>{f.from}</code> → <code>{f.to}</code>{f.evidence && ` — ${f.evidence}`}</span></li>))}</ul>
           ) : !d.related.length && !d.context.hidden ? <p className="body-6 text-muted">The model saw only this repository&apos;s code. No other repository was found to depend on the files it read, or to be depended on by them.</p> : null}
@@ -149,7 +149,7 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
         <Card aria-label="Impact">
           <CardTitle>What depends on the files this changes</CardTitle>
           {!d.impact.length ? <p className="body-6 text-muted">The change touches no existing file, so nothing depends on it yet.</p> : (
-            <ul className="space-y-1.5 body-6">{d.impact.map((i) => (
+            <ul className="space-y-2 body-6">{d.impact.map((i) => (
               <li key={i.file}><code>{i.file}</code>{" "}
                 {i.dependants ? <span>is used by {i.dependants} place{i.dependants === 1 ? "" : "s"} in {i.repos.join(", ")}{i.hidden ? ` and ${i.hidden} you cannot access` : ""}
                   <span className="block caption-5 text-muted">{i.examples.join("; ")}</span></span>
@@ -157,7 +157,7 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
         </Card>
         <Card aria-label="Review">
           <CardTitle right={<Badge tone={d.review.ok ? "green" : "red"}>{d.review.ok ? "no errors" : `${d.review.errors} error${d.review.errors === 1 ? "" : "s"}`}</Badge>}>Review (read, not run)</CardTitle>
-          <ul className="space-y-1.5 body-6">{d.review.findings.map((f, i) => (
+          <ul className="space-y-2 body-6">{d.review.findings.map((f, i) => (
             <li key={i} className="flex items-start gap-2"><Badge tone={LEVEL[f.level] ?? "gray"}>{f.level}</Badge><span>{f.file && <code className="mr-1">{f.file}</code>}{f.message}</span></li>))}</ul>
           <p className="mt-2 caption-5 text-muted">{d.review.note}</p>
         </Card>

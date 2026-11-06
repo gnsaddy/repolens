@@ -54,7 +54,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       </div>
       {dialog && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" onMouseDown={() => close(false)}>
-          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
+          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
             <h2 id="confirm-title" className="body-1">{dialog.title}</h2>
             {dialog.warning && <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 body-5 text-red-800">{dialog.warning}</div>}
             {dialog.message && <div className="mt-2 body-6 text-muted">{dialog.message}</div>}
@@ -63,7 +63,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                 <input type="checkbox" className="mt-0.5" checked={acked} onChange={(e) => setAcked(e.target.checked)} />
                 <span>{dialog.acknowledge}</span>
               </label>)}
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
               <Button variant={dialog.danger ? "danger" : "primary"} autoFocus={!dialog.acknowledge} disabled={!!dialog.acknowledge && !acked} onClick={() => close(true)}>{dialog.confirmLabel ?? "Confirm"}</Button>
             </div>

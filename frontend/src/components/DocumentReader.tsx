@@ -84,15 +84,15 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
             <label className="relative block"><Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted" />
               <Input aria-label="Find in document" className="pl-8" placeholder="Find in this document…" value={find} onChange={(e) => setFind(e.target.value)} /></label>
             <div className="mt-2 flex items-center gap-2 caption-5">
-              <label className="flex items-center gap-1.5"><input type="checkbox" checked={showAll} onChange={(e) => setAll(e.target.checked)} />Show all sections together</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={showAll} onChange={(e) => setAll(e.target.checked)} />Show all sections together</label>
             </div>
             <nav className="mt-2 min-h-0 flex-1 overflow-auto" aria-label={find.trim().length >= 2 ? "Search results" : "Sections"}>
               {find.trim().length >= 2 ? (
                 matches.length ? (
-                  <ul className="space-y-1.5 caption-5">
+                  <ul className="space-y-2 caption-5">
                     <li className="text-muted">{matches.reduce((n, m) => n + m.count, 0)} match{matches.reduce((n, m) => n + m.count, 0) === 1 ? "" : "es"} in {matches.length} section{matches.length === 1 ? "" : "s"}</li>
                     {matches.slice(0, 60).map((m) => (
-                      <li key={m.i}><button className="w-full rounded-lg p-1.5 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
+                      <li key={m.i}><button className="w-full rounded-lg p-2 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
                         <span className="font-medium">{m.title}</span> <span className="text-muted">({m.count})</span><span className="mt-0.5 block text-muted">{m.snippet}</span></button></li>))}
                   </ul>) : <p className="caption-5 text-muted">Nothing in this document matches “{find.trim()}”.</p>
               ) : (
@@ -103,7 +103,7 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
                 </ol>)}
             </nav>
           </aside>
-          <article className="reader min-h-0 overflow-auto p-5" style={{ "--reader-size": `${SIZES[size]}px` } as React.CSSProperties} aria-label="Document text">
+          <article className="reader min-h-0 overflow-auto p-4" style={{ "--reader-size": `${SIZES[size]}px` } as React.CSSProperties} aria-label="Document text">
             <div className="mx-auto max-w-3xl">
               {showAll
                 ? <Markdown text={page.markdown} onOpen={(repo, p) => nav(`/wiki?tab=browse&repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(p)}`)} />

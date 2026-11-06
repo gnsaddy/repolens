@@ -37,7 +37,7 @@ export default function Sources({ overview }: { overview?: WikiOverview }) {
                 <div className="truncate caption-5 text-muted"><Badge>{s.kind}</Badge> {s.label ?? s.url}{s.space_key ? ` · ${s.space_key}` : ""} · {s.pages} pages · {s.last_synced_at ? `synced ${timeAgo(s.last_synced_at)}` : "never synced"}</div>
                 {s.error && <div role="alert" className="caption-5 text-red-600">{s.error}</div>}</div>
               <Badge tone={statusTone(s.status)}>{s.status}</Badge><Badge tone={s.visibility === "restricted" ? "amber" : "gray"}>{s.visibility}</Badge>
-              {admin && <select aria-label={`Sync schedule for ${s.name}`} className="h-8 rounded-lg border border-line bg-white px-1.5 caption-5" value={s.sync_interval_hours ?? 0}
+              {admin && <select aria-label={`Sync schedule for ${s.name}`} className="h-8 rounded-lg border border-line bg-white px-2 caption-5" value={s.sync_interval_hours ?? 0}
                 onChange={(e) => schedule.mutate({ id: s.id, hours: +e.target.value })}>{SCHEDULES.map(([h, l]) => <option key={h} value={h}>{l}</option>)}</select>}
               {admin && <>
                 <Button variant="outline" size="sm" aria-label={`Sync ${s.name}`} disabled={sync.isPending} onClick={() => sync.mutate(s.id)}><RefreshCw className="h-3.5 w-3.5" />Sync</Button>

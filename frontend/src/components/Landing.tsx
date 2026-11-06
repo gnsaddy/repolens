@@ -229,7 +229,7 @@ export default function Landing({ card }: { card: ReactNode }) {
       <a href="#main" className="body-5 sr-only rounded-lg bg-brand px-3 py-2 text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-40">Skip to content</a>
       <Nav links={NAV} />
       <main id="main" aria-label="About RepoLens AI">
-        <section aria-label="Overview" className="mx-auto grid max-w-[1200px] gap-x-12 gap-y-8 px-4 pb-24 pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-center lg:pt-32">
+        <section aria-label="Overview" className="mx-auto grid max-w-[1200px] gap-x-12 gap-y-8 px-4 pb-24 pt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-center">
           <div className="max-w-[680px]">
             <span className="caption-4 mb-4 inline-flex items-center gap-2 rounded-lg border border-l-line bg-l-sunk px-3 py-1 text-l-muted">Open source, Apache 2.0 <span className="text-l-link">{APP_VERSION}</span></span>
             <h1 className="land-hero-title heading-3 md:heading-1">A living wiki for your code and docs.</h1>

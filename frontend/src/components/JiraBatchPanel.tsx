@@ -23,7 +23,7 @@ export default function JiraBatchPanel({ batch, canInvestigate, busy, onInvestig
       <div className="space-y-4" aria-label="Batch analysis">
         {c.possible_duplicates.length > 0 && (
           <div role="status" className="rounded-lg bg-amber-50 p-3 body-6 text-amber-900">
-            <div className="mb-1 flex items-center gap-1.5 font-medium"><Copy className="h-4 w-4" />Possible duplicates</div>
+            <div className="mb-1 flex items-center gap-2 font-medium"><Copy className="h-4 w-4" />Possible duplicates</div>
             <ul className="space-y-0.5">{c.possible_duplicates.map((d) => <li key={d.keys.join()}><b>{d.keys.join(" and ")}</b>: {d.why}</li>)}</ul>
             <p className="mt-1 caption-5">Investigate one of each pair; the other may close with the same cause.</p>
           </div>)}
@@ -38,13 +38,13 @@ export default function JiraBatchPanel({ batch, canInvestigate, busy, onInvestig
             <li key={t.key} className="p-3 body-6">
               <div className="flex flex-wrap items-center gap-2"><button className="font-medium text-brand hover:underline" onClick={() => onOpen(t.key)}>{t.key}</button><span className="min-w-0 flex-1 truncate">{t.summary}</span>
                 {t.investigation_id && <Link className="caption-5 text-brand hover:underline" to={`/investigations/${t.investigation_id}`}>View RCA</Link>}</div>
-              <div className="mt-1 flex flex-wrap gap-1.5">{t.signals.errors.map((e) => <Badge key={e} tone="red">{e}</Badge>)}{t.signals.files.slice(0, 3).map((f) => <Badge key={f} tone="blue">{f}</Badge>)}</div>
+              <div className="mt-1 flex flex-wrap gap-2">{t.signals.errors.map((e) => <Badge key={e} tone="red">{e}</Badge>)}{t.signals.files.slice(0, 3).map((f) => <Badge key={f} tone="blue">{f}</Badge>)}</div>
               {t.discussion.cause[0] && <p className="mt-1 caption-5 text-muted"><b>Proposed cause:</b> {t.discussion.cause[0].text}</p>}
               {t.flags.slice(0, 2).map((f) => <p key={f} className="mt-0.5 flex items-start gap-1 caption-5 text-amber-800"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{f}</p>)}
             </li>))}</ul></section>
         {batch.related.length > 0 && <section><h4 className="mb-1 caption-4 text-muted">Related in your docs and code</h4>
           <ul className="space-y-1 body-6">{batch.related.map((r, i) => <li key={i}><Badge tone={r.kind === "doc" ? "green" : "gray"}>{r.kind}</Badge> {r.node_id ? <Link className="text-brand hover:underline" to={`/knowledge?tab=graph&node=${r.node_id}`}>{r.title}</Link> : r.title} <span className="caption-5 text-muted">{r.repo}:{r.file}</span></li>)}</ul></section>}
-        {c.attention.length > 0 && <section><h4 className="mb-1 caption-4 text-muted">Gaps worth closing</h4><ul className="list-disc space-y-0.5 pl-5 caption-5 text-muted">{c.attention.map((a) => <li key={a}>{a}</li>)}</ul></section>}
+        {c.attention.length > 0 && <section><h4 className="mb-1 caption-4 text-muted">Gaps worth closing</h4><ul className="list-disc space-y-0.5 pl-4 caption-5 text-muted">{c.attention.map((a) => <li key={a}>{a}</li>)}</ul></section>}
         <div className="flex justify-end gap-2 border-t border-line pt-3">{canInvestigate && <Button disabled={busy} onClick={onInvestigate}><Microscope className="h-4 w-4" />{busy ? "Starting…" : `Investigate all ${batch.tickets.length}`}</Button>}<Button variant="outline" onClick={onClose}>Close</Button></div>
       </div>
     </Modal>

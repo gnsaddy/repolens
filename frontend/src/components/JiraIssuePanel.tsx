@@ -13,7 +13,7 @@ function Claims({ title, items }: { title: string; items: JiraClaim[] }) {
   if (!items.length) return null;
   return (
     <section><h4 className="mb-1 caption-4 text-muted">{title}</h4>
-      <ul className="space-y-1 body-6">{items.map((c, i) => <li key={i} className="rounded-lg bg-slate-50 px-2.5 py-1.5">{c.text}<span className="ml-2 caption-5 text-muted">{c.by || "someone"} · comment {c.comment}</span></li>)}</ul></section>
+      <ul className="space-y-1 body-6">{items.map((c, i) => <li key={i} className="rounded-lg bg-slate-50 px-3 py-2">{c.text}<span className="ml-2 caption-5 text-muted">{c.by || "someone"} · comment {c.comment}</span></li>)}</ul></section>
   );
 }
 
@@ -44,7 +44,7 @@ export default function JiraIssuePanel({ issueKey, canInvestigate, onClose }: { 
           {analysis.isPending && <Spinner />}
           {tab === "ticket" && (
             <div className="space-y-4">
-              {!!d.labels.length || !!d.components.length ? <div className="flex flex-wrap gap-1.5">{d.components.map((c) => <Badge key={c} tone="blue">{c}</Badge>)}{d.labels.map((l) => <Badge key={l}>{l}</Badge>)}</div> : null}
+              {!!d.labels.length || !!d.components.length ? <div className="flex flex-wrap gap-2">{d.components.map((c) => <Badge key={c} tone="blue">{c}</Badge>)}{d.labels.map((l) => <Badge key={l}>{l}</Badge>)}</div> : null}
               <section><h4 className="mb-1 caption-4 text-muted">Description</h4><pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-sans body-6">{d.description || "No description."}</pre></section>
               <section><h4 className="mb-1 caption-4 text-muted">Comments</h4>
                 {!d.comments.length ? <p className="body-6 text-muted">No comments yet.</p> : <ul className="space-y-2">{d.comments.map((c, i) => <li key={i} className="rounded-lg border border-line p-3 body-6"><div className="mb-1 caption-5 text-muted"><b className="text-ink">{c.author || "Unknown"}</b>{c.created ? ` · ${timeAgo(c.created)}` : ""}</div><p className="whitespace-pre-wrap">{c.body}</p></li>)}</ul>}</section>
@@ -60,7 +60,7 @@ export default function JiraIssuePanel({ issueKey, canInvestigate, onClose }: { 
               </div>
               {(!!a.signals.errors.length || !!a.signals.files.length || !!a.signals.symbols.length) && (
                 <section><h4 className="mb-1 caption-4 text-muted">Signals found in the ticket</h4>
-                  <div className="flex flex-wrap gap-1.5">{a.signals.errors.map((e) => <Badge key={e} tone="red">{e}</Badge>)}{a.signals.files.map((f) => <Badge key={f} tone="blue">{f}</Badge>)}{a.signals.symbols.map((s) => <Badge key={s} tone="brand">{s}</Badge>)}</div></section>)}
+                  <div className="flex flex-wrap gap-2">{a.signals.errors.map((e) => <Badge key={e} tone="red">{e}</Badge>)}{a.signals.files.map((f) => <Badge key={f} tone="blue">{f}</Badge>)}{a.signals.symbols.map((s) => <Badge key={s} tone="brand">{s}</Badge>)}</div></section>)}
               <Claims title="Proposed cause" items={a.discussion.cause} />
               <Claims title="Already tried" items={a.discussion.tried} />
               <Claims title="Workarounds" items={a.discussion.workarounds} />
@@ -68,7 +68,7 @@ export default function JiraIssuePanel({ issueKey, canInvestigate, onClose }: { 
               <Claims title="Still unanswered" items={a.discussion.open_questions} />
               {!!a.timeline.length && <section><h4 className="mb-1 caption-4 text-muted">How the discussion went</h4>
                 <ol className="space-y-1 body-6">{a.timeline.map((t, i) => <li key={i} className="flex items-start gap-2"><Badge tone={KIND_TONE[t.kind] ?? "gray"}>{t.kind}</Badge><span><b>{t.author || "Someone"}</b> <span className="text-muted">{t.excerpt}</span></span></li>)}</ol></section>}
-              <section><h4 className="mb-1 caption-4 text-muted">Suggested next steps</h4><ol className="list-decimal space-y-1 pl-5 body-6">{a.next_steps.map((s) => <li key={s}>{s}</li>)}</ol></section>
+              <section><h4 className="mb-1 caption-4 text-muted">Suggested next steps</h4><ol className="list-decimal space-y-1 pl-4 body-6">{a.next_steps.map((s) => <li key={s}>{s}</li>)}</ol></section>
               {!!a.related.length && <section><h4 className="mb-1 caption-4 text-muted">Related in your docs and code</h4>
                 <ul className="space-y-1 body-6">{a.related.map((r, i) => <li key={i}><Badge tone={r.kind === "doc" ? "green" : "gray"}>{r.kind}</Badge> {r.node_id ? <Link className="text-brand hover:underline" to={`/knowledge?tab=graph&node=${r.node_id}`}>{r.title}</Link> : r.title} <span className="caption-5 text-muted">{r.repo}:{r.file}</span></li>)}</ul></section>}
             </div>)}

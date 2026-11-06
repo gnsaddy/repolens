@@ -57,11 +57,11 @@ export default function Ownership() {
               {!d.areas.length ? <Empty>No commits indexed yet.</Empty> : (
                 <ul className="divide-y divide-line">{d.areas.map((a) => (
                   <li key={a.area} className="py-3">
-                    <div className="mb-1.5 flex flex-wrap items-center gap-2 body-6"><code className="font-medium">{a.area}</code>
+                    <div className="mb-2 flex flex-wrap items-center gap-2 body-6"><code className="font-medium">{a.area}</code>
                       <Badge tone={RISK[a.risk][0]}>{a.risk !== "ok" && <AlertTriangle className="mr-1 h-3 w-3" />}{RISK[a.risk][1]}</Badge>
                       <span className="ml-auto caption-5 text-muted">{a.commits} commits · active {timeAgo(a.last_activity)}</span></div>
                     <ShareBar owners={a.owners} />
-                    <div className="mt-1.5 flex flex-wrap gap-x-4 caption-5 text-muted">{a.owners.map((o, i) => <span key={o.author}><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{o.author} {Math.round(o.share * 100)}%</span>)}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 caption-5 text-muted">{a.owners.map((o, i) => <span key={o.author}><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />{o.author} {Math.round(o.share * 100)}%</span>)}</div>
                   </li>))}</ul>)}
             </Card>
             <Card>

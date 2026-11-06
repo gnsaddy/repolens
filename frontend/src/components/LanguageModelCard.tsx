@@ -51,8 +51,8 @@ export default function LanguageModelCard({ admin }: { admin: boolean }) {
         {on && data ? (
           <dl className="grid gap-x-6 gap-y-2 body-6 sm:grid-cols-3">
             <div><dt className="caption-5 text-muted">Provider</dt><dd className="font-medium">{providerLabel(data.provider)}</dd></div>
-            <div><dt className="caption-5 text-muted">Model in use</dt><dd><code className="rounded-md bg-slate-100 px-1.5 py-0.5 caption-4">{data.model}</code></dd></div>
-            <div><dt className="caption-5 text-muted">Key</dt><dd className="flex items-center gap-1.5 font-medium">stored<Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></dd></div>
+            <div><dt className="caption-5 text-muted">Model in use</dt><dd><code className="rounded-md bg-slate-100 px-2 py-0.5 caption-4">{data.model}</code></dd></div>
+            <div><dt className="caption-5 text-muted">Key</dt><dd className="flex items-center gap-2 font-medium">stored<Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></dd></div>
             {data.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 body-6 text-amber-900 sm:col-span-3">GitHub retired GitHub Models on 30 July 2026, so this no longer answers. Choose Change model and pick another provider.</p>}
           </dl>
         ) : <p className="body-6 text-muted">{admin ? "Not connected: answers and reports use the built-in rules." : "Only workspace admins can connect a language model."}</p>}
@@ -96,7 +96,7 @@ function Wizard({ data, onDone }: { data?: LLMSettings; onDone: () => void }) {
     <form className="space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); if (ping?.ok) save.mutate(); }}>
       <ol className="flex gap-2 caption-5" aria-label="Steps">
         {["Test your key", "Choose a model", "Test and save"].map((l, i) => (
-          <li key={l} className={cn("flex items-center gap-1.5 rounded-full px-2.5 py-1", step === i + 1 ? "bg-indigo-50 font-medium text-brand" : step > i + 1 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-muted")}>
+          <li key={l} className={cn("flex items-center gap-2 rounded-full px-3 py-1", step === i + 1 ? "bg-indigo-50 font-medium text-brand" : step > i + 1 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-muted")}>
             {step > i + 1 ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}{l}</li>))}
       </ol>
       <div className="grid gap-3">
@@ -116,9 +116,9 @@ function Wizard({ data, onDone }: { data?: LLMSettings; onDone: () => void }) {
           {models && <p role="status" className="body-6 text-emerald-700">Key accepted. {models.length} models available.</p>}
           {models && models.length > 0 && (<div aria-label="Available models">
             <Input aria-label="Filter models" placeholder="Filter models…" className="mb-2 h-8" value={filter} onChange={(e) => setFilter(e.target.value)} />
-            <ul className="flex max-h-44 flex-wrap gap-1.5 overflow-auto">{filtered.map((m) => (
+            <ul className="flex max-h-44 flex-wrap gap-2 overflow-auto">{filtered.map((m) => (
               <li key={m.id}><button type="button" title={m.name || m.id} aria-pressed={model === m.id} onClick={() => { setModel(m.id); setPing(null); }}
-                className={cn("rounded-full border px-2.5 py-1 caption-5", model === m.id ? "border-brand bg-indigo-50 font-medium text-brand" : "border-line bg-white hover:border-brand")}>{m.id}</button></li>))}</ul></div>)}
+                className={cn("rounded-full border px-3 py-1 caption-5", model === m.id ? "border-brand bg-indigo-50 font-medium text-brand" : "border-line bg-white hover:border-brand")}>{m.id}</button></li>))}</ul></div>)}
           {(manual || !models?.length) && <label className="block"><Label>Model name</Label><Input aria-label="Model name" value={model} onChange={(e) => { setModel(e.target.value); setPing(null); }} placeholder="e.g. gpt-4o-mini" /></label>}
           {!manual && !!models?.length && <button type="button" className="caption-5 text-brand hover:underline" onClick={() => setManual(true)}>Type a model name instead</button>}
           <div className="flex flex-wrap items-center gap-2">

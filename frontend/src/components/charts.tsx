@@ -9,7 +9,7 @@ export function Spark({ data, color = "#4f46e5", format, height = 44, max }: { d
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={pts} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
           <YAxis hide domain={[0, max ?? "auto"]} />
-          <Tooltip content={({ active, payload }) => (active && payload?.length ? <div className="rounded-md bg-slate-900 px-1.5 py-0.5 caption-5 text-white">{format ? format(Number(payload[0].value)) : String(payload[0].value)}</div> : null)} />
+          <Tooltip content={({ active, payload }) => (active && payload?.length ? <div className="rounded-md bg-slate-900 px-2 py-0.5 caption-5 text-white">{format ? format(Number(payload[0].value)) : String(payload[0].value)}</div> : null)} />
           <Area type="monotone" dataKey="v" stroke={color} fill={color} fillOpacity={0.15} strokeWidth={1.5} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>

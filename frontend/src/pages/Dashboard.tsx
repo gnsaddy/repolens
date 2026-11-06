@@ -46,7 +46,7 @@ export default function Dashboard() {
           <CardTitle icon={Rocket} right={<span className="caption-5 text-muted">{doneCount} of {steps.length} done</span>}>Getting started</CardTitle>
           <div role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={doneCount} className="mb-4 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></div>
           <ol className="grid gap-1 md:grid-cols-2 xl:grid-cols-3">{steps.map((s) => (
-            <li key={s.label}><Link to={s.to} aria-current={s === next ? "step" : undefined} className={cn("flex h-full gap-2.5 rounded-lg p-3 body-6 hover:bg-slate-50", s === next && "bg-indigo-50 hover:bg-indigo-50", s.done && "text-muted")}>
+            <li key={s.label}><Link to={s.to} aria-current={s === next ? "step" : undefined} className={cn("flex h-full gap-3 rounded-lg p-3 body-6 hover:bg-slate-50", s === next && "bg-indigo-50 hover:bg-indigo-50", s.done && "text-muted")}>
               {s.done ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted" />}
               <span><span className="block font-medium">{s.label}</span><span className="caption-5 text-muted">{s.hint}</span>{s === next && <span className="mt-1 block caption-4 text-brand">Next: {s.cta} →</span>}</span></Link></li>))}</ol>
         </Card>)}
@@ -68,7 +68,7 @@ export default function Dashboard() {
                 <tr key={i.id} className="border-t border-line">
                   <td className="max-w-xs truncate py-2"><Link className="text-brand hover:underline" to={`/investigations/${i.id}`}>{i.title}</Link></td>
                   <td className="text-muted">{i.repo}</td>
-                  <td><span className="inline-flex items-center gap-1.5 caption-5 text-muted"><StatusDot status={i.status} label="" />{i.status}</span></td>
+                  <td><span className="inline-flex items-center gap-2 caption-5 text-muted"><StatusDot status={i.status} label="" />{i.status}</span></td>
                   <td className="text-right text-muted">{timeAgo(i.created_at)}</td>
                 </tr>))}</tbody>
             </table>)}
@@ -102,7 +102,7 @@ function Attention({ items }: { items: DashInsights["attention"] }) {
       <CardTitle right={<span className="caption-5 text-muted">{items.length} thing{items.length === 1 ? "" : "s"}</span>}>Needs attention</CardTitle>
       <ul className="divide-y divide-line">{items.map((a) => {
         const [tone, Icon] = SEV[a.severity];
-        return <li key={a.text}><Link to={a.to} className="flex items-start gap-2.5 py-2 body-6 hover:text-brand"><Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} /><span>{a.text}</span></Link></li>;
+        return <li key={a.text}><Link to={a.to} className="flex items-start gap-3 py-2 body-6 hover:text-brand"><Icon className={cn("mt-0.5 h-4 w-4 shrink-0", tone)} /><span>{a.text}</span></Link></li>;
       })}</ul>
     </Card>
   );

@@ -36,7 +36,7 @@ export default function Profile() {
       <PageHeader title="Your profile" subtitle="Your account, where you are signed in, and how to keep it secure." actions={<Button variant="outline" onClick={logout}><LogOut className="h-4 w-4" />Sign out</Button>} />
       <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle><UserRound className="mr-1.5 inline h-4 w-4" />Account</CardTitle>
+          <CardTitle><UserRound className="mr-2 inline h-4 w-4" />Account</CardTitle>
           <div className="mb-4 flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-full bg-brand title-2 text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</div>
             <div className="min-w-0"><div className="truncate font-medium">{user.name || "No name set"}</div><div className="truncate body-6 text-muted">{user.email}</div></div>
@@ -51,16 +51,16 @@ export default function Profile() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardTitle><Moon className="mr-1.5 inline h-4 w-4" />Appearance</CardTitle>
+          <CardTitle><Moon className="mr-2 inline h-4 w-4" />Appearance</CardTitle>
           <div role="radiogroup" aria-label="Colour theme" className="inline-flex rounded-lg bg-slate-100 p-1 body-6">
             {([["system", "Match my device", Monitor], ["light", "Day", Sun], ["dark", "Night", Moon]] as [ThemePref, string, typeof Sun][]).map(([v, label, Icon]) => (
-              <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
+              <button key={v} role="radio" aria-checked={theme.pref === v} onClick={() => theme.set(v)} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${theme.pref === v ? "bg-white font-medium shadow-sm" : "text-muted"}`}><Icon className="h-4 w-4" />{label}</button>))}
           </div>
           <p className="mt-2 caption-5 text-muted">Saved in this browser only.</p>
         </Card>
 
         <Card>
-          <CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Password</CardTitle>
+          <CardTitle><KeyRound className="mr-2 inline h-4 w-4" />Password</CardTitle>
           {user.auth_source && user.auth_source !== "password" ? <p className="body-6 text-muted">You sign in through single sign-on, so there is no password here.</p> : (
             <form className="space-y-3" onSubmit={submit}>
               <label className="block"><Label>Current password</Label><Input type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></label>
@@ -75,10 +75,10 @@ export default function Profile() {
 
         {user.auth_source === "password" && <TwoFactor enabled={!!user.totp_enabled} onChange={(on) => setUser({ ...user, totp_enabled: on })} />}
 
-        <Card className="lg:col-span-2"><CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Access tokens and editor setup</CardTitle><p className="body-6 text-muted">Tokens for scripts, CI and editors now live in <Link className="text-brand hover:underline" to="/settings?tab=mcp">Settings → MCP &amp; tokens</Link>.</p></Card>
+        <Card className="lg:col-span-2"><CardTitle><KeyRound className="mr-2 inline h-4 w-4" />Access tokens and editor setup</CardTitle><p className="body-6 text-muted">Tokens for scripts, CI and editors now live in <Link className="text-brand hover:underline" to="/settings?tab=mcp">Settings → MCP &amp; tokens</Link>.</p></Card>
 
         <Card className="lg:col-span-2">
-          <CardTitle right={(sessions.data?.length ?? 0) > 1 ? <Button size="sm" variant="outline" disabled={others.isPending} onClick={async () => { if (await ask({ title: "Sign out everywhere else?", message: "Every other browser and device is signed out. This one stays signed in.", confirmLabel: "Sign out others", danger: true })) others.mutate(); }}>Sign out other devices</Button> : undefined}><ShieldCheck className="mr-1.5 inline h-4 w-4" />Where you are signed in</CardTitle>
+          <CardTitle right={(sessions.data?.length ?? 0) > 1 ? <Button size="sm" variant="outline" disabled={others.isPending} onClick={async () => { if (await ask({ title: "Sign out everywhere else?", message: "Every other browser and device is signed out. This one stays signed in.", confirmLabel: "Sign out others", danger: true })) others.mutate(); }}>Sign out other devices</Button> : undefined}><ShieldCheck className="mr-2 inline h-4 w-4" />Where you are signed in</CardTitle>
           {!sessions.data?.length ? <Empty>No active sessions.</Empty> : (
             <ul aria-label="Sessions" className="divide-y divide-line">{sessions.data.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center gap-3 py-3 body-6">
@@ -107,7 +107,7 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
   const disable = useMutation({ mutationFn: () => api("/auth/totp/disable", { method: "POST", json: { password: off.password, code: off.code } }), onSuccess: () => { setOff({ open: false, password: "", code: "" }); onChange(false); toast("Authenticator turned off"); } });
   return (
     <Card>
-      <CardTitle right={enabled ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}><Smartphone className="mr-1.5 inline h-4 w-4" />Authenticator app</CardTitle>
+      <CardTitle right={enabled ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}><Smartphone className="mr-2 inline h-4 w-4" />Authenticator app</CardTitle>
       <p className="mb-3 body-6 text-muted">Ask for a six-digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
       {codes ? (
         <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 body-6">

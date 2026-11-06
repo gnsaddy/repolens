@@ -51,7 +51,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   if (!open) return null;
   const go = (to: string) => { onClose(); nav(to); };
   return (
-    <div className="fixed inset-0 z-50 grid place-items-start bg-slate-900/40 p-4 pt-[15vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-start bg-slate-900/40 p-4 pt-24" onMouseDown={onClose}>
       <div role="dialog" aria-label="Command palette" className="mx-auto w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-line px-3">
           <Search className="h-4 w-4 text-muted" />
@@ -63,7 +63,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
               else if (e.key === "Enter" && items[idx]) go(items[idx].to);
               else if (e.key === "Escape") onClose();
             }} />
-          <kbd className="rounded-md border border-line px-1.5 text-[10px] text-muted">esc</kbd>
+          <kbd className="rounded-md border border-line px-2 text-[10px] text-muted">esc</kbd>
         </div>
         <ul role="listbox" className="max-h-80 overflow-auto p-1">
           {items.map((it, i) => (

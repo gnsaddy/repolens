@@ -32,7 +32,7 @@ export default function MemoryBrowser({ admin }: { admin: boolean }) {
     <div className="space-y-3">
       <form className="flex flex-wrap items-center gap-2" role="search" onSubmit={(e) => { e.preventDefault(); setQ(text.trim()); }}>
         <Input aria-label="Search memory" className="min-w-56 flex-1" placeholder="Search questions and answers…" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setQ(""); }} />
-        <label className="flex items-center gap-1.5 caption-5 text-muted"><input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />Deep: also read answers</label>
+        <label className="flex items-center gap-2 caption-5 text-muted"><input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} />Deep: also read answers</label>
         <Button variant="outline" size="sm">Search</Button>
       </form>
       {list.isLoading ? null : !list.data?.length ? <p className="py-6 text-center body-6 text-muted">{q ? `Nothing in memory matches “${q}”.` : "Nothing is remembered yet."}</p> : (

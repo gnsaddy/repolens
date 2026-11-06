@@ -72,14 +72,14 @@ export default function JiraIssueBrowser({ canInvestigate, onOpen, onAnalyzed, o
 
       {issues.isLoading ? <Spinner /> : !rows.length ? <p className="rounded-lg border border-dashed border-line p-8 text-center body-6 text-muted">No tickets match. Try “All types” or “Any status”.</p> : (
         <ul aria-label="Tickets" className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-white">
-          <li className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 caption-5 text-muted">
+          <li className="flex items-center gap-3 bg-slate-50 px-3 py-2 caption-5 text-muted">
             <input type="checkbox" aria-label="Select the first ten" checked={picked.length > 0 && allShown.every((k) => picked.includes(k))} onChange={(e) => setPicked(e.target.checked ? allShown : [])} />
             <span>Select tickets to analyse or investigate several at once</span>
           </li>
           {rows.map((i) => (
-            <li key={i.key} className={cn("flex items-center gap-3 px-3 py-2.5 body-6 hover:bg-slate-50", picked.includes(i.key) && "bg-indigo-50/60")}>
+            <li key={i.key} className={cn("flex items-center gap-3 px-3 py-3 body-6 hover:bg-slate-50", picked.includes(i.key) && "bg-indigo-50/60")}>
               <input type="checkbox" aria-label={`Select ${i.key}`} checked={picked.includes(i.key)} disabled={!picked.includes(i.key) && picked.length >= MAX_BATCH} onChange={() => toggle(i.key)} />
-              <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 caption-4", TYPE_TONE[i.type] ?? "bg-slate-100 text-slate-700")}>{i.type}</span>
+              <span className={cn("shrink-0 rounded-md px-2 py-0.5 caption-4", TYPE_TONE[i.type] ?? "bg-slate-100 text-slate-700")}>{i.type}</span>
               <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(i.key)} title="Read the ticket and analyse it">
                 <span className="mr-2 font-medium text-ink">{i.key}</span><span className="text-slate-700 hover:text-brand">{i.summary}</span>
               </button>

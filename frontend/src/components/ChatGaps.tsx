@@ -37,7 +37,7 @@ export default function ChatGaps() {
     <div aria-label="Unanswered questions">
       <p className="mb-2 px-2 caption-5 text-muted">From your own chats only. Nobody else sees this list.</p>
       <ul className="space-y-2">{items.map((g) => (
-        <li key={g.chat_id + g.question} className="rounded-lg border border-line p-2.5 body-6">
+        <li key={g.chat_id + g.question} className="rounded-lg border border-line p-3 body-6">
           <Link to={`/ask/${g.chat_id}`} className="block font-medium hover:text-brand">{g.question}</Link>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 caption-5 text-muted">
             <span>{g.count === 1 ? "asked once" : `asked ${g.count} times`}</span><span>{timeAgo(g.last_asked)}</span><span className="truncate">topic: {g.topic}</span></div>

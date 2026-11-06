@@ -25,7 +25,7 @@ export default function PublicLayout({ title, intro, children }: { title: string
     <div className="landing min-h-screen" id="top">
       <a href="#main" className="body-5 sr-only rounded-lg bg-brand px-3 py-2 text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-40">Skip to content</a>
       <Nav links={LINKS} current={pathname} signIn={user ? "/" : "/login"} signInLabel={user ? "Open the app" : "Sign in"} />
-      <main id="main" className="mx-auto max-w-[920px] px-4 pb-24 pt-32">
+      <main id="main" className="mx-auto max-w-[920px] px-4 pb-24 pt-24">
         <h1 className="heading-4 md:heading-3 text-l-text">{title}</h1>
         <p className="body-3 mt-4 max-w-[680px] text-l-muted">{intro}</p>
         <div className="mt-12 space-y-12">{children}</div>

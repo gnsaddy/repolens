@@ -31,7 +31,7 @@ export default function AccessPanel({ repoId, repoName }: { repoId: string; repo
           <span><b>Restricted</b><span className="block caption-5 text-muted">Hidden — including its code, history, graph nodes, search results and investigations — from everyone not listed below. Admins always have access.</span></span></label>
       </div>
       {visibility === "restricted" && (
-        <fieldset className="mt-3 space-y-1.5 border-t border-line pt-3">
+        <fieldset className="mt-3 space-y-2 border-t border-line pt-3">
           <legend className="mb-1 caption-4 text-muted">Users with access</legend>
           {!members.length && <p className="caption-5 text-muted">No non-admin users yet.</p>}
           {members.map((u) => (

@@ -79,11 +79,11 @@ export default function Ask() {
               <ul className="space-y-0.5">{items.map((c) => (
                 <li key={c.id} className={cn("group relative rounded-lg", c.id === id ? "bg-indigo-50" : "hover:bg-slate-50")}>
                   {renaming === c.id ? (
-                    <div className="flex items-center gap-1 p-1.5"><Input aria-label="Chat title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenaming(null); }} />
+                    <div className="flex items-center gap-1 p-2"><Input aria-label="Chat title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setRenaming(null); }} />
                       <button aria-label="Save title" className="p-1 text-emerald-600" onClick={saveRename}><Check className="h-4 w-4" /></button></div>
                   ) : (
                     <div className="flex items-center">
-                      <Link to={`/ask/${c.id}`} className="min-w-0 flex-1 px-2 py-1.5 body-6" aria-current={c.id === id ? "page" : undefined}>
+                      <Link to={`/ask/${c.id}`} className="min-w-0 flex-1 px-2 py-2 body-6" aria-current={c.id === id ? "page" : undefined}>
                         <span className={cn("block truncate", c.id === id && "font-medium text-brand")}>{c.title}</span>
                         {c.preview && <span className="block truncate caption-5 text-muted">{c.preview}</span>}
                       </Link>
@@ -91,9 +91,9 @@ export default function Ask() {
                     </div>)}
                   {menu === c.id && (
                     <div role="menu" aria-label={`Actions for ${c.title}`} className="absolute right-1 top-9 z-20 w-40 rounded-lg border border-line bg-white p-1 body-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => startRename(c)}><Pencil className="h-3.5 w-3.5" />Rename</button>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(null); patch.mutate({ id: c.id, body: { archived: !c.archived } }); toast(c.archived ? "Chat restored" : "Chat archived"); }}>{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{c.archived ? "Restore" : "Archive"}</button>
-                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); void removeChat(c); }}><Trash2 className="h-3.5 w-3.5" />Delete</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-2 hover:bg-slate-50" onClick={() => startRename(c)}><Pencil className="h-3.5 w-3.5" />Rename</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-2 hover:bg-slate-50" onClick={() => { setMenu(null); patch.mutate({ id: c.id, body: { archived: !c.archived } }); toast(c.archived ? "Chat restored" : "Chat archived"); }}>{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}{c.archived ? "Restore" : "Archive"}</button>
+                      <button role="menuitem" className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); void removeChat(c); }}><Trash2 className="h-3.5 w-3.5" />Delete</button>
                     </div>)}
                 </li>))}</ul>
             </section>))}
@@ -179,14 +179,14 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
           </InfoTip>
         </span>
         {thread && (<>
-          <button aria-label="Rename chat" title="Rename chat" className="rounded-md p-1.5 text-muted hover:bg-slate-100" onClick={onRename}><Pencil className="h-4 w-4" /></button>
-          <button aria-label={thread.archived ? "Restore chat" : "Archive chat"} title={thread.archived ? "Restore" : "Archive"} className="rounded-md p-1.5 text-muted hover:bg-slate-100" onClick={() => onChange({ archived: !thread.archived })}>{thread.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>
-          <button aria-label="Delete chat" title="Delete chat" className="rounded-md p-1.5 text-muted hover:bg-red-50 hover:text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4" /></button>
+          <button aria-label="Rename chat" title="Rename chat" className="rounded-md p-2 text-muted hover:bg-slate-100" onClick={onRename}><Pencil className="h-4 w-4" /></button>
+          <button aria-label={thread.archived ? "Restore chat" : "Archive chat"} title={thread.archived ? "Restore" : "Archive"} className="rounded-md p-2 text-muted hover:bg-slate-100" onClick={() => onChange({ archived: !thread.archived })}>{thread.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}</button>
+          <button aria-label="Delete chat" title="Delete chat" className="rounded-md p-2 text-muted hover:bg-red-50 hover:text-red-600" onClick={onDelete}><Trash2 className="h-4 w-4" /></button>
         </>)}
       </div>
 
-      <div role="log" aria-label="Conversation" className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-5">
-        {thread?.archived && <p className="rounded-lg bg-amber-50 p-2.5 caption-5 text-amber-900">This chat is archived. Writing in it brings it back.</p>}
+      <div role="log" aria-label="Conversation" className="min-h-0 flex-1 space-y-4 overflow-auto px-4 py-4">
+        {thread?.archived && <p className="rounded-lg bg-amber-50 p-3 caption-5 text-amber-900">This chat is archived. Writing in it brings it back.</p>}
         {loading ? <Spinner /> : error ? <ErrorNote error={error} /> : !items.length && !pending && (
           <div className="flex gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div>
             <div className="rounded-xl border border-line p-4 body-6">Ask anything about your connected repositories and documents: how a flow works, where something lives, or what depends on what. Answers cite the sources they used. Attach a <b>.txt</b> or <b>.log</b> file to debug an error.
@@ -198,10 +198,10 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
                 <div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button size="sm" disabled={!editText.trim() || edit.isPending} onClick={() => edit.mutate({ mid: m.id, content: editText.trim() })}>Save and answer again</Button></div>
                 <ErrorNote error={edit.error} /></div>
             ) : (<>
-              <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded-md p-1.5 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
-              <div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 body-6 text-white">
+              <button aria-label="Edit message" title="Edit and ask again" className="self-center rounded-md p-2 text-muted opacity-0 hover:bg-slate-100 focus:opacity-100 group-hover:opacity-100" onClick={() => { setEditing(m.id); setEditText(m.content); }}><Pencil className="h-3.5 w-3.5" /></button>
+              <div className="max-w-2xl rounded-xl bg-brand px-4 py-3 body-6 text-white">
                 <p className="whitespace-pre-wrap">{m.content}</p>
-                {m.attachment && <p className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 caption-5"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
+                {m.attachment && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 caption-5"><FileText className="h-3 w-3" />{m.attachment.name}</p>}
                 {m.edited_at && <p className="mt-1 text-right text-[10px] opacity-70">edited</p>}</div></>)}
           </div>
         ) : (
@@ -220,7 +220,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
             </div>
           </div>))}
         {pending && (<>
-          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-xl bg-brand px-4 py-2.5 body-6 text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
+          {!items.some((m) => m.content === pending && m.role === "user") && <div className="flex justify-end"><div className="max-w-2xl rounded-xl bg-brand px-4 py-3 body-6 text-white"><p className="whitespace-pre-wrap">{pending}</p></div></div>}
           <div className="flex gap-3" role="status" aria-label="Thinking"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100"><Bot className="h-5 w-5 text-brand" /></div><div className="flex items-center gap-2 rounded-xl border border-line px-4 py-3 body-6 text-muted"><Spinner />Searching your knowledge base…</div></div></>)}
         <div ref={end} />
       </div>
@@ -228,7 +228,7 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
       <div className="border-t border-line p-3">
         <ErrorNote error={send.error} />
         {(fileError || attached?.cut) && <p role="alert" className="mb-2 caption-5 text-amber-700">{fileError || `${attached!.name} is very large, so only the first ${MAX_ATTACH_CHARS.toLocaleString()} characters are sent.`}</p>}
-        {attached && <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-2.5 py-1 caption-5"><FileText className="h-3.5 w-3.5 text-brand" /><span className="font-medium">{attached.name}</span><span className="text-muted">{Math.max(1, Math.round(attached.text.length / 1024))} KB</span>
+        {attached && <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-1 caption-5"><FileText className="h-3.5 w-3.5 text-brand" /><span className="font-medium">{attached.name}</span><span className="text-muted">{Math.max(1, Math.round(attached.text.length / 1024))} KB</span>
           <button aria-label="Remove attachment" className="text-muted hover:text-red-600" onClick={() => setAttached(null)}><X className="h-3.5 w-3.5" /></button></div>}
         <div className="flex items-end gap-2">
           <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-muted hover:bg-slate-50" title="Attach a .txt or .log file to debug">
@@ -236,9 +236,9 @@ function Chat({ thread, loading, error, repos, modelAvailable, draft, onSaved, o
             <input type="file" accept=".txt,.log,text/plain" aria-label="Attach file" className="sr-only" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} /></label>
           <Textarea aria-label="Message" rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything across repositories, architectures, API routes, or code flow…" className="max-h-40 min-h-11 flex-1 resize-none"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
-          <Button className="h-11 shrink-0 px-5" disabled={!text.trim() || send.isPending} onClick={submit}><Send className="h-4 w-4" />Send</Button>
+          <Button className="h-11 shrink-0 px-4" disabled={!text.trim() || send.isPending} onClick={submit}><Send className="h-4 w-4" />Send</Button>
         </div>
-        <p className="mt-1.5 text-[11px] text-muted">Enter sends, Shift+Enter adds a line. Chats are private to you.</p>
+        <p className="mt-2 text-[11px] text-muted">Enter sends, Shift+Enter adds a line. Chats are private to you.</p>
       </div>
     </Card>
   );
@@ -250,7 +250,7 @@ function Sources({ sources }: { sources: ChatSource[] }) {
   return (
     <details className="mt-3 border-t border-line pt-2 caption-5">
       <summary className="cursor-pointer font-medium text-muted">Sources ({sources.length})</summary>
-      <ul className="mt-2 space-y-1.5">{sources.map((s) => {
+      <ul className="mt-2 space-y-2">{sources.map((s) => {
         const to = href(s), ext = safeHref(s.url);
         const label = <><b>[{s.id}]</b> {s.repo}:{s.file}{s.start_line ? `:${s.start_line}` : ""}</>;
         return (<li key={s.id}>{to ? <Link className="text-brand hover:underline" to={to}>{label}</Link> : ext ? <a className="text-brand hover:underline" href={ext} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>}

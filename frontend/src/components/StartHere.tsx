@@ -20,33 +20,33 @@ export default function StartHere({ repoId }: { repoId: string }) {
   const communities = list(r.communities), hubs = list(r.hubs), surprising = list(r.surprising), questions = list(r.questions);
   return (
     <Card aria-label="Start here">
-      <CardTitle right={<span className="caption-5 text-muted">{r.stats.nodes} items · {r.stats.edges} connections · {r.stats.communities} areas</span>}><Compass className="mr-1.5 inline h-4 w-4" />Start here: {r.repo.name}</CardTitle>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <CardTitle right={<span className="caption-5 text-muted">{r.stats.nodes} items · {r.stats.edges} connections · {r.stats.communities} areas</span>}><Compass className="mr-2 inline h-4 w-4" />Start here: {r.repo.name}</CardTitle>
+      <div className="grid gap-4 lg:grid-cols-2">
         <section aria-label="Areas">
-          <h3 className="mb-1.5 caption-4 uppercase tracking-wide text-muted">Areas that hang together</h3>
+          <h3 className="mb-2 caption-4 uppercase tracking-wide text-muted">Areas that hang together</h3>
           {!communities.length ? <p className="body-6 text-muted">No clear areas yet; the graph is small or loosely connected.</p> : (
-            <ul className="space-y-1.5 body-6">{communities.map((c) => (
-              <li key={c.id} className="flex items-start gap-2"><span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: communityColor(c.id) }} />
+            <ul className="space-y-2 body-6">{communities.map((c) => (
+              <li key={c.id} className="flex items-start gap-2"><span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: communityColor(c.id) }} />
                 <span><b>{c.label}</b> <span className="caption-5 text-muted">{c.size} items, {c.files} files</span>
                   <span className="block caption-5 text-muted">{list(c.top).map((t) => t.name).join(" · ")}</span></span></li>))}</ul>)}
         </section>
         <section aria-label="Hubs">
-          <h3 className="mb-1.5 caption-4 uppercase tracking-wide text-muted">Hubs: change with care</h3>
+          <h3 className="mb-2 caption-4 uppercase tracking-wide text-muted">Hubs: change with care</h3>
           <ul className="space-y-1 body-6">{hubs.slice(0, 8).map((h) => (
             <li key={h.id} className="flex items-center gap-2"><Link className="truncate text-brand hover:underline" to={`/knowledge?tab=graph&node=${h.id}`}><code className="caption-5">{h.name}</code></Link>
               <span className="caption-5 text-muted">{h.degree} links</span></li>))}</ul>
         </section>
       </div>
       {!!surprising.length && (
-        <section aria-label="Surprising connections" className="mt-5">
-          <h3 className="mb-1.5 caption-4 uppercase tracking-wide text-muted">Surprising connections between areas</h3>
+        <section aria-label="Surprising connections" className="mt-4">
+          <h3 className="mb-2 caption-4 uppercase tracking-wide text-muted">Surprising connections between areas</h3>
           <ul className="space-y-1 body-6">{surprising.map((s, i) => (
-            <li key={i} className="flex flex-wrap items-center gap-1.5"><code className="caption-5">{s.source.name}</code><span className="caption-5 text-muted">({s.from_area}) {rel(s.relation)}</span><code className="caption-5">{s.target.name}</code><span className="caption-5 text-muted">({s.to_area})</span><Badge tone={trustTone(s.trust)}>{s.trust}</Badge></li>))}</ul>
+            <li key={i} className="flex flex-wrap items-center gap-2"><code className="caption-5">{s.source.name}</code><span className="caption-5 text-muted">({s.from_area}) {rel(s.relation)}</span><code className="caption-5">{s.target.name}</code><span className="caption-5 text-muted">({s.to_area})</span><Badge tone={trustTone(s.trust)}>{s.trust}</Badge></li>))}</ul>
         </section>)}
       {!!questions.length && (
-        <section aria-label="Good first questions" className="mt-5">
-          <h3 className="mb-1.5 caption-4 uppercase tracking-wide text-muted">Good first questions</h3>
-          <ul className="list-disc space-y-0.5 pl-5 body-6">{questions.map((x) => <li key={x}>{x}</li>)}</ul>
+        <section aria-label="Good first questions" className="mt-4">
+          <h3 className="mb-2 caption-4 uppercase tracking-wide text-muted">Good first questions</h3>
+          <ul className="list-disc space-y-0.5 pl-4 body-6">{questions.map((x) => <li key={x}>{x}</li>)}</ul>
         </section>)}
     </Card>
   );

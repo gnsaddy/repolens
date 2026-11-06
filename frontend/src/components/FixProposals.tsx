@@ -69,7 +69,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
           <div className="mt-2 caption-5 text-muted">{f.files.join(", ")} · {f.checks.lines_changed} lines · {f.checks.syntax_ok ? "syntax checked" : "syntax problem"}</div>
           {f.checks.notes.map((n) => <p key={n} className="caption-5 text-red-600">{n}</p>)}
           <div className="mt-2"><Diff text={f.diff} /></div>
-          {!!f.tests.length && <div className="mt-2 caption-5"><span className="font-medium">Tests to add or run:</span><ul className="list-disc pl-5">{f.tests.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+          {!!f.tests.length && <div className="mt-2 caption-5"><span className="font-medium">Tests to add or run:</span><ul className="list-disc pl-4">{f.tests.map((t) => <li key={t}>{t}</li>)}</ul></div>}
           {f.result && f.status !== "approved" && <p className="mt-2 caption-5 text-red-600">{f.result}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => patch(f)}><Download className="h-3.5 w-3.5" />Download patch</Button>

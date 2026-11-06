@@ -54,8 +54,8 @@ export default function QualityPanel({ canWrite }: { canWrite: boolean }) {
             <span className="body-6 text-muted">{l.passed} of {l.total} questions passed</span>
             {d.compare.delta !== null && <Badge tone={d.compare.delta > 0 ? "green" : d.compare.delta < 0 ? "red" : "gray"}>{d.compare.delta > 0 ? "+" : ""}{Math.round(d.compare.delta * 100)} points since the run before</Badge>}
           </div>
-          {d.compare.broke.length > 0 && <div className="mt-3 body-6"><span className="font-medium text-red-700">Got worse:</span><ul className="list-disc pl-5">{d.compare.broke.map((q) => <li key={q}>{q}</li>)}</ul></div>}
-          {d.compare.fixed.length > 0 && <div className="mt-3 body-6"><span className="font-medium text-emerald-700">Got better:</span><ul className="list-disc pl-5">{d.compare.fixed.map((q) => <li key={q}>{q}</li>)}</ul></div>}
+          {d.compare.broke.length > 0 && <div className="mt-3 body-6"><span className="font-medium text-red-700">Got worse:</span><ul className="list-disc pl-4">{d.compare.broke.map((q) => <li key={q}>{q}</li>)}</ul></div>}
+          {d.compare.fixed.length > 0 && <div className="mt-3 body-6"><span className="font-medium text-emerald-700">Got better:</span><ul className="list-disc pl-4">{d.compare.fixed.map((q) => <li key={q}>{q}</li>)}</ul></div>}
           {failing.length > 0 && <div className="mt-3"><h3 className="mb-1 body-5">What failed</h3><ul className="space-y-2">{failing.map((r) => <Failure key={r.id} r={r} />)}</ul></div>}
           {l.mode === "retrieval" && <p className="mt-3 caption-5 text-muted">Retrieval runs check which files were found, not how the answer reads. Phrase checks need a full run.</p>}
         </Card>)}
@@ -79,8 +79,8 @@ export default function QualityPanel({ canWrite }: { canWrite: boolean }) {
 
 function Failure({ r }: { r: GoldenResult }) {
   return (
-    <li className="rounded-lg border border-line p-2.5 body-6"><div className="font-medium">{r.question}</div>
-      <ul className="mt-1 space-y-0.5 caption-5">{r.checks.filter((c) => !c.ok).map((c) => <li key={c.name} className="flex items-start gap-1.5 text-red-700"><X className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />{c.name}: {c.detail}</li>)}</ul>
+    <li className="rounded-lg border border-line p-3 body-6"><div className="font-medium">{r.question}</div>
+      <ul className="mt-1 space-y-0.5 caption-5">{r.checks.filter((c) => !c.ok).map((c) => <li key={c.name} className="flex items-start gap-2 text-red-700"><X className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />{c.name}: {c.detail}</li>)}</ul>
       {r.files.length > 0 && <p className="mt-1 caption-5 text-muted">Found instead: {r.files.slice(0, 4).join(", ")}</p>}
     </li>
   );

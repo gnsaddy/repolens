@@ -15,7 +15,7 @@ function Kpi({ icon, label, value, hint, tone = "text-brand" }: { icon: ReactNod
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 caption-5 text-muted"><span className={tone}>{icon}</span>{label}</div>
-      <div className="mt-1.5 heading-5 tracking-tight">{value}</div>
+      <div className="mt-2 heading-5 tracking-tight">{value}</div>
       {hint && <div className="mt-1 caption-5 text-muted">{hint}</div>}
     </Card>
   );
@@ -66,7 +66,7 @@ export default function Insights() {
             <Card className="p-4" aria-label="Savings">
               <div className="mb-2 flex items-baseline justify-between body-6"><span className="font-medium">Without routing, memory and condensing, this would have been {fmtTokens(wouldHave)} tokens</span><span className="text-emerald-700">{Math.round(m.ai.savings_rate * 100)}% saved</span></div>
               <div className="flex h-3 overflow-hidden rounded-full bg-slate-100"><div className="bg-brand" style={{ width: `${(m.ai.tokens / wouldHave) * 100}%` }} title="used" /><div className="bg-emerald-400" style={{ width: `${(m.ai.tokens_avoided / wouldHave) * 100}%` }} title="avoided" /></div>
-              <div className="mt-1.5 flex gap-4 caption-5 text-muted"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-brand" />used {fmtTokens(m.ai.tokens)}</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />avoided {fmtTokens(m.ai.tokens_avoided)}</span></div>
+              <div className="mt-2 flex gap-4 caption-5 text-muted"><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-brand" />used {fmtTokens(m.ai.tokens)}</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />avoided {fmtTokens(m.ai.tokens_avoided)}</span></div>
             </Card>)}
           <div className="grid gap-4 lg:grid-cols-5">
             <Card className="lg:col-span-3"><CardTitle>Tokens per day</CardTitle>
@@ -124,11 +124,11 @@ function Housekeeping({ h }: { h: SysHealth }) {
   return (
     <section aria-label="RepoLens health" className="space-y-3">
       <div className="flex items-center gap-2"><h2 className="body-4">RepoLens health</h2>{h.ok ? <Badge tone="green">all running</Badge> : <Badge tone="red">needs attention</Badge>}<span className="caption-5 text-muted">{h.version}</span></div>
-      {h.problems.length > 0 && <ul role="alert" className="list-disc rounded-lg bg-amber-50 p-3 pl-7 body-6 text-amber-800">{h.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
+      {h.problems.length > 0 && <ul role="alert" className="list-disc rounded-lg bg-amber-50 p-3 pl-8 body-6 text-amber-800">{h.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2"><CardTitle>Background jobs</CardTitle>
           <ul className="divide-y divide-line body-6">{h.jobs.map((j) => (
-            <li key={j.name} className="flex flex-wrap items-center justify-between gap-2 py-1.5"><span>{JOB_NAME[j.name] ?? j.name}</span>
+            <li key={j.name} className="flex flex-wrap items-center justify-between gap-2 py-2"><span>{JOB_NAME[j.name] ?? j.name}</span>
               <span className="flex items-center gap-2 caption-5 text-muted">{j.state === "failing" && j.last_error ? <span className="truncate text-red-700" title={j.last_error}>{j.last_error}</span> : j.last_ok ? `last ran ${timeAgo(new Date(j.last_ok * 1000).toISOString())}` : "has not run yet"}
                 <Badge tone={j.state === "ok" ? "green" : j.state === "waiting" ? "gray" : "red"}>{j.state}</Badge></span></li>))}</ul></Card>
         <Card className="p-4"><CardTitle>Indexes and quality</CardTitle>

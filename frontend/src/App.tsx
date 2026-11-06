@@ -87,7 +87,7 @@ function Shell() {
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-surface p-3 md:flex">
-        <div className="mb-5 flex items-center gap-2 px-2 pt-2">
+        <div className="mb-4 flex items-center gap-2 px-2 pt-2">
           <Logo className="h-7 w-7" /><span className="font-semibold tracking-tight">RepoLens AI</span>
         </div>
         <button onClick={() => setPalette(true)} className="mb-4 flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-left caption-5 text-muted hover:bg-slate-50">
@@ -97,15 +97,15 @@ function Shell() {
           {groups.map((g) => {
             const items = g.items.filter((n) => !n.adminOnly || user.role === "admin");
             return (
-              <div key={g.label || "top"} className={g.label ? "mt-5" : ""}>
+              <div key={g.label || "top"} className={g.label ? "mt-4" : ""}>
                 {g.label && <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">{g.label}</div>}
                 <div className="flex flex-col gap-0.5">
                   {items.map(({ to, label, icon: Icon, end }) => (
                     <NavLink key={to} to={to} end={end}
-                      className={({ isActive }) => cn("group flex items-center gap-2.5 rounded-lg px-3 py-1.5 body-6 text-slate-600 hover:bg-slate-100 hover:text-ink", isActive && "bg-indigo-50 font-medium text-brand hover:bg-indigo-50 hover:text-brand")}>
+                      className={({ isActive }) => cn("group flex items-center gap-3 rounded-lg px-3 py-2 body-6 text-slate-600 hover:bg-slate-100 hover:text-ink", isActive && "bg-indigo-50 font-medium text-brand hover:bg-indigo-50 hover:text-brand")}>
                       {({ isActive }) => (<>
                         <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-brand" : "text-slate-400 group-hover:text-slate-600")} aria-hidden />{label}
-                        {to === "/wiki" && !!drift.data?.open && <span title="Pages that may be out of date" className="ml-auto rounded-full bg-amber-100 px-1.5 caption-4 text-amber-700">{drift.data.open}</span>}
+                        {to === "/wiki" && !!drift.data?.open && <span title="Pages that may be out of date" className="ml-auto rounded-full bg-amber-100 px-2 caption-4 text-amber-700">{drift.data.open}</span>}
                       </>)}
                     </NavLink>
                   ))}
@@ -115,14 +115,14 @@ function Shell() {
           })}
         </nav>
         <div className="mt-4 border-t border-line pt-3 caption-5">
-          <NavLink to="/profile" className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100", isActive && "bg-slate-100")} title="Your profile and sessions">
+          <NavLink to="/profile" className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-100", isActive && "bg-slate-100")} title="Your profile and sessions">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand caption-3 text-white" aria-hidden>{(user.name || user.email)[0].toUpperCase()}</span>
             <span className="min-w-0"><span className="block truncate text-ink">{user.name || user.email}</span><span className="block truncate text-muted">{user.role}</span></span>
           </NavLink>
-          <button onClick={theme.toggle} aria-label={theme.dark ? "Switch to day mode" : "Switch to night mode"} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100">
+          <button onClick={theme.toggle} aria-label={theme.dark ? "Switch to day mode" : "Switch to night mode"} className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-slate-600 hover:bg-slate-100">
             {theme.dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{theme.dark ? "Day mode" : "Night mode"}
           </button>
-          <button onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-slate-600 hover:bg-slate-100">
+          <button onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-slate-600 hover:bg-slate-100">
             <LogOut className="h-4 w-4" />Sign out
           </button>
           <ReportIssue />

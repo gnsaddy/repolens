@@ -47,7 +47,7 @@ export default function MeasurePanel({ repo, onClose }: { repo: Repo; onClose: (
           <p className="mt-2 caption-5 text-muted">Share of bug fixes where the right file was among the top 1 / 3 / 5 suggested.{r.top3_ci95 && <> Top 3 is likely between <strong>{pc(r.top3_ci95[0])}</strong> and <strong>{pc(r.top3_ci95[1])}</strong>.</>} Picking at random would reach about {pc(r.random_top3)} in the top 3.</p>
           <details className="mt-3"><summary className="cursor-pointer caption-4">Per bug fix</summary>
             <ul className="mt-2 space-y-1 caption-5">{r.rows.map((x) => (<li key={x.commit} className="flex items-center gap-2"><code className="text-muted">{x.commit}</code><span className="min-w-0 flex-1 truncate">{x.report}</span><Badge tone={x.investigation_rank ? "green" : "red"}>{x.investigation_rank ? `found #${x.investigation_rank}` : "missed"}</Badge></li>))}</ul></details>
-          <ul className="mt-3 list-disc space-y-0.5 pl-5 caption-5 text-muted">{r.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
+          <ul className="mt-3 list-disc space-y-0.5 pl-4 caption-5 text-muted">{r.caveats.map((c) => <li key={c}>{c}</li>)}</ul>
         </div>)}
       </div>
     </Modal>

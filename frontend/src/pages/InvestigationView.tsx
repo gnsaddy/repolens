@@ -110,13 +110,13 @@ export default function InvestigationView() {
               {inv.suggested_fix && <div className="mt-4 rounded-lg bg-indigo-50 p-3 body-6"><div className="mb-1 font-medium text-indigo-900">Suggested next steps</div>{inv.suggested_fix}</div>}
             </>)}
             {canWrite(user) && inv.status === "completed" && inv.root_cause_status === "unconfirmed" && (
-              <div className="mt-5 flex items-center gap-2 border-t border-line pt-4">
+              <div className="mt-4 flex items-center gap-2 border-t border-line pt-4">
                 <span className="caption-5 text-muted">Was this the real root cause?</span>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("confirmed")}><ThumbsUp className="h-3.5 w-3.5" />Confirm</Button>
                 <Button size="sm" variant="outline" onClick={() => review.mutate("rejected")}><ThumbsDown className="h-3.5 w-3.5" />Reject</Button>
               </div>)}
             {canWrite(user) && inv.status === "completed" && inv.root_cause_status === "confirmed" && (
-              <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
                 <span className="caption-5 text-muted">Confirmed. Capture it so the next person finds the answer fast.</span>
                 <Button size="sm" variant="outline" disabled={runbook.isPending} onClick={() => runbook.mutate()}><FileText className="h-3.5 w-3.5" />Draft a runbook</Button>
                 <ErrorNote error={runbook.error} />

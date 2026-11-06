@@ -22,9 +22,9 @@ export default function StoragePanel() {
   if (!d) return null;
   return (
     <Card>
-      <CardTitle right={<Badge>{fmtBytes(d.total_bytes)}</Badge>}><span className="inline-flex items-center gap-1.5"><HardDrive className="h-4 w-4" />Clone storage</span></CardTitle>
+      <CardTitle right={<Badge>{fmtBytes(d.total_bytes)}</Badge>}><span className="inline-flex items-center gap-2"><HardDrive className="h-4 w-4" />Clone storage</span></CardTitle>
       {!d.checkouts.length ? <p className="caption-5 text-muted">No cloned repositories. Local-path repositories are read in place and use no extra space.</p> : (
-        <ul className="space-y-1.5 caption-5">{d.checkouts.map((c) => (
+        <ul className="space-y-2 caption-5">{d.checkouts.map((c) => (
           <li key={c.path} className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate" title={c.repos.join(", ")}>{c.repos.join(", ")}</span>
             {c.partial && <span title="A partial clone: file contents are fetched only when needed, so it takes less disk space"><Badge tone="blue">blob-less</Badge></span>}{!c.exists && <Badge tone="amber">removed</Badge>}
             <span className="text-muted">{c.exists ? fmtBytes(c.bytes) : "—"} · {c.last_used_at ? timeAgo(c.last_used_at) : "never used"}</span></li>))}</ul>)}

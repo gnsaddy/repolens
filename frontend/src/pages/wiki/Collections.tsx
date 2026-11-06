@@ -27,7 +27,7 @@ export default function Collections({ sources, onChanged }: { sources: WikiSourc
         <ul className="divide-y divide-line">{cols.map((c) => (
           <li key={c.repo_id} className="py-2">
             <div className="flex items-center gap-2 body-6">
-              <button className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-expanded={openId === c.repo_id} onClick={() => setOpenId(openId === c.repo_id ? null : c.repo_id)}>
+              <button className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={openId === c.repo_id} onClick={() => setOpenId(openId === c.repo_id ? null : c.repo_id)}>
                 {openId === c.repo_id ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
                 <span className="truncate font-medium">{c.name}</span><span className="caption-5 text-muted">{c.pages} pages</span></button>
               <Badge tone={statusTone(c.status)}>{c.status}</Badge>

@@ -27,7 +27,7 @@ export default function AccessTokens({ canWrite }: { canWrite: boolean }) {
   const active = (Array.isArray(list.data) ? list.data : []).filter((t) => !t.revoked);
   return (
     <Card className="lg:col-span-2">
-      <CardTitle><KeyRound className="mr-1.5 inline h-4 w-4" />Access tokens</CardTitle>
+      <CardTitle><KeyRound className="mr-2 inline h-4 w-4" />Access tokens</CardTitle>
       <p className="mb-3 body-6 text-muted">For scripts, CI and editor tools such as Claude Code or Cursor. A token acts as you, with less power: <b>read</b> can search, ask and look things up; <b>write</b> can also start investigations. Neither can change settings or people.</p>
       {fresh && (
         <div role="status" className="mb-3 space-y-2 rounded-lg bg-emerald-50 p-3 body-6">
@@ -51,7 +51,7 @@ export default function AccessTokens({ canWrite }: { canWrite: boolean }) {
             <Button size="sm" variant="ghost" className="ml-auto" onClick={async () => { if (await ask({ title: `Revoke “${t.name}”?`, message: "Anything using it stops working immediately.", confirmLabel: "Revoke", danger: true })) revoke.mutate(t.id); }}>Revoke</Button>
           </li>))}</ul>)}
       <details open className="rounded-lg border border-line p-3 body-6">
-        <summary className="flex cursor-pointer items-center gap-1.5 font-medium"><Plug className="h-4 w-4" />Use RepoLens from your editor (MCP)</summary>
+        <summary className="flex cursor-pointer items-center gap-2 font-medium"><Plug className="h-4 w-4" />Use RepoLens from your editor (MCP)</summary>
         <div className="mt-3 space-y-3 caption-5">
           <p className="text-muted">RepoLens speaks the Model Context Protocol, so an editor can search your code, docs and pull requests, ask questions with cited sources, and check a symbol before changing it, using your access. Replace the token with yours.</p>
           <div><div className="mb-1 font-medium">Claude Code</div><pre className="overflow-x-auto rounded-md bg-slate-900 p-2 font-mono text-slate-100">{`claude mcp add --transport http repolens ${url} --header "Authorization: Bearer ${shown}"`}</pre></div>

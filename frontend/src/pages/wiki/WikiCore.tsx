@@ -20,7 +20,7 @@ export function PageSearch({ open }: { open: Open }) {
     <div className="mb-4">
       <form onSubmit={submit} role="search" className="flex gap-2">
         <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted" />
-          <Input aria-label="Search pages" className="pl-9" placeholder="Search every page by meaning — e.g. how do we roll back a deploy?" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setQ(""); }} /></div>
+          <Input aria-label="Search pages" className="pl-8" placeholder="Search every page by meaning — e.g. how do we roll back a deploy?" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setQ(""); }} /></div>
         <Button variant="outline" disabled={text.trim().length < 2}>Search</Button>
       </form>
       {q && (

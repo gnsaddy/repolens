@@ -54,7 +54,7 @@ export function RiskResult({ r }: { r: RiskAssessment }) {
           <CardTitle>Affected components{!a.symbol_level && <span className="ml-2 caption-5 font-normal text-muted">(file level)</span>}</CardTitle>
           {!!a.symbols.length && <div className="mb-3 flex flex-wrap gap-1">{a.symbols.map((s) => <Badge key={s.name + s.path} tone="brand">{s.name}</Badge>)}</div>}
           {!a.dependents.length ? <Empty>No dependents found in the graph.</Empty> : (
-            <ul className="space-y-1.5 body-6">{a.dependents.slice(0, 12).map((d) => (
+            <ul className="space-y-2 body-6">{a.dependents.slice(0, 12).map((d) => (
               <li key={d.node_id + d.rel} title={d.evidence}><code className="caption-5">{d.name}</code> <span className="text-muted">{d.rel === "CALLS" ? "calls" : "imports"} {d.target}</span>
                 <div className="caption-5 text-muted">{d.repo}:{d.path}{d.cross_repo && <Badge tone="amber" className="ml-2">other repo</Badge>}</div></li>))}</ul>)}
         </Card>
@@ -143,7 +143,7 @@ export default function Risk() {
           </Card>
           {!!history.data?.length && (
             <Card><CardTitle>Saved assessments</CardTitle>
-              <ul className="space-y-1.5 body-6">{history.data.map((h) => (
+              <ul className="space-y-2 body-6">{history.data.map((h) => (
                 <li key={h.id}><button className="flex w-full items-center gap-2 text-left hover:underline" onClick={() => open.mutate(h.id)}><Badge tone={TONE[h.level]}>{Math.round(h.score)}</Badge><span className="truncate">{h.title || h.ref}</span><span className="ml-auto caption-5 text-muted">{timeAgo(h.created_at)}</span></button></li>))}</ul></Card>)}
         </div>
         <div>{result ? <RiskResult r={result} /> : <Empty>Pick a commit, branch, PR or file list to see its risk breakdown.</Empty>}</div>

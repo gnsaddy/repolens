@@ -33,7 +33,7 @@ export default function Wiki() {
   return (
     <div>
       <PageHeader title="DeepMind Wiki" subtitle="One connected knowledge base over READMEs, uploaded docs, web pages and Confluence — linked to your code." />
-      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <Stat label="Sources" value={o?.totals.sources ?? "—"} />
         <Stat label="Pages" value={o?.totals.pages ?? "—"} hint={o ? `${o.totals.sections} sections` : undefined} />
         <Stat label="Concepts" value={o?.concepts ?? "—"} hint="terms that recur across docs" />
@@ -43,7 +43,7 @@ export default function Wiki() {
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {TABS.map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => go(k)} className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 body-6", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}>
-            <Icon className="h-4 w-4" />{label}{k === "drift" && !!drift.data?.open && <span className="rounded-full bg-amber-100 px-1.5 caption-5 text-amber-800">{drift.data.open}</span>}</button>))}
+            <Icon className="h-4 w-4" />{label}{k === "drift" && !!drift.data?.open && <span className="rounded-full bg-amber-100 px-2 caption-5 text-amber-800">{drift.data.open}</span>}</button>))}
       </div>
       {tab === "browse" && <Browse sources={o?.sources ?? []} repo={sp.get("repo")} path={sp.get("path")} anchor={sp.get("a")} open={open} openConcept={(t) => go("concepts", { term: t })} onAdd={() => go("sources")} />}
       {tab === "ask" && <AskWiki open={open} />}
@@ -82,8 +82,8 @@ function AtAGlance({ i }: { i: PageInsights }) {
         {!!i.warnings.length && <ul className="space-y-1">{i.warnings.map((w, k) => <li key={k} className="rounded-lg bg-amber-50 px-2 py-1 caption-5 text-amber-900"><b className="capitalize">{w.level}:</b> {w.text}</li>)}</ul>}
         {!!i.owners.length && <div className="caption-5"><span className="text-muted">Who to ask: </span>{i.owners.map((o) => `${o.who} (${o.role})`).join(", ")}</div>}
         {!!i.commands.length && <div><div className="mb-1 caption-5 text-muted">Commands{i.steps ? ` · ${i.steps} steps` : ""}</div><pre className="max-h-32 overflow-auto rounded-md bg-slate-900 p-2 font-mono caption-5 text-slate-100">{i.commands.join("\n")}</pre></div>}
-        {!!i.endpoints.length && <div className="caption-5"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
-        {!!i.settings.length && <div className="caption-5"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-1.5 break-all">{e}</code>)}</div>}
+        {!!i.endpoints.length && <div className="caption-5"><span className="text-muted">Endpoints: </span>{i.endpoints.map((e) => <code key={e} className="mr-2 break-all">{e}</code>)}</div>}
+        {!!i.settings.length && <div className="caption-5"><span className="text-muted">Settings: </span>{i.settings.map((e) => <code key={e} className="mr-2 break-all">{e}</code>)}</div>}
         {i.last_dated && <div className="caption-5 text-muted">Last dated {i.last_dated}</div>}
       </div>
     </Card>
@@ -94,7 +94,7 @@ function RefList({ title, items, open, empty }: { title: string; items: PageRef[
   if (!items.length && !empty) return null;
   return (
     <Card className="p-4"><CardTitle>{title}</CardTitle>
-      {!items.length ? <p className="caption-5 text-muted">{empty}</p> : <ul className="space-y-1.5 body-6">{items.map((r) => (
+      {!items.length ? <p className="caption-5 text-muted">{empty}</p> : <ul className="space-y-2 body-6">{items.map((r) => (
         <li key={r.repo_id + r.path}><button className="text-left text-brand hover:underline" onClick={() => open(r.repo_id, r.path)}>{r.title}</button>
           <div className="caption-5 text-muted">{r.repo}{r.sections?.length ? ` · in “${[...new Set(r.sections)].slice(0, 2).join("”, “")}”` : ""}{r.weight ? ` · ${Math.round(r.weight * 100)}% similar` : ""}</div></li>))}</ul>}
     </Card>
@@ -195,9 +195,9 @@ function Browse({ sources, repo, path, anchor, open, openConcept, onAdd }: { sou
           <RefList title="Links to" items={p.links_out} open={open} />
           {!!p.mentions_code.length && (
             <Card className="p-4"><CardTitle>Code it describes</CardTitle>
-              <ul className="space-y-1.5 body-6">{p.mentions_code.map((m) => <li key={m.id}><Link className="text-brand hover:underline" to={`/knowledge?tab=graph&node=${m.id}`}><code className="caption-5">{m.qualname || m.name}</code></Link><div className="caption-5 text-muted">{m.repo}:{m.path}</div></li>)}</ul></Card>)}
+              <ul className="space-y-2 body-6">{p.mentions_code.map((m) => <li key={m.id}><Link className="text-brand hover:underline" to={`/knowledge?tab=graph&node=${m.id}`}><code className="caption-5">{m.qualname || m.name}</code></Link><div className="caption-5 text-muted">{m.repo}:{m.path}</div></li>)}</ul></Card>)}
           <RefList title="Related pages" items={p.related} open={open} />
-          {!!p.concepts.length && <Card className="p-4"><CardTitle>Concepts</CardTitle><div className="flex flex-wrap gap-1.5">{p.concepts.map((c) => <button key={c} onClick={() => openConcept(c)} className="rounded-full border border-line px-2 py-0.5 caption-5 hover:bg-slate-50">{c}</button>)}</div></Card>}
+          {!!p.concepts.length && <Card className="p-4"><CardTitle>Concepts</CardTitle><div className="flex flex-wrap gap-2">{p.concepts.map((c) => <button key={c} onClick={() => openConcept(c)} className="rounded-full border border-line px-2 py-0.5 caption-5 hover:bg-slate-50">{c}</button>)}</div></Card>}
         </>)}
       </div>
     </div>
@@ -260,7 +260,7 @@ function Concepts({ initial, open }: { initial: string | null; open: Open }) {
             <p className="body-6">{d.summary || "No summary available."}</p>
             <p className="mt-1 caption-5 text-muted">from {d.summary_source.repo} · {d.summary_source.section}</p>
             {!!d.code.length && <div className="mt-3 flex flex-wrap gap-2">{d.code.map((c) => <Link key={c.id} to={`/knowledge?tab=graph&node=${c.id}`} className="rounded-lg border border-line px-2 py-1 caption-5 hover:bg-slate-50"><code>{c.qualname}</code> <span className="text-muted">{c.repo}:{c.path}</span></Link>)}</div>}
-            {!!d.related_terms.length && <div className="mt-3 flex flex-wrap gap-1.5">{d.related_terms.map((r) => <button key={r.term} onClick={() => setTerm(r.term)} className="rounded-full border border-line px-2 py-0.5 caption-5 hover:bg-slate-50">{r.term}</button>)}</div>}
+            {!!d.related_terms.length && <div className="mt-3 flex flex-wrap gap-2">{d.related_terms.map((r) => <button key={r.term} onClick={() => setTerm(r.term)} className="rounded-full border border-line px-2 py-0.5 caption-5 hover:bg-slate-50">{r.term}</button>)}</div>}
           </Card>
           {!!d.definitions.length && <Card><CardTitle>Defined in</CardTitle><ul className="space-y-2 body-6">{d.definitions.map((m, i) => <li key={i}><button className="text-brand hover:underline" onClick={() => open(m.repo_id, m.path)}>{m.section}</button> <span className="caption-5 text-muted">{m.repo} · {m.path}</span></li>)}</ul></Card>}
           <Card><CardTitle>Mentioned in</CardTitle>{!d.mentions.length ? <p className="body-6 text-muted">Only defined, never mentioned elsewhere.</p> : <ul className="space-y-2 body-6">{d.mentions.map((m, i) => <li key={i}><button className="text-brand hover:underline" onClick={() => open(m.repo_id, m.path)}>{m.section}</button> <span className="caption-5 text-muted">{m.repo} · {m.path}</span></li>)}</ul>}</Card>
@@ -346,9 +346,9 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
               <span className="ml-auto caption-5 text-muted">{a.repo} {a.from_sha}…{a.to_sha} · {timeAgo(a.updated_at)}</span>
             </div>
             <div className="mt-2 caption-5"><span className="text-muted">Changed code the page mentions:</span>
-              <ul className="mt-1 space-y-1.5">{a.symbols.map((s) => (
+              <ul className="mt-1 space-y-2">{a.symbols.map((s) => (
                 <li key={s.id}>
-                  <Link to={`/knowledge?tab=graph&node=${s.id}`} className="rounded-md border border-line px-1.5 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>
+                  <Link to={`/knowledge?tab=graph&node=${s.id}`} className="rounded-md border border-line px-2 py-0.5 hover:bg-slate-50"><code>{s.qualname}</code></Link>
                   {!!s.lines && <span className="ml-2 text-muted">{s.lines} line{s.lines === 1 ? "" : "s"} changed in <code>{s.path}</code></span>}
                   {s.mention && <blockquote className="mt-1 border-l-2 border-line pl-2 text-muted" aria-label={`Where the page mentions ${s.name}`}>{s.mention}</blockquote>}
                   {!!s.changes?.length && <div className="mt-0.5 text-muted">{s.changes.map((c) => `${c.subject || c.sha} (${c.author || "unknown"})`).join("; ")}</div>}

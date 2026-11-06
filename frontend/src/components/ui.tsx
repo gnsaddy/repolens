@@ -24,7 +24,7 @@ export function Button({ className, variant, size, ...p }: ButtonHTMLAttributes<
 }
 
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-xl border border-line bg-surface p-5", className)} {...p} />;
+  return <div className={cn("rounded-xl border border-line bg-surface p-4", className)} {...p} />;
 }
 export function CardTitle({ children, right, icon: Icon }: { children: ReactNode; right?: ReactNode; icon?: LucideIcon }) {
   return (

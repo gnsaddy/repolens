@@ -49,7 +49,7 @@ export default function GitHubBrowse({ provider = "github" }: { provider?: Provi
           {repos.isLoading ? <Spinner /> : !repos.data?.items.length ? <Empty>{debounced ? "No repository matches." : "This token can not see any repositories. Check its repository access."}</Empty> : (
             <ul className="max-h-[34rem] space-y-1 overflow-auto" aria-label="Repositories">{repos.data.items.map((r) => (
               <li key={r.full_name}><button onClick={() => setSel(r.full_name)} aria-current={sel === r.full_name} className={cn("w-full rounded-lg px-2 py-2 text-left hover:bg-slate-50", sel === r.full_name && "bg-indigo-50")}>
-                <div className="flex items-center gap-1.5 body-5">{r.private && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="private" />}<span className="truncate">{r.full_name}</span>
+                <div className="flex items-center gap-2 body-5">{r.private && <Lock className="h-3 w-3 shrink-0 text-amber-600" aria-label="private" />}<span className="truncate">{r.full_name}</span>
                   {r.added_repo_id && <Badge tone="green">added</Badge>}</div>
                 <div className="truncate caption-5 text-muted">{r.description || "No description"}</div>
                 <div className="mt-0.5 flex gap-3 caption-5 text-muted">{r.language && <span>{r.language}</span>}<span className="flex items-center gap-0.5"><Star className="h-3 w-3" />{r.stars}</span><span>pushed {timeAgo(r.updated_at)}</span></div></button></li>))}</ul>)}
@@ -81,9 +81,9 @@ function RepoDetail({ repo, writable, provider }: { repo: GhRepo; writable: bool
       <p className="body-6 text-muted">{repo.description || "No description"}</p>
       <p className="mt-1 caption-5 text-muted">default branch {repo.default_branch} · {repo.language || "unknown language"} · {repo.open_issues} open issues and PRs</p>
       <div className="mt-3"><AddRepo repo={repo} writable={writable} provider={provider} /></div>
-      <div role="tablist" className="mt-5 flex gap-1 border-b border-line">
+      <div role="tablist" className="mt-4 flex gap-1 border-b border-line">
         {([["pulls", "Pull requests", GitPullRequest], ["issues", "Issues", CircleDot], ["branches", "Branches", GitBranch]] as const).filter(([k]) => k !== "issues" || P.issues).map(([k, label, Icon]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 body-6", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn("-mb-px flex items-center gap-2 border-b-2 px-3 py-2 body-6", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       {tab !== "branches" && (
         <div className="mt-3 flex gap-1" role="group" aria-label="State">{["open", "closed", "all"].map((s) => (
@@ -127,7 +127,7 @@ function AddRepo({ repo, writable, provider }: { repo: GhRepo; writable: boolean
       <div className="mb-2 caption-4 text-muted">Branches to index (each is indexed separately, max 8)</div>
       {branches.isLoading ? <Spinner /> : (
         <div className="flex max-h-40 flex-wrap gap-x-4 gap-y-1 overflow-auto">{(branches.data ?? [{ name: repo.default_branch, protected: false }]).map((b) => (
-          <label key={b.name} className="flex items-center gap-1.5 body-6"><input type="checkbox" checked={picked.includes(b.name)} onChange={() => setPicked((p) => (p.includes(b.name) ? p.filter((x) => x !== b.name) : [...p, b.name]))} />{b.name}</label>))}</div>)}
+          <label key={b.name} className="flex items-center gap-2 body-6"><input type="checkbox" checked={picked.includes(b.name)} onChange={() => setPicked((p) => (p.includes(b.name) ? p.filter((x) => x !== b.name) : [...p, b.name]))} />{b.name}</label>))}</div>)}
       <ErrorNote error={add.error} />
       <div className="mt-3 flex gap-2"><Button size="sm" disabled={!picked.length || add.isPending} onClick={() => add.mutate()}>Clone and index</Button><Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button></div>
     </div>

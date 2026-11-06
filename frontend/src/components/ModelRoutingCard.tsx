@@ -46,10 +46,10 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
                 <ul className="divide-y divide-line">
                   {c.models.map((m) => (
                     <li key={m.id} className={cn("flex flex-wrap items-center gap-3 px-3 py-2 body-6", !m.enabled && "opacity-60")}>
-                      <code className="rounded-md bg-slate-100 px-1.5 py-0.5 caption-4">{m.model}</code>
+                      <code className="rounded-md bg-slate-100 px-2 py-0.5 caption-4">{m.model}</code>
                       {admin && !c.legacy ? (<>
                         <select aria-label={`Tier for ${m.model}`} className={cn(selectCls, "h-8 w-auto caption-5")} value={m.tier} onChange={(e) => patch.mutate({ id: m.id, tier: e.target.value as Tier })}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-                        <label className="flex items-center gap-1.5 caption-5 text-muted"><input type="checkbox" checked={m.enabled} onChange={(e) => patch.mutate({ id: m.id, enabled: e.target.checked })} />In use</label>
+                        <label className="flex items-center gap-2 caption-5 text-muted"><input type="checkbox" checked={m.enabled} onChange={(e) => patch.mutate({ id: m.id, enabled: e.target.checked })} />In use</label>
                         <button aria-label={`Remove ${m.model}`} className="ml-auto text-muted hover:text-red-600" onClick={() => del.mutate(m.id)}><Trash2 className="h-4 w-4" /></button>
                       </>) : <Badge tone={tierTone(m.tier)}>{m.tier}</Badge>}
                     </li>))}
@@ -66,7 +66,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
             {data.active > 1 && (
               <table className="w-full body-6" aria-label="Routing plan">
                 <thead><tr className="text-left caption-5 text-muted"><th className="py-1 font-normal">Task</th><th className="font-normal">Model now</th><th className="font-normal">Why</th></tr></thead>
-                <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-1.5">{r.label}</td><td><code className="caption-5">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="caption-5 text-muted">{r.why}</td></tr>)}</tbody>
+                <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-2">{r.label}</td><td><code className="caption-5">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="caption-5 text-muted">{r.why}</td></tr>)}</tbody>
               </table>)}
           </div>)}
         <ErrorNote error={patch.error ?? del.error ?? savings.error ?? review.error} />
@@ -149,7 +149,7 @@ export function MemoryCard({ admin }: { admin: boolean }) {
     <ConnectionCard icon={Brain} tint="violet" title="Answer memory" status={<StatusPill on={data.enabled} onLabel="On" offLabel="Off" />}
       description="Answers are remembered on this server. A repeated or re-worded question is answered from memory, with no model call and no tokens, until the underlying docs or code change."
       footer={data.entries > 0 ? (<>
-        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3 body-5 text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
+        <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-2 rounded-lg bg-brand px-3 body-5 text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
         {admin && <Button size="sm" variant="outline" onClick={async () => { if (await ask({ title: "Forget all remembered answers?", message: "Questions will be sent to the model again.", confirmLabel: "Forget", danger: true })) clear.mutate(); }}>Clear memory</Button>}</>) : undefined}>
       <dl className="grid gap-4 body-6 sm:grid-cols-3">
         <div><dt className="caption-5 text-muted">Remembered answers</dt><dd className="font-medium">{data.entries}</dd></div>

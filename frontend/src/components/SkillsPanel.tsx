@@ -61,7 +61,7 @@ export default function SkillsPanel({ admin, canSubmit }: { admin: boolean; canS
               <div className="min-w-0 flex-1"><h3 className="font-medium">{s.title}</h3>{s.description && <p className="body-6 text-muted">{s.description}</p>}</div>
               <Badge tone={tone(s.status)}>{s.status === "pending" ? "waiting for review" : s.status}</Badge>
             </div>
-            <div className="mt-2 flex flex-wrap gap-1.5 caption-5">
+            <div className="mt-2 flex flex-wrap gap-2 caption-5">
               {(s.tasks.length ? s.tasks : ["any task"]).map((t) => <Badge key={t}>{t}</Badge>)}
               {s.repos.length ? s.repos.map((r) => <Badge key={r} tone="blue">{r}</Badge>) : <Badge tone="blue">all repositories</Badge>}
               {s.always && <Badge tone="brand">always</Badge>}
@@ -118,12 +118,12 @@ function SkillForm({ skill, admin, onClose, onSaved }: { skill: SkillRow | null;
     <Modal wide title={skill ? "Edit skill" : "Add a skill"} icon={<Sparkles className="mt-1 h-5 w-5 text-brand" />} onClose={onClose}
       subtitle={admin ? "It starts working as soon as you save it." : "An admin reviews it before it is used."}>
       <form className="space-y-4 body-6" onSubmit={(e) => { e.preventDefault(); if (ok) save.mutate(); }}>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-1.5 caption-5 hover:bg-slate-50"><FileUp className="h-4 w-4" />Upload a SKILL.md<input type="file" accept=".md,.markdown,.txt" className="sr-only" aria-label="Upload a skill file" onChange={upload} /></label>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 caption-5 hover:bg-slate-50"><FileUp className="h-4 w-4" />Upload a SKILL.md<input type="file" accept=".md,.markdown,.txt" className="sr-only" aria-label="Upload a skill file" onChange={upload} /></label>
         {err && <p role="alert" className="caption-5 text-red-700">{err}</p>}
         <label className="block"><Label>Name</Label><Input aria-label="Name" required value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="How we write API endpoints" /></label>
         <label className="block"><Label>When should it apply?</Label><Input aria-label="When should it apply?" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Use when asked to write, add or change an API endpoint" /><span className="caption-5 text-muted">The model sees this skill when a question shares words with the name and this line.</span></label>
         <label className="block"><Label>Instructions</Label><Textarea aria-label="Instructions" required rows={8} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} placeholder="Every endpoint calls authorize() first, returns a response model, and has a regression test." /><span className="caption-5 text-muted">{f.body.length.toLocaleString()} / 8,000 characters. Secrets are removed when you save.</span></label>
-        <fieldset><Label>Applies to</Label><div className="flex flex-wrap gap-3">{TASKS.map(([k, l]) => <label key={k} className="flex items-center gap-1.5"><input type="checkbox" checked={f.tasks.includes(k)} onChange={() => toggle(k)} />{l}</label>)}</div><span className="caption-5 text-muted">None ticked means every kind of question.</span></fieldset>
+        <fieldset><Label>Applies to</Label><div className="flex flex-wrap gap-3">{TASKS.map(([k, l]) => <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={f.tasks.includes(k)} onChange={() => toggle(k)} />{l}</label>)}</div><span className="caption-5 text-muted">None ticked means every kind of question.</span></fieldset>
         <label className="block"><Label>Repository</Label><select aria-label="Repository" value={f.repo} onChange={(e) => setF({ ...f, repo: e.target.value })} className="h-9 rounded-lg border border-line bg-white px-2"><option value="">All repositories</option>{(repos.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
         <label className="flex items-start gap-2"><input type="checkbox" className="mt-1" checked={f.always} onChange={(e) => setF({ ...f, always: e.target.checked })} /><span>Apply to every matching kind of question, not only when the words match<span className="block caption-5 text-muted">For house rules such as "always cite the file path".</span></span></label>
         <ErrorNote error={save.error} />

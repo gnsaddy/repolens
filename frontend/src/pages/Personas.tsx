@@ -98,7 +98,7 @@ export default function PersonasPage() {
                       {x.status === "failed" ? <Badge tone="red">failed</Badge> : <span>{x.mode === "design" ? "overview" : `${x.found} finding${x.found === 1 ? "" : "s"}`}</span>}
                       {x.high > 0 && <Badge tone="red">{x.high} high</Badge>}{x.shared && <span className="inline-flex items-center gap-1"><Share2 className="h-3 w-3" />shared</span>}</div>
                   </button>
-                  {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "review"}`} className="mt-1.5" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
+                  {(x.mine || user?.role === "admin") && <Button size="sm" variant="ghost" aria-label={`Delete ${x.title || "review"}`} className="mt-2" onClick={() => ask(x)}><Trash2 className="h-4 w-4" /></Button>}
                 </li>))}</ul>)}
           </Card>
         </div>
@@ -158,7 +158,7 @@ function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: {
           <Card aria-label="Dependencies">
             <CardTitle>What it was told about other repositories</CardTitle>
             {!d.notes.dependencies.facts.length && !d.notes.dependencies.hidden ? <p className="body-6 text-muted">No other repository was found to use, or be used by, the code it read.</p> : (
-              <ul className="space-y-1.5 body-6">{d.notes.dependencies.facts.map((f, i) => (
+              <ul className="space-y-2 body-6">{d.notes.dependencies.facts.map((f, i) => (
                 <li key={i}><code>{f.path}</code> {f.direction === "used_by" ? "is used by" : "depends on"} <strong>{f.repo}</strong>
                   <span className="block caption-5 text-muted"><code>{f.from}</code> → <code>{f.to}</code>{f.evidence && ` — ${f.evidence}`}</span></li>))}</ul>)}
             {d.notes.dependencies.hidden > 0 && <p className="mt-2 caption-5 text-muted">{d.notes.dependencies.hidden} more link{d.notes.dependencies.hidden === 1 ? "" : "s"} involve repositories you cannot access; they are not described.</p>}
@@ -196,12 +196,12 @@ function Design({ design, titles, copy }: { design: PersonaDesign; titles?: Pers
         {!!design.flows.length && (
           <div className="mt-3 space-y-2 body-6" aria-label="Flows">{design.flows.map((f) => (
             <Panel key={f.name}><div className="font-medium">{f.name}</div>
-              <ol className="ml-5 list-decimal">{f.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+              <ol className="ml-4 list-decimal">{f.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
               <div className="mt-1 flex flex-wrap gap-1">{f.files.map((x) => <code key={x} className="caption-5 text-muted">{x}</code>)}</div></Panel>))}</div>)}
       </Card>
       {!!design.not_covered.length && (
         <Card aria-label="Not covered"><CardTitle>What it could not tell</CardTitle>
-          <ul className="list-disc space-y-0.5 pl-5 body-6">{design.not_covered.map((n, i) => <li key={i}>{n}</li>)}</ul></Card>)}
+          <ul className="list-disc space-y-0.5 pl-4 body-6">{design.not_covered.map((n, i) => <li key={i}>{n}</li>)}</ul></Card>)}
     </>
   );
 }
