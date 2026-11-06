@@ -6,7 +6,7 @@ import PublicLayout, { Points, REPO_URL, SECURITY_MD_URL, Section } from "@/comp
 // Change this page and that table together. Do not add a certification or audit name unless one exists.
 const FLOWS: [string, string, string][] = [
   ["A language model you choose", "The passages retrieved for a question, with keys and tokens masked", "Only if you connect a model. With none, nothing is sent."],
-  ["An embedding or reranking service", "Text to be turned into vectors or re-scored", "Only if you set one up. The built-in embedder runs on your server."],
+  ["An embedding or reranking service", "Text to be turned into vectors or rescored", "Only if you set one up. The built in embedder runs on your server."],
   ["GitHub, Bitbucket, Jira, Confluence, Slack, Notion, Google Docs, SharePoint", "Requests, using the token you saved, to read your own content", "Only for sources you connect."],
   ["A draft pull request on GitHub", "The change a person approved", "Only after approval. A public repository gets an extra warning and a second confirmation."],
   ["A Jira ticket or Confluence page", "A report or page a person approved", "Only after approval, and only if publishing is switched on for that connection."],
@@ -48,8 +48,8 @@ export default function Security() {
         <Points items={[
           "Three roles (admin, member, viewer), checked against the database on every request, with a policy check and an audit entry for every sensitive action, including refusals.",
           "Repositories can be restricted to chosen people. Search, answers, the graph, investigations and counts all respect it, and hidden items answer as if they do not exist.",
-          "Sign-in: passwords checked against a strength policy, optional authenticator-app codes with one-time recovery codes, single sign-on (OpenID Connect) and SCIM provisioning, sessions you can see and end, an idle timeout, and rate limits on sign-in and on the API.",
-          "Invitations and password resets are single-use links that expire and are stored only as hashes. Access tokens for scripts and editors are shown once, stored as hashes, expire, and can never change account security.",
+          "Sign in: passwords checked against a strength policy, optional authenticator app codes with one time recovery codes, single sign on (OpenID Connect) and SCIM provisioning, sessions you can see and end, an idle timeout, and rate limits on sign in and on the API.",
+          "Invitations and password resets are single use links that expire and are stored only as hashes. Access tokens for scripts and editors are shown once, stored as hashes, expire, and can never change account security.",
         ]} />
       </Section>
 
@@ -64,7 +64,7 @@ export default function Security() {
       <Section id="ai" title="The AI is not in charge">
         <Points items={[
           "Documents, code, tickets and logs are treated as untrusted text, never as instructions. Hostile text is kept on the data side of every prompt, and a test suite tries to trick it.",
-          "Answers cite their sources, and made-up citations are flagged. Model output is read strictly and capped.",
+          "Answers cite their sources, and made up citations are flagged. Model output is read strictly and capped.",
           "A suggested fix is a draft. It must change existing text exactly, may not touch build, deployment, dependency or secret files, is dropped if it adds command execution or network calls, and is never run or merged by RepoLens. A person approves it, and a public repository needs a second confirmation.",
           "Reports and wiki edits are proposals until a person approves them.",
         ]} />
@@ -72,7 +72,7 @@ export default function Security() {
 
       <Section id="record" title="A record of what happened">
         <Points items={[
-          "Admins can read and export an audit log of who did what, what was refused and failed sign-ins. Passwords and keys are never written to it.",
+          "Admins can read and export an audit log of who did what, what was refused and failed logins. Passwords and keys are never written to it.",
           "Old records are cleaned up on a schedule you can set, and a whole workspace can be deleted with one command.",
         ]} />
       </Section>
@@ -80,7 +80,7 @@ export default function Security() {
       <Section id="verify" title="Check it yourself">
         <Points items={[
           <>The source is open under the Apache License 2.0: <a className="text-l-link hover:underline" href={REPO_URL} target="_blank" rel="noopener noreferrer">github.com/gnsaddy/repolens</a>.</>,
-          "An automated test fails the build if any endpoint works without signing in, if a state-changing endpoint skips the policy check, or if a viewer can change anything.",
+          "An automated test fails the build if any endpoint works without signing in, if a state changing endpoint skips the policy check, or if a viewer can change anything.",
           "Every change runs lint, type checks, the test suites on two databases, browser tests, and a vulnerability scan of the container images.",
           <>The controls, and where each is implemented, are listed in <a className="text-l-link hover:underline" href={SECURITY_MD_URL} target="_blank" rel="noopener noreferrer">SECURITY.md</a>.</>,
         ]} />
@@ -92,7 +92,7 @@ export default function Security() {
           "You run it, so TLS, backups, secrets, updates and network exposure are yours to manage. The operations guide in the repository covers them.",
           "A model you connect sees the passages sent to it. Choose one you are comfortable with, or run without one.",
           "Fixes are never executed by RepoLens, so a person reviews them rather than a test run confirming them.",
-          "Single sign-on is configured through the API; there is no settings page for it yet.",
+          "Single sign on is configured through the API; there is no settings page for it yet.",
         ]} />
       </Section>
 

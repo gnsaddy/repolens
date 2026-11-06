@@ -39,7 +39,7 @@ const geminiChecks = (b: Record<string, unknown>) => (b.model ? (b.model === "ge
 describe("Language model", () => {
   it("starts offline with a Connect button and no model selection", async () => {
     llmSetup();
-    expect(await screen.findByText("Not connected: answers and reports use the built-in rules.")).toBeInTheDocument();
+    expect(await screen.findByText("Not connected: answers and reports use the built in rules.")).toBeInTheDocument();
     expect(screen.getByText("Offline")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Model/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Connect a language model" }));
@@ -139,7 +139,7 @@ describe("Language model", () => {
     expect(await screen.findByText("Offline")).toBeInTheDocument();
   });
 
-  it("is read-only for non-admins", async () => {
+  it("is read only for non-admins", async () => {
     llmSetup("member");
     expect(await screen.findByText(/Only workspace admins can connect a language model/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Connect a language model|Change model|Disconnect/ })).toBeNull();

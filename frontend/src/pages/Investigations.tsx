@@ -29,7 +29,7 @@ export default function Investigations() {
 
   return (
     <div>
-      <PageHeader title="Investigations" subtitle="Root-cause analysis across your repositories, commits and past incidents."
+      <PageHeader title="Investigations" subtitle="Root cause analysis across your repositories, commits and past incidents."
         actions={jira.data?.base_url ? <Button variant="outline" onClick={() => setPicker(true)}><Ticket className="h-4 w-4" />Start from Jira</Button> : undefined} />
       {picker && <JiraPicker canInvestigate={canWrite(user)} onClose={() => setPicker(false)} />}
       {canWrite(user) && (

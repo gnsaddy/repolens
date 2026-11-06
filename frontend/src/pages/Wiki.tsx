@@ -292,9 +292,9 @@ function Health({ open }: { open: Open }) {
           <ul className="space-y-1 body-6">{d.broken_links.map((b, i) => <li key={i}>{page(b)} <span className="caption-5 text-muted">→ <code>{b.link.replace(/^wiki:/, "")}</code></span></li>)}</ul></Section>
         <Section title="Stale pages" count={s.stale} hint={`Not updated in ${s.stale_days}+ days.`}>
           <ul className="space-y-1 body-6">{d.stale.map((o) => <li key={o.repo_id + o.path}>{page(o)} <span className="caption-5 text-muted">{o.age_days} days · {o.repo}</span></li>)}</ul></Section>
-        <Section title="Near-duplicate pages" count={s.duplicates} hint="Pages with almost identical content — consider merging.">
+        <Section title="Near duplicate pages" count={s.duplicates} hint="Pages with almost identical content — consider merging.">
           <ul className="space-y-1 body-6">{d.duplicates.map((x, i) => <li key={i}>{page(x.a)} ↔ {page(x.b)} <span className="caption-5 text-muted">{Math.round(x.similarity * 100)}%</span></li>)}</ul></Section>
-        <Section title="Undocumented code" count={s.undocumented_code} hint="Public classes and functions no page mentions, most-connected first.">
+        <Section title="Undocumented code" count={s.undocumented_code} hint="Public classes and functions no page mentions, most connected first.">
           <ul className="space-y-1 body-6">{d.undocumented_code.map((n) => <li key={n.id}><Link className="text-brand hover:underline" to={`/knowledge?tab=graph&node=${n.id}`}><code className="caption-5">{n.qualname}</code></Link> <span className="caption-5 text-muted">{n.repo}:{n.path}</span></li>)}</ul></Section>
         <Section title="Possibly outdated references" count={s.outdated_references} hint="Docs name code that no longer exists.">
           <ul className="space-y-1 body-6">{d.outdated_references.map((r, i) => <li key={i}><code className="caption-5">{r.term}</code> <button className="caption-5 text-brand hover:underline" onClick={() => open(r.repo_id, r.path)}>{r.section || r.path}</button></li>)}</ul></Section>
@@ -337,7 +337,7 @@ function Drift({ open, review }: { open: Open; review: (proposalId: string) => v
             if (await ask({ title: `Mark all ${ids.length} as reviewed?`, message: "Every alert listed here is closed with no update. Each comes back only if the same code changes again.", confirmLabel: "Mark all reviewed" })) dismissAll.mutate(ids);
           }}>Mark all {list.data?.length} reviewed</Button>
         </div>)}
-      {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "open" ? "Nothing to review. When a re-index finds changed code that a page mentions, it appears here." : "Nothing here."}</Empty> : (
+      {list.isLoading ? <Spinner /> : !list.data?.length ? <Empty>{status === "open" ? "Nothing to review. When a reindex finds changed code that a page mentions, it appears here." : "Nothing here."}</Empty> : (
         <ul className="space-y-3">{list.data.map((a) => (
           <li key={a.id}><Card className="p-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -420,7 +420,7 @@ function Proposals({ selectedId, open }: { selectedId: string | null; open: Open
             {d.status === "pending" && editing === null && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {(d.apply_options ?? []).map((t) => (
-                  <Button key={t} disabled={decide.isPending} onClick={async () => { if (await ask({ title: t === "confluence_comment" ? "Post this as a Confluence comment?" : d.kind === "new" ? "Create this page?" : "Apply this change?", message: t === "confluence_comment" ? "The page itself is not changed. The suggestion is added as a comment for its owners to act on." : "The page is updated now and re-indexed.", confirmLabel: t === "confluence_comment" ? "Post comment" : "Approve" })) decide.mutate({ approve: true, target: t }); }}>
+                  <Button key={t} disabled={decide.isPending} onClick={async () => { if (await ask({ title: t === "confluence_comment" ? "Post this as a Confluence comment?" : d.kind === "new" ? "Create this page?" : "Apply this change?", message: t === "confluence_comment" ? "The page itself is not changed. The suggestion is added as a comment for its owners to act on." : "The page is updated now and reindexed.", confirmLabel: t === "confluence_comment" ? "Post comment" : "Approve" })) decide.mutate({ approve: true, target: t }); }}>
                     <Check className="h-4 w-4" />{t === "confluence_comment" ? "Approve and comment in Confluence" : d.kind === "new" ? "Approve and create" : "Approve and apply"}</Button>))}
                 {!(d.apply_options ?? []).length && <span className="caption-5 text-muted">This page lives in a code repository: copy the proposed text into a pull request.</span>}
                 <Button variant="outline" onClick={() => setEditing(d.proposed)}>Edit first</Button>

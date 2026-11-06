@@ -60,7 +60,7 @@ export default function Login() {
         {needCode && <label className="block"><span className={lab}>Authentication code</span><input className={field} autoFocus inputMode="numeric" autoComplete="one-time-code" aria-label="Authentication code" placeholder="6 digit code, or a recovery code" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /><span className="caption-5 mt-1 block text-l-muted">Open your authenticator app. Lost your phone? Use a recovery code, or ask an admin to reset it.</span></label>}
         <ErrorNote error={err} />
         {ssoError && <p role="alert" className="caption-2 text-red-600">{ssoError}</p>}
-        {sso && <button type="button" className={outline} onClick={() => { window.location.href = `/api/auth/sso/start?email=${encodeURIComponent(f.email)}`; }}>Continue with single sign-on{sso.organization ? ` (${sso.organization})` : ""}</button>}
+        {sso && <button type="button" className={outline} onClick={() => { window.location.href = `/api/auth/sso/start?email=${encodeURIComponent(f.email)}`; }}>Continue with single sign on{sso.organization ? ` (${sso.organization})` : ""}</button>}
         <button className={primary} disabled={busy}>{mode === "login" ? "Sign in" : "Create account"}</button>
         {github && mode === "login" && <button type="button" className={outline} onClick={() => { window.location.href = "/api/auth/github/start"; }}><GithubLogo size={20} aria-hidden />Continue with GitHub</button>}
       </form>
@@ -72,7 +72,7 @@ export default function Login() {
   return <Landing card={card} />;
 }
 
-/** Landing page after the identity provider: trades the one-time code for a session. */
+/** Landing page after the identity provider: trades the one time code for a session. */
 export function SsoComplete() {
   const { completeSso } = useAuth();
   const nav = useNavigate();
@@ -80,7 +80,7 @@ export function SsoComplete() {
   const [err, setErr] = useState<unknown>(null);
   useEffect(() => {
     const code = sp.get("code");
-    if (!code) { setErr(new Error("Missing sign-in code")); return; }
+    if (!code) { setErr(new Error("Missing sign in code")); return; }
     completeSso(code).then(() => nav("/", { replace: true })).catch(setErr);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (

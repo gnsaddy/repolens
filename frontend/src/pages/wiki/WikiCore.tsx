@@ -48,7 +48,7 @@ export function PageEditor({ repoId, path, onDone }: { repoId: string; path: str
     mutationFn: () => api<{ path: string; created: boolean }>("/wiki/page", { method: "PUT", json: { repo_id: repoId, path: target, content: value } }),
     onSuccess: (r) => {
       for (const k of ["wiki-overview", "wiki-tree", "wiki-page", "wiki-source", "wiki-search"]) qc.invalidateQueries({ queryKey: [k] });
-      toast(r.created ? "Page created. Indexing…" : "Saved. Re-indexing…");
+      toast(r.created ? "Page created. Indexing…" : "Saved. Reindexing…");
       onDone(r.path);
     },
   });
@@ -58,7 +58,7 @@ export function PageEditor({ repoId, path, onDone }: { repoId: string; path: str
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       {!path && <label className="block body-5">Page path<Input aria-label="Page path" className="mt-1" value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder="runbooks/restart-api.md" /></label>}
       <Textarea aria-label="Page content" className="h-96 font-mono body-6" value={value} onChange={(e) => setText(e.target.value)} />
-      <p className="caption-5 text-muted">Markdown. Link pages with [[Page title]]. Secrets are removed automatically. The page is re-indexed and linked to code when you save.</p>
+      <p className="caption-5 text-muted">Markdown. Link pages with [[Page title]]. Secrets are removed automatically. The page is reindexed and linked to code when you save.</p>
       <ErrorNote error={save.error} />
       <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => onDone(path ?? "")}>Cancel</Button><Button disabled={save.isPending || (!path && !newPath.trim()) || !value.trim()}>{save.isPending ? "Saving…" : "Save page"}</Button></div>
     </form>

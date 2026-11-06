@@ -73,7 +73,7 @@ export default function GraphPage() {
   return (
     <div>
       <PageHeader title="Graph" subtitle="Pick repositories to see how they depend on each other, which change together, and where trouble concentrates."
-        actions={<Link to="/knowledge?tab=graph" className="body-6 text-brand hover:underline">Open the code-level graph</Link>} />
+        actions={<Link to="/knowledge?tab=graph" className="body-6 text-brand hover:underline">Open the code level graph</Link>} />
       <div className="grid gap-4 lg:grid-cols-4">
         <div className="space-y-4 lg:col-span-1">
           <Card aria-label="Saved systems">
@@ -218,7 +218,7 @@ function CodeDependencies({ cg, loading, error, weak, onWeak, node, onNode, focu
       {loading ? <Spinner /> : error ? <ErrorNote error={error} /> : !cg ? null : (<>
         {!cg.nodes.length ? (
           <div className="rounded-lg bg-slate-50 p-4 body-6 text-muted">
-            <p>No code-level link was found between these repositories{focus ? " in this direction" : ""}.</p>
+            <p>No code level link was found between these repositories{focus ? " in this direction" : ""}.</p>
             {cg.available.weak > 0 && !weak && <p className="mt-2">{cg.available.weak} calls match a name that exists in the other repository. Between unrelated projects these are usually coincidences, so they are hidden.</p>}
             <p className="mt-2">Imports are read for Python, JavaScript/TypeScript, Go, Java, Kotlin, C#, Rust, C, C++, Ruby, PHP, Swift and Scala, and URLs are matched against the routes another repository serves. Dependencies through a shared database, a message queue or a URL held in configuration cannot be seen from the code.</p>
           </div>) : (

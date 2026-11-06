@@ -29,7 +29,7 @@ export function useGithub(): Integration {
   };
 }
 
-/** GitHub sign-in via the OAuth device flow (no redirect URI, no client secret, token never reaches the browser), or a personal access token. */
+/** GitHub sign in via the OAuth device flow (no redirect URI, no client secret, token never reaches the browser), or a personal access token. */
 export function GithubForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -74,7 +74,7 @@ export function GithubForm({ onDone }: { onDone: () => void }) {
       <form onSubmit={(e) => { e.preventDefault(); saveToken.mutate(); }} className="space-y-3">
         <h3 className="body-4">Personal access token</h3>
         <label className="block"><Label>Personal access token</Label><Input required type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder="github_pat_…" />
-          <span className="mt-1 block caption-5 text-muted">Fine-grained token with read access to Contents, Pull requests, Issues and Metadata. Stored encrypted, never shown again.</span></label>
+          <span className="mt-1 block caption-5 text-muted">Fine grained token with read access to Contents, Pull requests, Issues and Metadata. Stored encrypted, never shown again.</span></label>
         <label className="block"><Label>API URL (change for GitHub Enterprise)</Label><Input value={apiBase} onChange={(e) => setApiBase(e.target.value)} /></label>
         <ErrorNote error={saveToken.error} />
         {check.message}

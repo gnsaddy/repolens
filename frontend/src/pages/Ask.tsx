@@ -11,7 +11,7 @@ import InfoTip from "@/components/InfoTip";
 import Markdown from "./wiki/Markdown";
 
 const MAX_ATTACH_CHARS = 400_000;
-const EXAMPLES = ["How does the sign-in flow work?", "Where is the retry policy documented?", "What depends on the payment service?"];
+const EXAMPLES = ["How does the sign in flow work?", "Where is the retry policy documented?", "What depends on the payment service?"];
 type Attached = { name: string; text: string; cut: boolean };
 
 const group = (iso: string) => {

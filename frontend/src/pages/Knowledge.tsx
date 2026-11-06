@@ -64,7 +64,7 @@ function MemoryTab({ admin }: { admin: boolean }) {
   const d = stats.data;
   return (
     <div className="space-y-4">
-      <p className="body-6 text-muted">Everything RepoLens has answered and kept. A repeated or re-worded question is answered from here, with no model call. Search questions and answers, then turn what you find into a skill.</p>
+      <p className="body-6 text-muted">Everything RepoLens has answered and kept. A repeated or reworded question is answered from here, with no model call. Search questions and answers, then turn what you find into a skill.</p>
       {d?.entries !== undefined && (
         <div className="grid grid-cols-3 gap-4"><Stat label="Remembered answers" value={d.entries} /><Stat label="Times reused" value={d.hits} /><Stat label="Tokens saved" value={d.tokens_saved.toLocaleString()} hint={d.enabled ? "memory is on" : "memory is off"} /></div>)}
       <Card><MemoryBrowser admin={admin} /></Card>
@@ -250,7 +250,7 @@ function GraphTab({ repos, initialNode }: { repos: Repo[]; initialNode: string |
             <label className="flex items-center gap-2"><input type="checkbox" checked={factsOnly} onChange={(e) => setFactsOnly(e.target.checked)} />Facts only <span className="text-muted">(hide inferred and uncertain links)</span></label>
             <label className="flex items-center gap-2">Colour by
               <select aria-label="Colour by" className="h-8 rounded-lg border border-line bg-white px-2" value={colorBy} onChange={(e) => setColorBy(e.target.value)}>
-                <option value="type">Node type</option><option value="community">Area (what hangs together)</option><option value="churn">Heat: recent change (90 days)</option><option value="bugs">Heat: bug-fix activity</option>
+                <option value="type">Node type</option><option value="community">Area (what hangs together)</option><option value="churn">Heat: recent change (90 days)</option><option value="bugs">Heat: bug fix activity</option>
                 <option value="connections">Heat: most connected</option><option value="undocumented">Heat: undocumented code</option></select></label>
             {!["type", "community"].includes(colorBy) && (<span className="flex items-center gap-2 text-muted" aria-label="Heat legend">
               {heat.isLoading ? "Loading…" : (<><span>cold</span><span className="h-2.5 w-28 rounded-md" style={{ background: HEAT_GRADIENT }} /><span>hot</span><span>· {heat.data?.label}</span>{heat.data && !Object.keys(heat.data.values).length && <span className="text-amber-700">· no data for these nodes</span>}</>)}</span>)}

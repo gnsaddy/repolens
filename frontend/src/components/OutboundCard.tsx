@@ -25,7 +25,7 @@ export default function OutboundCard() {
             <p className="mt-1 caption-5 text-muted">Manage: {i.where}</p>
           </li>))}</ul>)}
       <ul className="mt-3 space-y-1 border-t border-line pt-3 caption-5 text-muted">{data.local_only.map((t) => <li key={t} className="flex items-start gap-2"><Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-600" aria-hidden />{t}</li>)}</ul>
-      <p className="mt-2 caption-5"><Link className="text-brand hover:underline" to="/profile">Your own sessions and sign-in security</Link></p>
+      <p className="mt-2 caption-5"><Link className="text-brand hover:underline" to="/profile">Your own sessions and sign in security</Link></p>
     </ConnectionCard>
   );
 }

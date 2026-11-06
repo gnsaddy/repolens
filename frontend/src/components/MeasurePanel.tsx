@@ -25,11 +25,11 @@ export default function MeasurePanel({ repo, onClose }: { repo: Repo; onClose: (
   const r = latest?.status === "completed" ? latest.result : null;
   return (
     <Modal wide title={`Measure on ${repo.name}`} icon={<Gauge className="mt-1 h-5 w-5 text-brand" />} onClose={onClose}
-      subtitle="Takes this repository's own bug-fix commits, rebuilds the index as it was just before each fix, and checks whether the files the fix changed are found.">
+      subtitle="Takes this repository's own bug fix commits, rebuilds the index as it was just before each fix, and checks whether the files the fix changed are found.">
       <div className="space-y-4 body-6">
         <p className="rounded-lg bg-slate-50 p-3 caption-5 text-muted">Runs on this machine. Nothing is downloaded and no language model is called, so no code leaves your server. It can take several minutes on a large repository.</p>
         {runs.isLoading ? <Spinner /> : !runs.data?.can_run ? (
-          <p className="text-muted">{repo.source === "docs" ? "Document collections have no bug-fix history to test." : "Index this repository first so its history is available."}</p>
+          <p className="text-muted">{repo.source === "docs" ? "Document collections have no bug fix history to test." : "Index this repository first so its history is available."}</p>
         ) : (
           <div className="flex flex-wrap items-end gap-3">
             <label className="caption-5 text-muted">Bug fixes to test<select aria-label="Bug fixes to test" value={cases} onChange={(e) => setCases(+e.target.value)} disabled={busy} className="mt-1 block h-9 rounded-lg border border-line bg-white px-2 body-6 text-ink">{[5, 10, 15].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>

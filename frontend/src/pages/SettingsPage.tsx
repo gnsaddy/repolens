@@ -33,7 +33,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Connect the tools your team already uses, a language model if you want AI-written answers, and the people who use RepoLens." />
+      <PageHeader title="Settings" subtitle="Connect the tools your team already uses, a language model if you want AI written answers, and the people who use RepoLens." />
       <div role="tablist" aria-label="Settings sections" className="mb-6 flex gap-1 border-b border-line">
         {tabs.map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setSp(k === "integrations" ? {} : { tab: k })}
@@ -53,7 +53,7 @@ export default function SettingsPage() {
         <Logo className="h-12 w-12" />
         <div className="min-w-0 flex-1">
           <div className="font-semibold">RepoLens AI <span className="ml-1 rounded-md bg-slate-100 px-2 py-0.5 caption-4 text-slate-600">{APP_VERSION}</span></div>
-          <p className="caption-5 text-muted">A living wiki for your code and docs, with evidence-backed investigations. Beta: expect rough edges. Apache License 2.0.</p>
+          <p className="caption-5 text-muted">A living wiki for your code and docs, with evidence backed investigations. Beta: expect rough edges. Apache License 2.0.</p>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 body-6">
           <Link className="text-brand hover:underline" to="/about">About</Link>
@@ -75,9 +75,9 @@ function RetrievalCard() {
       {data.embedding_state?.stale && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 body-6 text-amber-900">{data.embedding_state.message} An admin can run <code>python -m repolens.devtools.reembed</code> on the server.</p>}
       <dl className="grid gap-4 body-6 sm:grid-cols-2">
         <div><dt className="caption-5 text-muted">Embeddings</dt><dd className="font-medium">{data.embedding.model} <Badge tone={data.embedding.offline ? "gray" : "brand"}>{data.embedding.offline ? "offline" : data.embedding.provider}</Badge></dd>
-          <dd className="caption-5 text-muted">{data.embedding.dimensions} dimensions{data.embedding.offline ? " · works without internet; an embedding model finds re-worded questions better (see evals/README)" : ""}</dd></div>
+          <dd className="caption-5 text-muted">{data.embedding.dimensions} dimensions{data.embedding.offline ? " · works without internet; an embedding model finds reworded questions better (see evals/README)" : ""}</dd></div>
         <div><dt className="caption-5 text-muted">Reranker</dt><dd className="font-medium">{data.rerank.provider === "none" ? "Off" : data.rerank.model} {!data.rerank.configured && <Badge tone="amber">no endpoint set</Badge>}</dd>
-          <dd className="caption-5 text-muted">{data.rerank.provider === "none" ? "Enable with REPOLENS_RERANK_PROVIDER" : `re-scores the top ${data.rerank.depth} results of every search`}</dd></div>
+          <dd className="caption-5 text-muted">{data.rerank.provider === "none" ? "Enable with REPOLENS_RERANK_PROVIDER" : `rescores the top ${data.rerank.depth} results of every search`}</dd></div>
       </dl>
     </ConnectionCard>
   );

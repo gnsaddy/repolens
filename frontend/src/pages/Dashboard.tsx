@@ -36,7 +36,7 @@ export default function Dashboard() {
   const max = Math.max(1, ...(data?.top_repositories.map((r) => r.count) ?? [1]));
   return (
     <div>
-      <PageHeader title={`Welcome back${user?.name ? `, ${user.name}` : ""}`} subtitle="Evidence-backed repository intelligence for faster debugging." />
+      <PageHeader title={`Welcome back${user?.name ? `, ${user.name}` : ""}`} subtitle="Evidence backed repository intelligence for faster debugging." />
       <form onSubmit={go} className="mb-6 flex gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Describe a bug, paste a stack trace or ask about your codebase…" aria-label="Investigate" />
         <Button type="submit"><Search className="h-4 w-4" />Investigate</Button>
@@ -54,7 +54,7 @@ export default function Dashboard() {
       <StatGroup className="mb-6" items={[
         { label: "Repositories indexed", value: `${data?.indexed_repositories ?? "—"}`, hint: `${data?.repositories ?? 0} connected` },
         { label: "Investigations completed", value: data?.completed ?? "—", hint: `${data?.investigations ?? 0} total` },
-        { label: "Verified accuracy", value: pct(data?.verified_accuracy), hint: data?.reviewed ? `${data.reviewed} human-reviewed` : "No reviews yet" },
+        { label: "Verified accuracy", value: pct(data?.verified_accuracy), hint: data?.reviewed ? `${data.reviewed} human reviewed` : "No reviews yet" },
         { label: "Avg. investigation time", value: data?.avg_duration_s != null ? `${data.avg_duration_s}s` : "—" },
       ]} />
       {more.data?.ai && <Insights d={more.data} />}

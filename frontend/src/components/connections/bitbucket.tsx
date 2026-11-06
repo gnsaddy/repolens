@@ -59,7 +59,7 @@ export function BitbucketForm({ onDone }: { onDone: () => void }) {
       {deployment === "cloud" && <div><Label>Workspace (recommended)</Label><Input aria-label="Bitbucket workspace" value={workspaces} onChange={(e) => setWorkspaces(e.target.value)} placeholder="my-team" />
         <p className="mt-1 caption-5 text-muted">The first part of your repository addresses: bitbucket.org/<b>my-team</b>/repo. Several can be separated by commas. Leave empty to list every workspace the token can see, which needs the read:workspace:bitbucket scope.</p></div>}
       <div><Label>{deployment === "server" ? "Personal access token" : kind === "app" ? "App password" : "Token"}</Label><Input aria-label="Bitbucket token" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
-        <p className="mt-1 caption-5 text-muted">{help} Use a read-only credential. Stored encrypted, never shown again.</p></div>
+        <p className="mt-1 caption-5 text-muted">{help} Use a read only credential. Stored encrypted, never shown again.</p></div>
       <ErrorNote error={save.error} />
       {check.message}
       <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onDone}>Cancel</Button><Button type="button" variant="outline" disabled={!ready || check.pending} onClick={check.run}>Test connection</Button><Button disabled={save.isPending || token.length < 4 || (deployment === "server" && !baseUrl) || (needsUser && !username)}>Save connection</Button></div>

@@ -71,7 +71,7 @@ export default function Ownership() {
                   <div className="caption-5 text-muted">{p.areas.join(", ")} · last {timeAgo(p.last_commit_at)}</div></li>))}</ul>
             </Card>
           </div>
-          <p className="mt-3 caption-5 text-muted">Recent work counts more than old work (half-life 6 months), bigger changes count more, and bots are ignored. It only sees indexed commits.</p>
+          <p className="mt-3 caption-5 text-muted">Recent work counts more than old work (half life 6 months), bigger changes count more, and bots are ignored. It only sees indexed commits.</p>
         </>)}
       </>)}
     </div>

@@ -64,6 +64,8 @@ Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 - **The sidebar is grouped** (Work, Knowledge, Sources, Monitor); a new page goes in the group of what people do with it.
 - **One typeface, named text styles.** The font is Geist. Text uses the named styles in `index.css` (`heading-1` to `heading-6`, `title-1` to `title-5`, `body-1` to `body-6`, `button-lg` to `button-xsm`, `caption-1` to `caption-5`), never a loose size and weight such as `text-sm font-medium`. A new style is the next number in its group, built from a Tailwind size step.
 - **Spacing is 0, 0.5, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20 or 24** (2 to 96 pixels). Do not use 1.5, 2.5, 3.5, 5, 7, 9, 11 or 14.
+- **Night mode backgrounds** come only from #181818 (page), #1f1f1f (cards), #272727 (blocks and tinted badges), #313131 (hover, borders) and #000000 (code and tooltips), set once in the `.dark` block of `index.css`. Do not add another dark background.
+- **No hyphens in interface copy.** Write "sign in", "read only", "root cause", "email" and "reindex"; keep hyphens only in names, ids, paths and model names (`gpt-4o-mini`, `cert-manager`).
 - **The landing page** (`components/Landing.tsx`) follows the landing page design rules in full, including no hyphens in its copy, flat backgrounds from the dark palette, and scroll animation on transform and opacity only. Keep its copy to facts the code backs.
 - **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
 

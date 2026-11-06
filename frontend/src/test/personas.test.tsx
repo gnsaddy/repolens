@@ -17,7 +17,7 @@ const repos = [{ id: "a", name: "shop", source: "git", status: "ready" }, { id: 
 const personas: Persona[] = [
   { key: "security-auditor", name: "Security auditor", summary: "Reads code for ways it could be attacked.", placeholder: "The login endpoint.", modes: ["review", "design"], overview: { label: "Threat model", action: "Write the threat model", first: "Threat model", second: "Weak points and attack paths", placeholder: "Leave empty for the whole repository." } },
   { key: "test-engineer", name: "Test engineer", summary: "Reads code for behaviour that has no test.", placeholder: "The order total.", modes: ["review", "design"], overview: { label: "Test plan", action: "Write the test plan", first: "Test strategy", second: "Test plan by module", placeholder: "Leave empty for the whole repository." } },
-  { key: "architect", name: "Architect", summary: "Reads how the code is structured.", placeholder: "The orders module.", modes: ["review", "design"], overview: { label: "Design overview (HLD and LLD)", action: "Write the design overview", first: "High-level design", second: "Low-level design", placeholder: "Leave empty for the whole repository." } },
+  { key: "architect", name: "Architect", summary: "Reads how the code is structured.", placeholder: "The orders module.", modes: ["review", "design"], overview: { label: "Design overview (HLD and LLD)", action: "Write the design overview", first: "High level design", second: "Low level design", placeholder: "Leave empty for the whole repository." } },
   { key: "developer", name: "Developer", summary: "Reviews the code like a colleague.", placeholder: "create_order.", modes: ["review", "design"], overview: { label: "Code walkthrough", action: "Write the code walkthrough", first: "How it works", second: "Where to change what", placeholder: "Leave empty for the whole repository." } },
 ];
 const tokens = { calls: 1, input_tokens: 1500, output_tokens: 400, cost: 0.0105 };
@@ -174,10 +174,10 @@ describe("Agent personas", () => {
   it("shows the design: high-level and low-level text, components and flows with their files, the diagram, and what it could not tell", async () => {
     open({ design: true });
     await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
-    expect(await screen.findByLabelText("High-level design")).toHaveTextContent("Looks users up in a database.");
+    expect(await screen.findByLabelText("High level design")).toHaveTextContent("Looks users up in a database.");
     expect(screen.getByLabelText("Components")).toHaveTextContent("auth — looks users up");
     expect(screen.getByLabelText("Diagram")).toHaveTextContent("flowchart LR");
-    const lld = screen.getByLabelText("Low-level design");
+    const lld = screen.getByLabelText("Low level design");
     expect(lld).toHaveTextContent("find_user builds a query.");
     expect(within(screen.getByLabelText("Flows")).getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByLabelText("Not covered")).toHaveTextContent("the web layer was not shown");

@@ -33,7 +33,7 @@ export default function AccessPanel({ repoId, repoName }: { repoId: string; repo
       {visibility === "restricted" && (
         <fieldset className="mt-3 space-y-2 border-t border-line pt-3">
           <legend className="mb-1 caption-4 text-muted">Users with access</legend>
-          {!members.length && <p className="caption-5 text-muted">No non-admin users yet.</p>}
+          {!members.length && <p className="caption-5 text-muted">No non admin users yet.</p>}
           {members.map((u) => (
             <label key={u.id} className="flex items-center gap-2 body-6"><input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggle(u.id)} />
               {u.email}<Badge>{u.role}</Badge></label>))}

@@ -16,7 +16,7 @@ afterEach(() => vi.restoreAllMocks());
 const wrap = (el: React.ReactNode, url = "/") => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AuthProvider><FeedbackProvider><MemoryRouter initialEntries={[url]}>{el}</MemoryRouter></FeedbackProvider></AuthProvider></QueryClientProvider>);
 const me = (extra = {}) => ({ id: "1", email: "ana@acme.io", name: "Ana", role: "admin", org_id: "o", auth_source: "password", totp_enabled: false, ...extra });
 
-describe("Sign-in with an authenticator", () => {
+describe("Sign in with an authenticator", () => {
   it("asks for the code after the password and sends it with the next attempt", async () => {
     const bodies: { code?: string }[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -66,7 +66,7 @@ describe("People", () => {
   const people = [
     { id: "1", email: "ana@acme.io", name: "Ana", role: "admin", active: true, auth_source: "password", totp_enabled: true, pending: null, created_at: new Date().toISOString() },
     { id: "2", email: "bo@acme.io", name: "", role: "member", active: true, auth_source: "password", totp_enabled: false, pending: "invite", created_at: new Date().toISOString() }];
-  it("invites someone and shows the one-time link once", async () => {
+  it("invites someone and shows the one time link once", async () => {
     localStorage.setItem("repolens.token", "tok");
     const posts: { url: string; body?: unknown }[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
@@ -82,9 +82,9 @@ describe("People", () => {
     expect(within(t).getByText("invited, not joined yet")).toBeInTheDocument();
     expect(within(t).getByText("authenticator")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Invite someone/ }));
-    await userEvent.type(await screen.findByLabelText("E-mail"), "cy@acme.io");
+    await userEvent.type(await screen.findByLabelText("Email"), "cy@acme.io");
     await userEvent.click(screen.getByRole("button", { name: "Create invitation" }));
-    expect(await screen.findByLabelText("One-time link")).toHaveValue(`${window.location.origin}/reset?token=ZZZ`);
+    expect(await screen.findByLabelText("One time link")).toHaveValue(`${window.location.origin}/reset?token=ZZZ`);
     expect(posts.find((p) => p.url.endsWith("/auth/invites"))?.body).toEqual({ email: "cy@acme.io", name: "", role: "member" });
   });
   it("is closed to members", async () => {
@@ -112,7 +112,7 @@ describe("Profile: authenticator app", () => {
     wrap(<Profile />);
     await userEvent.click(await screen.findByRole("button", { name: "Set up" }));
     expect(await screen.findByLabelText("Setup key")).toHaveTextContent("JBSWY3DPEHPK3PXP");
-    await userEvent.type(screen.getByLabelText("Six-digit code"), "123456");
+    await userEvent.type(screen.getByLabelText("Six digit code"), "123456");
     await userEvent.click(screen.getByRole("button", { name: "Turn on" }));
     expect(await screen.findByLabelText("Recovery codes")).toHaveTextContent("aaaaaa-bbbbbb");
     await userEvent.click(screen.getByRole("button", { name: "I have saved them" }));

@@ -12,8 +12,8 @@ const wrap = (ui: React.ReactNode, url = "/") => render(<QueryClientProvider cli
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
-describe("SSO sign-in", () => {
-  it("offers single sign-on only for e-mail addresses that have it, and shows provider errors", async () => {
+describe("SSO sign in", () => {
+  it("offers single sign on only for email addresses that have it, and shows provider errors", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const u = String(input);
       if (u.includes("/auth/sso/discover")) return json(u.includes("ana%40corp.io") ? { sso: true, organization: "Corp" } : { sso: false });
@@ -23,13 +23,13 @@ describe("SSO sign-in", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("domain is not allowed");
     await userEvent.type(screen.getByLabelText("Email"), "bob@other.com");
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: /single sign-on/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /single sign on/ })).toBeNull();
     await userEvent.clear(screen.getByLabelText("Email"));
     await userEvent.type(screen.getByLabelText("Email"), "ana@corp.io");
-    expect(await screen.findByRole("button", { name: "Continue with single sign-on (Corp)" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Continue with single sign on (Corp)" })).toBeInTheDocument();
   });
 
-  it("trades the one-time code for a session and never shows a token in the URL", async () => {
+  it("trades the one time code for a session and never shows a token in the URL", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const u = String(input);
       if (u.endsWith("/auth/sso/exchange") && init?.method === "POST") return json({ access_token: "jwt-abc", user: { id: "1", email: "ana@corp.io", name: "Ana", role: "viewer", org_id: "o" } });
@@ -42,7 +42,7 @@ describe("SSO sign-in", () => {
   });
 
   it("shows an error for a missing or rejected code", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ detail: "This sign-in expired. Start again." }, 401));
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => json({ detail: "This sign in expired. Start again." }, 401));
     wrap(<SsoComplete />, "/sso-complete?code=" + "d".repeat(30));
     expect(await screen.findByRole("alert")).toHaveTextContent("expired");
   });

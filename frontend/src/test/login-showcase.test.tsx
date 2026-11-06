@@ -12,7 +12,7 @@ function show() {
   render(<QueryClientProvider client={new QueryClient()}><AuthProvider><MemoryRouter><Login /></MemoryRouter></AuthProvider></QueryClientProvider>);
 }
 
-describe("sign-in page", () => {
+describe("sign in page", () => {
   it("says what you can do and why you can trust it, and links to the proof", async () => {
     show();
     const about = await screen.findByLabelText("About RepoLens AI");

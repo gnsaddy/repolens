@@ -61,7 +61,7 @@ export default function Profile() {
 
         <Card>
           <CardTitle><KeyRound className="mr-2 inline h-4 w-4" />Password</CardTitle>
-          {user.auth_source && user.auth_source !== "password" ? <p className="body-6 text-muted">You sign in through single sign-on, so there is no password here.</p> : (
+          {user.auth_source && user.auth_source !== "password" ? <p className="body-6 text-muted">You sign in through single sign on, so there is no password here.</p> : (
             <form className="space-y-3" onSubmit={submit}>
               <label className="block"><Label>Current password</Label><Input type="password" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></label>
               <label className="block"><Label>New password</Label><Input type="password" autoComplete="new-password" minLength={8} value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></label>
@@ -84,7 +84,7 @@ export default function Profile() {
               <li key={s.id} className="flex flex-wrap items-center gap-3 py-3 body-6">
                 <Laptop className="h-5 w-5 text-muted" />
                 <div className="min-w-0 flex-1"><div className="font-medium">{s.device}{s.current && <Badge tone="green" className="ml-2">this device</Badge>}</div>
-                  <div className="caption-5 text-muted">{s.ip || "unknown address"} · signed in {timeAgo(s.created_at)} · last active {timeAgo(s.last_seen_at)}{s.method === "sso" ? " · single sign-on" : ""}</div></div>
+                  <div className="caption-5 text-muted">{s.ip || "unknown address"} · signed in {timeAgo(s.created_at)} · last active {timeAgo(s.last_seen_at)}{s.method === "sso" ? " · single sign on" : ""}</div></div>
                 {!s.current && <Button size="sm" variant="ghost" disabled={end.isPending} onClick={() => end.mutate(s.id)}>End session</Button>}
               </li>))}</ul>)}
           <ErrorNote error={end.error ?? others.error} />
@@ -95,7 +95,7 @@ export default function Profile() {
 }
 
 
-/** Optional second step at sign-in: a six-digit code from an authenticator app. */
+/** Optional second step at sign in: a six digit code from an authenticator app. */
 function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boolean) => void }) {
   const toast = useToast();
   const [setup, setSetup] = useState<TotpSetup | null>(null);
@@ -108,7 +108,7 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
   return (
     <Card>
       <CardTitle right={enabled ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}><Smartphone className="mr-2 inline h-4 w-4" />Authenticator app</CardTitle>
-      <p className="mb-3 body-6 text-muted">Ask for a six-digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
+      <p className="mb-3 body-6 text-muted">Ask for a six digit code from an app such as Google Authenticator, 1Password or Authy each time you sign in, so a stolen password is not enough.</p>
       {codes ? (
         <div role="status" className="space-y-2 rounded-lg bg-emerald-50 p-3 body-6">
           <p className="font-medium text-emerald-900">Save these recovery codes now. Each works once if you lose your phone; they are not shown again.</p>
@@ -127,8 +127,8 @@ function TwoFactor({ enabled, onChange }: { enabled: boolean; onChange: (on: boo
           <p className="body-6">1. In your app choose “add account” and enter this key (or open the link on your phone):</p>
           <code aria-label="Setup key" className="block break-all rounded-md bg-slate-100 p-2 body-6">{setup.secret}</code>
           <a className="caption-5 text-brand hover:underline" href={setup.uri}>Open in an authenticator app</a>
-          <p className="body-6">2. Enter the six-digit code it shows:</p>
-          <Input aria-label="Six-digit code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
+          <p className="body-6">2. Enter the six digit code it shows:</p>
+          <Input aria-label="Six digit code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" />
           <ErrorNote error={confirm.error} />
           <div className="flex gap-2"><Button size="sm" disabled={code.replace(/\D/g, "").length !== 6 || confirm.isPending}>Turn on</Button><Button size="sm" type="button" variant="outline" onClick={() => setSetup(null)}>Cancel</Button></div>
         </form>

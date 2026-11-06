@@ -11,14 +11,14 @@ import { cn } from "@/lib/utils";
 const PROVIDERS = [
   ["gemini", "Google Gemini"],
   ["anthropic", "Anthropic Claude"],
-  ["openai", "OpenAI-compatible (OpenAI, Azure, vLLM, Ollama…)"],
+  ["openai", "OpenAI compatible (OpenAI, Azure, vLLM, Ollama…)"],
 ] as const;
 export const providerLabel = (p: string) => PROVIDERS.find(([v]) => v === p)?.[1].split(" (")[0] ?? (p === "github-models" ? "GitHub Models (retired)" : p);
 
 interface CheckResult { ok: boolean; error?: string; models?: { id: string; name: string }[]; model?: string; latency_ms?: number; input_tokens?: number }
 const KEY_HELP: Record<string, string> = {
-  gemini: "Create a key at aistudio.google.com/apikey. The free tier is rate limited and Google may use free-tier requests to improve its products, so avoid it for private code.",
-  anthropic: "Anthropic only supports API keys for apps (Claude subscription sign-in is limited to Claude Code and claude.ai). Create one in the Claude Console.",
+  gemini: "Create a key at aistudio.google.com/apikey. The free tier is rate limited and Google may use free tier requests to improve its products, so avoid it for private code.",
+  anthropic: "Anthropic only supports API keys for apps (Claude subscription sign in is limited to Claude Code and claude.ai). Create one in the Claude Console.",
   openai: "Any service that speaks the OpenAI chat-completions protocol. Enter its base URL and key.",
 };
 
@@ -41,7 +41,7 @@ export default function LanguageModelCard({ admin }: { admin: boolean }) {
   return (
     <>
       <ConnectionCard icon={KeyRound} tint="violet" title="Language model" status={data ? <StatusPill on={on} onLabel="Connected" offLabel="Offline" /> : undefined}
-        description="Optional. Everything works offline; a model makes answers and root-cause write-ups read better."
+        description="Optional. Everything works offline; a model makes answers and root cause write ups read better."
         footer={admin ? (on ? (<>
           <Button size="sm" variant="outline" disabled={test.isPending} onClick={() => { setNote(null); test.mutate(); }}>Test connection</Button>
           <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Change model</Button>
@@ -55,7 +55,7 @@ export default function LanguageModelCard({ admin }: { admin: boolean }) {
             <div><dt className="caption-5 text-muted">Key</dt><dd className="flex items-center gap-2 font-medium">stored<Badge tone="brand">{data.source === "org" ? "workspace setting" : "server default"}</Badge></dd></div>
             {data.provider === "github-models" && <p role="alert" className="rounded-lg bg-amber-50 p-3 body-6 text-amber-900 sm:col-span-3">GitHub retired GitHub Models on 30 July 2026, so this no longer answers. Choose Change model and pick another provider.</p>}
           </dl>
-        ) : <p className="body-6 text-muted">{admin ? "Not connected: answers and reports use the built-in rules." : "Only workspace admins can connect a language model."}</p>}
+        ) : <p className="body-6 text-muted">{admin ? "Not connected: answers and reports use the built in rules." : "Only workspace admins can connect a language model."}</p>}
       </ConnectionCard>
       {open && <Modal title={on ? "Change language model" : "Connect a language model"} subtitle="Test your key, choose a model, test it, then save." onClose={() => setOpen(false)}><Wizard data={data} onDone={() => setOpen(false)} /></Modal>}
     </>

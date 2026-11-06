@@ -48,7 +48,7 @@ describe("StoragePanel", () => {
     });
     wrap(<StoragePanel />);
     expect(await screen.findByText("proj, proj@dev")).toBeInTheDocument();
-    expect(screen.getByText("blob-less")).toBeInTheDocument();
+    expect(screen.getByText("blobless")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Preview" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Would free 2.5 GB from 1 clone(s)");
     expect(fmtBytes(1500)).toBe("2 KB");

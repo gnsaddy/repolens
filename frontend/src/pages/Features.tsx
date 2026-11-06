@@ -22,7 +22,7 @@ export default function FeaturesPage() {
   const confirm = useConfirm();
   const [repoId, setRepoId] = useState("");
   const [request, setRequest] = useState("");
-  const [related, setRelated] = useState<string[]>([]);  // other repositories whose code is shown to the model, read-only
+  const [related, setRelated] = useState<string[]>([]);  // other repositories whose code is shown to the model, read only
   const [openId, setOpenId] = useState<string | null>(null);
   const [reusedId, setReusedId] = useState<string | null>(null);  // the page was opened by reusing this draft
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });
@@ -61,7 +61,7 @@ export default function FeaturesPage() {
                     {ready.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></Label>
                 {others.length > 0 && (
                   <fieldset className="space-y-1" aria-label="Other repositories">
-                    <legend className="body-5">Also show code from <span className="font-normal text-muted">(read-only, optional)</span></legend>
+                    <legend className="body-5">Also show code from <span className="font-normal text-muted">(read only, optional)</span></legend>
                     <details className="group rounded-lg border border-line bg-white body-6 text-ink">
                       <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 px-2" aria-label="Choose other repositories">
                         <span className="truncate">{chosen.length ? others.filter((o) => chosen.includes(o.id)).map((o) => o.name).join(", ") : "None"}</span>
@@ -135,7 +135,7 @@ function Draft({ d, reused, write, admin, again, onShare, onDelete }: { d: Featu
       {d.status === "drafted" && (<>
         <Card aria-label="Context">
           <CardTitle>What the model knew about other repositories</CardTitle>
-          {d.related.length > 0 && <p className="body-6">Code shown read-only from: {d.related.map((r) => r.name).join(", ")}.</p>}
+          {d.related.length > 0 && <p className="body-6">Code shown read only from: {d.related.map((r) => r.name).join(", ")}.</p>}
           {d.related_hidden > 0 && <p className="caption-5 text-muted">{d.related_hidden} more repositor{d.related_hidden === 1 ? "y was" : "ies were"} used that you cannot access.</p>}
           {d.context.files.length > 0 && (
             <ul className="mt-1 space-y-0.5 caption-5">{d.context.files.map((f) => <li key={`${f.repo_id}${f.path}`}><code>{f.repo}: {f.path}</code> <span className="text-muted">{f.why}</span></li>)}</ul>)}

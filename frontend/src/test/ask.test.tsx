@@ -145,8 +145,8 @@ describe("Ask: a new chat", () => {
   it("offers example questions that fill the box", async () => {
     server();
     page();
-    await userEvent.click(await screen.findByRole("button", { name: "How does the sign-in flow work?" }));
-    expect((await sendBox() as HTMLTextAreaElement).value).toBe("How does the sign-in flow work?");
+    await userEvent.click(await screen.findByRole("button", { name: "How does the sign in flow work?" }));
+    expect((await sendBox() as HTMLTextAreaElement).value).toBe("How does the sign in flow work?");
   });
 });
 

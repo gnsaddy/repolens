@@ -10,14 +10,14 @@ import SettingsPage from "@/pages/SettingsPage";
 afterEach(() => vi.restoreAllMocks());
 
 describe("version", () => {
-  it("is v0.2.2 and shown on the sign-in page", async () => {
+  it("is v0.2.2 and shown on the sign in page", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 401, headers: { "Content-Type": "application/json" } })));
     expect(APP_VERSION).toBe("v0.2.2");
     render(<QueryClientProvider client={new QueryClient()}><AuthProvider><MemoryRouter><Login /></MemoryRouter></AuthProvider></QueryClientProvider>);
     expect((await screen.findAllByText("v0.2.2")).length).toBeGreaterThan(0);
   });
 
-  it("the new logo is on the sign-in page and an About strip with the version is on Settings", async () => {
+  it("the new logo is on the sign in page and an About strip with the version is on Settings", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const u = String(input);
       const body = u.endsWith("/auth/me") ? { id: "1", email: "a@b.io", name: "A", role: "member", org_id: "o" } : {};

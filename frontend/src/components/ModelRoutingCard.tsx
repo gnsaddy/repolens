@@ -11,7 +11,7 @@ import { api, type MemoryStats, type ModelRegistry, type Tier } from "@/lib/api"
 import { cn } from "@/lib/utils";
 
 const TIERS: [Tier, string][] = [["light", "Light — quick, cheap"], ["standard", "Standard"], ["strong", "Strong — hard problems"]];
-const PROVIDERS = [["gemini", "Google Gemini"], ["anthropic", "Anthropic Claude"], ["openai", "OpenAI-compatible"]] as const;
+const PROVIDERS = [["gemini", "Google Gemini"], ["anthropic", "Anthropic Claude"], ["openai", "OpenAI compatible"]] as const;
 const guessTier = (id: string): Tier => (/(^|[-_.:/])(lite|mini|nano|small|haiku|flash-8b)([-_.:/]|$)/i.test(id) ? "light" : /(^|[-_.:/])(pro|opus|ultra|large|o1|o3)([-_.:/]|$)/i.test(id) ? "strong" : "standard");
 const tierTone = (t: Tier) => (t === "light" ? "green" : t === "strong" ? "brand" : "gray") as "green" | "brand" | "gray";
 
@@ -35,7 +35,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
       <ConnectionCard icon={Layers} tint="indigo" title="Models and routing" status={<StatusPill on={data.active > 0} onLabel={`${data.active} model${data.active === 1 ? "" : "s"} active`} offLabel="No model" />}
         description="Add several models, even from different providers. Each task uses the cheapest one that can do it, and moves up only when it is hard."
         footer={admin ? <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Add models</Button> : undefined}>
-        {data.connections.length === 0 ? <p className="body-6 text-muted">{admin ? "Add a model to get AI-written answers; everything also works without one." : "No models configured."}</p> : (
+        {data.connections.length === 0 ? <p className="body-6 text-muted">{admin ? "Add a model to get AI written answers; everything also works without one." : "No models configured."}</p> : (
           <div className="space-y-4">
             {data.connections.map((c) => (
               <section key={c.id} aria-label={`${providerLabel(c.provider)} models`} className="rounded-lg border border-line">
@@ -57,7 +57,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
               </section>))}
             <label className="flex items-start gap-3 rounded-lg bg-emerald-50 p-3 body-6">
               <input type="checkbox" className="mt-1" checked={data.savings_mode} disabled={!admin || savings.isPending} onChange={(e) => savings.mutate(e.target.checked)} />
-              <span><span className="font-medium">Savings mode</span><span className="block caption-5 text-muted">Plain tasks use the next cheaper tier. Long, multi-repository or low-confidence work moves up. Off: every task uses its normal tier.</span></span>
+              <span><span className="font-medium">Savings mode</span><span className="block caption-5 text-muted">Plain tasks use the next cheaper tier. Long, multi repository or low confidence work moves up. Off: every task uses its normal tier.</span></span>
             </label>
             <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 body-6">
               <input type="checkbox" className="mt-1" aria-label="Independent review of investigations" checked={!!data.independent_review} disabled={!admin || review.isPending} onChange={(e) => review.mutate(e.target.checked)} />
@@ -147,7 +147,7 @@ export function MemoryCard({ admin }: { admin: boolean }) {
   if (data?.entries === undefined) return null;
   return (
     <ConnectionCard icon={Brain} tint="violet" title="Answer memory" status={<StatusPill on={data.enabled} onLabel="On" offLabel="Off" />}
-      description="Answers are remembered on this server. A repeated or re-worded question is answered from memory, with no model call and no tokens, until the underlying docs or code change."
+      description="Answers are remembered on this server. A repeated or reworded question is answered from memory, with no model call and no tokens, until the underlying docs or code change."
       footer={data.entries > 0 ? (<>
         <Link to="/knowledge?tab=memory" className="inline-flex h-8 items-center gap-2 rounded-lg bg-brand px-3 body-5 text-white hover:bg-brand-600"><Search className="h-3.5 w-3.5" />Browse and search memory</Link>
         {admin && <Button size="sm" variant="outline" onClick={async () => { if (await ask({ title: "Forget all remembered answers?", message: "Questions will be sent to the model again.", confirmLabel: "Forget", danger: true })) clear.mutate(); }}>Clear memory</Button>}</>) : undefined}>

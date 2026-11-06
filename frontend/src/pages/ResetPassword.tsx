@@ -26,7 +26,7 @@ export default function ResetPassword() {
           <Link to="/login" className="inline-flex h-9 items-center rounded-lg bg-brand px-4 body-5 text-white hover:bg-brand-600">Go to sign in</Link>
         </>) : !token ? <p role="alert" className="body-6 text-red-600">This link is incomplete. Ask an admin for a new one.</p> : (<>
           <h1 className="mb-1 title-2">Choose a password</h1>
-          <p className="mb-4 caption-5 text-muted">At least 8 characters, not a common password, and not your e-mail name.</p>
+          <p className="mb-4 caption-5 text-muted">At least 8 characters, not a common password, and not your email name.</p>
           <form onSubmit={submit} className="space-y-3">
             <label className="block"><Label>New password</Label><Input type="password" autoFocus autoComplete="new-password" minLength={8} value={pw} onChange={(e) => setPw(e.target.value)} /></label>
             <label className="block"><Label>Repeat it</Label><Input type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} /></label>

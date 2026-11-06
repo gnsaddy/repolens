@@ -121,7 +121,7 @@ export default function Repositories() {
             <Card>
               <CardTitle right={canWrite(user) && (<div className="flex gap-1">
                 {repo.source !== "docs" && <Button size="sm" variant="outline" onClick={() => setMeasuring(true)} disabled={repo.status !== "ready"}><Gauge className="h-3.5 w-3.5" />Measure</Button>}
-                <Button size="sm" variant="outline" onClick={() => reindex.mutate(repo.id)} disabled={repo.status === "indexing"}><RefreshCw className="h-3.5 w-3.5" />Re-index</Button>
+                <Button size="sm" variant="outline" onClick={() => reindex.mutate(repo.id)} disabled={repo.status === "indexing"}><RefreshCw className="h-3.5 w-3.5" />Reindex</Button>
                 {user?.role === "admin" && <Button size="sm" variant="ghost" aria-label="Delete repository" onClick={async () => { if (await ask({ title: `Delete ${repo.name}?`, message: "Its index, graph, investigations and clone are removed. The source repository is not touched.", confirmLabel: "Delete repository", danger: true })) remove.mutate(repo.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>}</div>)}>{repo.name}</CardTitle>
               <div className="flex flex-wrap gap-x-6 gap-y-1 caption-5 text-muted">
                 <span>{repo.file_count} files</span><span>{repo.chunk_count} chunks</span><span>branch {repo.branch || repo.default_branch}</span>{lastRun?.finished_at && <span>last index {Math.max(1, Math.round((+new Date(lastRun.finished_at) - +new Date(lastRun.started_at)) / 1000))}s</span>}
@@ -129,8 +129,8 @@ export default function Repositories() {
               {!!runs.data?.[0]?.secrets_redacted && <p className="mt-2 caption-5 text-amber-700">The last index removed {runs.data[0].secrets_redacted} apparent secret(s) from stored code, diffs and docs.</p>}
               {repo.status === "error" && (
                 <div className="mt-2 body-6 text-red-600">
-                  <p>Indexing failed{repo.last_error ? `: ${repo.last_error}` : " — check the path/URL and re-index."}</p>
-                  <p className="caption-5 text-muted">A failure that can pass by itself, such as a timeout, is tried again automatically. Anything else needs the path, address or credentials fixed, then Re-index.</p>
+                  <p>Indexing failed{repo.last_error ? `: ${repo.last_error}` : " — check the path/URL and reindex."}</p>
+                  <p className="caption-5 text-muted">A failure that can pass by itself, such as a timeout, is tried again automatically. Anything else needs the path, address or credentials fixed, then Reindex.</p>
                 </div>)}
               {repo.status === "ready" && repo.source !== "docs" && <p className="mt-2 caption-5 text-muted">Checked once a day: if the repository changed, it is indexed again automatically.</p>}
             </Card>

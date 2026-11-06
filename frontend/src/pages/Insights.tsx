@@ -115,7 +115,7 @@ export default function Insights() {
 }
 
 const JOB_NAME: Record<string, string> = {
-  "daily-reindex": "Daily re-index", retention: "Old-record clean-up", "source-sync": "Connected sources", "investigation-reaper": "Stuck investigations",
+  "daily-reindex": "Daily reindex", retention: "Old record cleanup", "source-sync": "Connected sources", "investigation-reaper": "Stuck investigations",
   "system-sampler": "Server readings", "checkout-cleanup": "Unused clones",
 };
 

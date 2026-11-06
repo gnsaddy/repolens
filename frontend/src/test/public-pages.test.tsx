@@ -23,7 +23,7 @@ function open(route: string, signedIn = false) {
 describe("Security page", () => {
   it("opens without signing in and lists exactly where data can go", async () => {
     open("/security");
-    expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument(); // not bounced to the sign-in page
+    expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument(); // not bounced to the sign in page
     const table = screen.getByRole("table", { name: "Where data can go" });
     expect(within(table).getByText("A language model you choose")).toBeInTheDocument();
     expect(within(table).getByText(/Only if you connect a model/)).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe("About page", () => {
 });
 
 describe("how people reach them", () => {
-  it("are one click from the sign-in page", async () => {
+  it("are one click from the sign in page", async () => {
     open("/login");
     const nav = await screen.findByRole("navigation", { name: "Trust" }); // the footer of the landing page
     await userEvent.click(within(nav).getByRole("link", { name: "Security" }));
@@ -84,9 +84,9 @@ describe("control status", () => {
     open("/security");
     const table = await screen.findByRole("table", { name: "Control status" });
     const row = (name: RegExp) => within(table).getByText(name).closest("tr")!;
-    expect(row(/^Roles and per-repository access$/)).toHaveTextContent("Built");
-    expect(row(/^SAML single sign-on$/)).toHaveTextContent("Not yet");
-    expect(row(/^Single sign-on \(OpenID Connect\)$/)).toHaveTextContent("Partly"); // it works, but only through the API
+    expect(row(/^Roles and per repository access$/)).toHaveTextContent("Built");
+    expect(row(/^SAML single sign on$/)).toHaveTextContent("Not yet");
+    expect(row(/^Single sign on \(OpenID Connect\)$/)).toHaveTextContent("Partly"); // it works, but only through the API
     expect(row(/^Encryption in transit/)).toHaveTextContent("Partly"); // we serve HTTP behind your proxy
     expect(row(/^SOC 2, ISO 27001/)).toHaveTextContent("Not yet");
     expect(row(/^Independent penetration test$/)).toHaveTextContent("Not yet");
@@ -109,7 +109,7 @@ describe("FAQ page", () => {
     expect(document.body.textContent).not.toMatch(/SOC ?2 (Type|compliant|certified)|ISO ?27001 certified|HIPAA compliant|GDPR compliant/i);
   });
 
-  it("opens and closes an answer, and is linked from the sign-in page, the navigation and the footer", async () => {
+  it("opens and closes an answer, and is linked from the sign in page, the navigation and the footer", async () => {
     open("/login");
     await userEvent.click(within(await screen.findByRole("navigation", { name: "Product" })).getByRole("link", { name: "FAQ" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Questions about trust" })).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe("footer", () => {
 });
 
 describe("day and night mode before signing in", () => {
-  it("can be switched on the sign-in page, the public pages and the reset page, and is remembered", async () => {
+  it("can be switched on the sign in page, the public pages and the reset page, and is remembered", async () => {
     document.documentElement.classList.remove("dark");
     open("/login");
     await userEvent.click(await screen.findByRole("button", { name: "Switch to night mode" }));

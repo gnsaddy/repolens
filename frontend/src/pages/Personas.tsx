@@ -177,7 +177,7 @@ function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: {
 /** The architect's design overview: the high-level and low-level design as text, the components and flows with the files
  *  they come from, and a Mermaid diagram as text to paste into any Mermaid viewer. */
 function Design({ design, titles, copy }: { design: PersonaDesign; titles?: PersonaOverview; copy: (text: string) => void }) {
-  const first = titles?.first ?? "High-level design", second = titles?.second ?? "Low-level design";
+  const first = titles?.first ?? "High level design", second = titles?.second ?? "Low level design";
   return (
     <>
       <Card aria-label={first}><CardTitle>{first}</CardTitle><Markdown text={design.hld} onOpen={() => {}} />
