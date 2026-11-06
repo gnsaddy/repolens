@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Compass } from "lucide-react";
+import { Compass } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { communityColor } from "@/components/ForceGraph";
 import { Badge, Card, CardTitle, ErrorNote, Spinner } from "@/components/ui";

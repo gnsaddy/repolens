@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Building2, ExternalLink, FileText, GitFork, GitMerge, Library, MessageSquare, NotebookText, Plug, Ticket, type LucideIcon } from "lucide-react";
+import { Buildings as Building2, ArrowSquareOut as ExternalLink, FileText, GitFork, GitMerge, Books as Library, ChatCircle as MessageSquare, Notebook as NotebookText, Plugs as Plug, Ticket } from "@phosphor-icons/react";
+import type { Icon as IconType } from "@phosphor-icons/react";
 import { useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { TINTS, StatusPill } from "@/components/ConnectionCard";
@@ -15,13 +16,13 @@ import { api, type WikiSourceStatus } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Def {
-  id: string; name: string; description: string; icon: LucideIcon; tint: keyof typeof TINTS;
+  id: string; name: string; description: string; icon: IconType; tint: keyof typeof TINTS;
   state?: Integration; Form?: ComponentType<{ onDone: () => void }>; formTitle?: string;
   /** Sources that are set up per collection in the wiki rather than once per workspace. */
   wiki?: { kind: string; count: number };
 }
 
-function IconTile({ icon: Icon, tint }: { icon: LucideIcon; tint: keyof typeof TINTS }) {
+function IconTile({ icon: Icon, tint }: { icon: IconType; tint: keyof typeof TINTS }) {
   return <span className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl ring-1", TINTS[tint])}><Icon className="h-5 w-5" /></span>;
 }
 

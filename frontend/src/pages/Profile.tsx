@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Laptop, LogOut, Monitor, Moon, ShieldCheck, Smartphone, Sun, UserRound } from "lucide-react";
+import { Copy, Key as KeyRound, Laptop, SignOut as LogOut, Monitor, Moon, ShieldCheck, DeviceMobile as Smartphone, Sun, User as UserRound } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";

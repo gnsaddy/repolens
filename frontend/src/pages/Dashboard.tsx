@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, BarChart3, BookOpen, Bug, Check, CheckCircle2, Circle, Coins, FolderGit2, Info, Rocket, Search, ShieldAlert } from "lucide-react";
+import { Pulse as Activity, Warning as AlertTriangle, ChartBar as BarChart3, BookOpen, Bug, Check, CheckCircle as CheckCircle2, Circle, Coins, FolderOpen as FolderGit2, Info, RocketLaunch as Rocket, MagnifyingGlass as Search, ShieldWarning as ShieldAlert } from "@phosphor-icons/react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, type FormEvent } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";

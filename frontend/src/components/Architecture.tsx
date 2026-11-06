@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Plus, Trash2 } from "lucide-react";
+import { DownloadSimple as Download, Plus, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, ErrorNote, Label, Spinner, Textarea } from "@/components/ui";

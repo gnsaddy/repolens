@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FilePlus2, Map as MapIcon, Pencil, Search } from "lucide-react";
+import { FilePlus as FilePlus2, MapTrifold as MapIcon, PencilSimple as Pencil, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/feedback";

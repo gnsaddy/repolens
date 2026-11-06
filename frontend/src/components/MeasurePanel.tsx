@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Gauge } from "lucide-react";
+import { Gauge } from "@phosphor-icons/react";
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import { Badge, Button, ErrorNote, Spinner } from "@/components/ui";

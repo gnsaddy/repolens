@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, FileUp, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Check, FileArrowUp as FileUp, PencilSimple as Pencil, Plus, Sparkle as Sparkles, Trash as Trash2, X } from "@phosphor-icons/react";
 import { useState, type ChangeEvent } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import Modal from "@/components/Modal";

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FlaskConical, FileText, ShieldAlert } from "lucide-react";
+import { Flask as FlaskConical, FileText, ShieldWarning as ShieldAlert } from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, PageHeader, Spinner } from "@/components/ui";
 import { api, type Repo, type RiskAssessment, type RiskRow, type RiskScanRow } from "@/lib/api";

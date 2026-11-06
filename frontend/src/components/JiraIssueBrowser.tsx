@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { MessageSquare, Microscope, Search, Sparkles } from "lucide-react";
+import { ChatCircle as MessageSquare, Microscope, MagnifyingGlass as Search, Sparkle as Sparkles } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, ErrorNote, Input, Spinner } from "@/components/ui";

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Users } from "lucide-react";
+import { Warning as AlertTriangle, Users } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Badge, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat } from "@/components/ui";
 import { api, type OwnershipOverview, type PathOwners, type Repo } from "@/lib/api";

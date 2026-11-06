@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Download, ShieldAlert } from "lucide-react";
+import { DownloadSimple as Download, ShieldWarning as ShieldAlert } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Badge, Button, Card, Empty, ErrorNote, Input, PageHeader, Spinner } from "@/components/ui";
 import { api, tokenStore, type AuditFacets, type AuditPage } from "@/lib/api";

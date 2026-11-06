@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { safeHref } from "@/lib/utils";
-import { Copy, ExternalLink } from "lucide-react";
+import { Copy, ArrowSquareOut as ExternalLink } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { selectCls } from "@/components/ConnectionCard";
 import { useToast } from "@/components/feedback";

@@ -1,4 +1,4 @@
-import { History } from "lucide-react";
+import { ClockCounterClockwise as History } from "@phosphor-icons/react";
 import { Badge, Card, CardTitle } from "@/components/ui";
 import type { SimilarAnswer } from "@/lib/api";
 

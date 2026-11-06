@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, GitPullRequest, Wrench, X } from "lucide-react";
+import { DownloadSimple as Download, ArrowSquareOut as ExternalLink, GitPullRequest, Wrench, X } from "@phosphor-icons/react";
 import { Badge, Button, Card, CardTitle, ErrorNote } from "@/components/ui";
 import { useConfirm } from "@/components/feedback";
 import { api, tokenStore } from "@/lib/api";

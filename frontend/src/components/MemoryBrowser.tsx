@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, Sparkles, Trash2 } from "lucide-react";
+import { Copy, DownloadSimple as Download, Sparkle as Sparkles, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useToast } from "@/components/feedback";
 import { Button, ErrorNote, Input } from "@/components/ui";

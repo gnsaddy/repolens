@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Lock, Share2, Sparkles, Trash2 } from "lucide-react";
+import { Copy, Lock, ShareNetwork as Share2, Sparkle as Sparkles, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Panel, Spinner, Textarea } from "@/components/ui";

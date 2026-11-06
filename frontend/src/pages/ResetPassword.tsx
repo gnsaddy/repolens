@@ -1,6 +1,6 @@
 import ThemeToggle from "@/components/ThemeToggle";
 import { useMutation } from "@tanstack/react-query";
-import { Activity } from "lucide-react";
+import { Pulse as Activity } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button, Card, ErrorNote, Input, Label } from "@/components/ui";

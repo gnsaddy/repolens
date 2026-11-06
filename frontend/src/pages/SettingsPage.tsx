@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Brain, CheckCircle2, KeyRound, Plug, SearchCheck, ShieldCheck, Sparkles, UserCog } from "lucide-react";
+import { Brain, CheckCircle as CheckCircle2, Key as KeyRound, Plugs as Plug, MagnifyingGlass as SearchCheck, ShieldCheck, Sparkle as Sparkles, UserGear as UserCog } from "@phosphor-icons/react";
 import Logo from "@/components/Logo";
 import { ISSUES_URL } from "@/components/ReportIssue";
 import { APP_VERSION } from "@/lib/version";

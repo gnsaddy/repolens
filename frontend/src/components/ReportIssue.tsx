@@ -1,4 +1,4 @@
-import { Bug, ExternalLink, Lightbulb, MessageSquarePlus } from "lucide-react";
+import { Bug, ArrowSquareOut as ExternalLink, Lightbulb, ChatCircleDots as MessageSquarePlus } from "@phosphor-icons/react";
 import { useState } from "react";
 import Modal from "@/components/Modal";
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Check, Layers, Search, Trash2, X } from "lucide-react";
+import { Brain, Check, Stack as Layers, MagnifyingGlass as Search, Trash as Trash2, X } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ConnectionCard, StatusPill, selectCls } from "@/components/ConnectionCard";

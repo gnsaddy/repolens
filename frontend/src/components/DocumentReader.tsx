@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize2, Minimize2, Minus, Plus, Search } from "lucide-react";
+import { ArrowLeft, CaretLeft as ChevronLeft, CaretRight as ChevronRight, DownloadSimple as Download, ArrowSquareOut as ExternalLink, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Minus, Plus, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Markdown from "@/pages/wiki/Markdown";

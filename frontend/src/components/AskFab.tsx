@@ -1,4 +1,4 @@
-import { MessageSquarePlus } from "lucide-react";
+import { ChatCircleDots as MessageSquarePlus } from "@phosphor-icons/react";
 import { Link, useLocation } from "react-router-dom";
 
 /** A button that is always within reach, opening a new chat. It stays out of the way on the chat page itself. */

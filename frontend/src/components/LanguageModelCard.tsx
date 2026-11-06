@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, KeyRound } from "lucide-react";
+import { Check, Key as KeyRound } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { ConnectionCard, StatusPill, selectCls } from "@/components/ConnectionCard";
 import { useConfirm, useToast } from "@/components/feedback";

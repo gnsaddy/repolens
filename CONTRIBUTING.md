@@ -60,9 +60,11 @@ Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 - **One corner-radius scale:** `rounded-md` (6px) for chips and code, `rounded-lg` (8px) for controls and inset blocks, `rounded-xl` (12px) for cards and dialogs, `rounded-full` for pills and dots. Do not add other radii.
 - **Cards are flat** (a border, no shadow) and never hold another card. Inside a card use `Panel` (a tinted block), `Section`, or a list divided by rules (`divide-y divide-line`). Several numbers in a row use `StatGroup`.
 - **A badge says something unusual** (failed, needs attention, shared). The normal state is plain text or a `StatusDot`: do not badge "ready", "done", "private" or "connected".
-- **Icons are lucide icons**, passed as the `icon` of `CardTitle`/`Section` or placed beside the label. Do not use text characters such as ✓, ✗ or ▾ as icons.
+- **Icons are Phosphor icons** (`@phosphor-icons/react`), passed as the `icon` of `CardTitle`/`Section` (typed `IconType`) or placed beside the label with a size class such as `h-4 w-4`. Do not use text characters such as ✓, ✗ or ▾ as icons, and do not add another icon set.
 - **The sidebar is grouped** (Work, Knowledge, Sources, Monitor); a new page goes in the group of what people do with it.
-- **The landing page is the exception to the sidebar's look.** The sign-in screen (`components/Landing.tsx`) follows the landing page design rules instead: Geist only, the named text styles in `index.css` (`heading-1` to `caption-5`), spacing and radius from the Tailwind steps, Phosphor icons, no hyphens in its copy. Keep new landing copy to facts the code backs.
+- **One typeface, named text styles.** The font is Geist. Text uses the named styles in `index.css` (`heading-1` to `heading-6`, `title-1` to `title-5`, `body-1` to `body-6`, `button-lg` to `button-xsm`, `caption-1` to `caption-5`), never a loose size and weight such as `text-sm font-medium`. A new style is the next number in its group, built from a Tailwind size step.
+- **Spacing is 0, 0.5, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20 or 24** (2 to 96 pixels). Do not use 1.5, 2.5, 3.5, 5, 7, 9, 11 or 14.
+- **The landing page** (`components/Landing.tsx`) follows the landing page design rules in full, including no hyphens in its copy, flat backgrounds from the dark palette, and scroll animation on transform and opacity only. Keep its copy to facts the code backs.
 - **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
 
 ## How a version is made (maintainers)

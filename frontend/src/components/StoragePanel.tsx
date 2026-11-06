@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/feedback";
-import { HardDrive } from "lucide-react";
+import { HardDrive } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote } from "@/components/ui";
 import { api, type CleanupResult, type StorageInfo } from "@/lib/api";

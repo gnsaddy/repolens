@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import JiraPicker from "@/components/JiraPicker";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Textarea, statusTone } from "@/components/ui";
-import { Ticket } from "lucide-react";
+import { Ticket } from "@phosphor-icons/react";
 import { api, type CiPreview, type InvestigationSummary, type JiraConnection, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, pct, timeAgo } from "@/lib/utils";

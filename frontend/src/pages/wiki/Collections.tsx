@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, FileText, Trash2 } from "lucide-react";
+import { CaretDown as ChevronDown, CaretRight as ChevronRight, FileText, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Badge, Card, CardTitle, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";

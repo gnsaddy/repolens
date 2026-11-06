@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Plug } from "lucide-react";
+import { Copy, Key as KeyRound, Plugs as Plug } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import { selectCls } from "@/components/ConnectionCard";

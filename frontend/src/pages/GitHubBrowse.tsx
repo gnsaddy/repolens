@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleDot, ExternalLink, GitBranch, GitPullRequest, Lock, Plus, Star } from "lucide-react";
+import { RadioButton as CircleDot, ArrowSquareOut as ExternalLink, GitBranch, GitPullRequest, Lock, Plus, Star } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/feedback";

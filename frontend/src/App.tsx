@@ -3,7 +3,8 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-rou
 import Logo from "@/components/Logo";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useTheme } from "@/lib/theme";
-import { BookOpen, BrainCircuit, Bug, Bot, Coins, FolderGit2, Gauge, GitFork, GitPullRequestArrow, Hammer, LayoutDashboard, LogOut, MessageSquareText, Moon, Network, ScrollText, Search, Settings, ShieldAlert, Sun, Ticket, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, Brain as BrainCircuit, Bug, Robot as Bot, Coins, FolderOpen as FolderGit2, Gauge, GitFork, GitPullRequest as GitPullRequestArrow, Hammer, SquaresFour as LayoutDashboard, SignOut as LogOut, ChatCircleText as MessageSquareText, Moon, Graph as Network, Scroll as ScrollText, MagnifyingGlass as Search, Gear as Settings, ShieldWarning as ShieldAlert, Sun, Ticket, Users } from "@phosphor-icons/react";
+import type { Icon as IconType } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { useAuth } from "./lib/auth";
@@ -38,7 +39,7 @@ const Insights = lazy(() => import("./pages/Insights"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 import ResetPassword from "./pages/ResetPassword";
 
-type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; adminOnly?: boolean };
+type NavItem = { to: string; label: string; icon: IconType; end?: boolean; adminOnly?: boolean };
 /** The sidebar, in groups of what people do together: the work itself, the knowledge it builds on, where the code comes
  *  from, and how it is going. */
 const groups: { label: string; items: NavItem[] }[] = [

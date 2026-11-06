@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, Search } from "lucide-react";
+import { ArrowElbowDownLeft as CornerDownLeft, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type GraphNode, type Repo } from "@/lib/api";

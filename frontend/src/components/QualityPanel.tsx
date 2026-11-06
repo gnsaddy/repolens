@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Plus, Trash2, X, XCircle } from "lucide-react";
+import { CheckCircle as CheckCircle2, Plus, Trash as Trash2, X, XCircle } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import Modal from "@/components/Modal";

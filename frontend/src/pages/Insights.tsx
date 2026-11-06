@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Cpu, Database, Gauge, Network, PiggyBank, Sparkles, Users } from "lucide-react";
+import { Pulse as Activity, Cpu, Database, Gauge, Graph as Network, PiggyBank, Sparkle as Sparkles, Users } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Meter, Spark } from "@/components/charts";

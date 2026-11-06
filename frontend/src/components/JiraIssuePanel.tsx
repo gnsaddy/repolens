@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Microscope } from "lucide-react";
+import { Warning as AlertTriangle, ArrowRight, Microscope } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Modal from "@/components/Modal";

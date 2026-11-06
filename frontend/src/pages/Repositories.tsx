@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "@/components/feedback";
-import { BookOpen, File, FolderGit2, Gauge, GitPullRequest, Lock, RefreshCw, Search, Trash2 } from "lucide-react";
+import { BookOpen, File, FolderOpen as FolderGit2, Gauge, GitPullRequest, Lock, ArrowsClockwise as RefreshCw, MagnifyingGlass as Search, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, statusTone } from "@/components/ui";
 import StoragePanel from "@/components/StoragePanel";

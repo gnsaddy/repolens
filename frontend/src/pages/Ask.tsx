@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Bot, Check, ClipboardCheck, Copy, FileText, GitBranch, MessageSquarePlus, MoreVertical, Paperclip, Pencil, Send, Trash2, X } from "lucide-react";
+import { Archive, ArrowCounterClockwise as ArchiveRestore, Robot as Bot, Check, ClipboardText as ClipboardCheck, Copy, FileText, GitBranch, ChatCircleDots as MessageSquarePlus, DotsThreeVertical as MoreVertical, Paperclip, PencilSimple as Pencil, PaperPlaneTilt as Send, Trash as Trash2, X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";

@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@phosphor-icons/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** A centred card over a dimmed page: Escape or a click outside closes it; focus moves into it and returns afterwards. */

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, BookOpen, Check, FileEdit, Map as MapIcon, ChevronDown, Trash2, ChevronRight, Database, ExternalLink, HeartPulse, Lightbulb, Sparkles } from "lucide-react";
+import { Warning as AlertTriangle, BookOpen, Check, NotePencil as FileEdit, MapTrifold as MapIcon, CaretDown as ChevronDown, Trash as Trash2, CaretRight as ChevronRight, Database, ArrowSquareOut as ExternalLink, Heartbeat as HeartPulse, Lightbulb, Sparkle as Sparkles } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, PageHeader, Spinner, Stat, Textarea } from "@/components/ui";

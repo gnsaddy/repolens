@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock } from "lucide-react";
+import { Lock } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { Badge, Button, Card, CardTitle, ErrorNote } from "@/components/ui";
 import { api, type AccessInfo, type User } from "@/lib/api";

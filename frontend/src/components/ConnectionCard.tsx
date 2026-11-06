@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { Icon as IconType } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +16,7 @@ export function StatusPill({ on, onLabel = "Connected", offLabel = "Not connecte
 
 /** One integration or setting: icon tile, title, description and live status on top, content below, optional action bar. */
 export function ConnectionCard({ icon: Icon, tint = "indigo", title, description, status, children, footer, id }: {
-  icon: LucideIcon; tint?: keyof typeof TINTS; title: string; description: ReactNode; status?: ReactNode; children?: ReactNode; footer?: ReactNode; id?: string;
+  icon: IconType; tint?: keyof typeof TINTS; title: string; description: ReactNode; status?: ReactNode; children?: ReactNode; footer?: ReactNode; id?: string;
 }) {
   return (
     <section id={id} aria-label={title} className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">

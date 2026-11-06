@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import type { LucideIcon } from "lucide-react";
+import type { Icon as IconType } from "@phosphor-icons/react";
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export function Button({ className, variant, size, ...p }: ButtonHTMLAttributes<
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("rounded-xl border border-line bg-surface p-4", className)} {...p} />;
 }
-export function CardTitle({ children, right, icon: Icon }: { children: ReactNode; right?: ReactNode; icon?: LucideIcon }) {
+export function CardTitle({ children, right, icon: Icon }: { children: ReactNode; right?: ReactNode; icon?: IconType }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-2">
       <h3 className="flex items-center gap-2 body-4">{Icon && <Icon className="h-4 w-4 text-slate-400" aria-hidden />}{children}</h3>{right}
@@ -40,7 +40,7 @@ export function Panel({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
 }
 
 /** A titled part of a page or card, separated by space (or a rule between sections), not by a box. */
-export function Section({ title, icon: Icon, right, children, className }: { title: ReactNode; icon?: LucideIcon; right?: ReactNode; children: ReactNode; className?: string }) {
+export function Section({ title, icon: Icon, right, children, className }: { title: ReactNode; icon?: IconType; right?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={cn("space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">

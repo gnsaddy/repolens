@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { ThumbsDown, ThumbsUp } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { api } from "@/lib/api";

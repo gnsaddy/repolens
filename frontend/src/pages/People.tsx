@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, ShieldOff, UserPlus } from "lucide-react";
+import { Copy, Key as KeyRound, ShieldSlash as ShieldOff, UserPlus } from "@phosphor-icons/react";
 import { useState, type FormEvent } from "react";
 import { useConfirm, useToast } from "@/components/feedback";
 import Modal from "@/components/Modal";

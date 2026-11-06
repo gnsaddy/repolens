@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FilePlus2 } from "lucide-react";
+import { FilePlus as FilePlus2 } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Button, Spinner } from "@/components/ui";

@@ -1,4 +1,4 @@
-import { Download, Expand, Maximize2, Minimize2, Minus, Pause, Play, Plus, ScanSearch } from "lucide-react";
+import { DownloadSimple as Download, ArrowsOut as Expand, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Minus, Pause, Play, Plus, FileMagnifyingGlass as ScanSearch } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GraphEdge, GraphNode } from "@/lib/api";
 

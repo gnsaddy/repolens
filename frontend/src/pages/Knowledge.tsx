@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, FileText, Maximize2, Minimize2, Network, PanelRightClose, PanelRightOpen, Search, Sparkles, Trash2, Upload } from "lucide-react";
+import { Brain, FileText, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Graph as Network, SidebarSimple as PanelRightClose, SidebarSimple as PanelRightOpen, MagnifyingGlass as Search, Sparkle as Sparkles, Trash as Trash2, UploadSimple as Upload } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";

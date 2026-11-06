@@ -1,4 +1,4 @@
-import { Info } from "lucide-react";
+import { Info } from "@phosphor-icons/react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 /** A small (i) button that explains a setting. Shows on hover, keyboard focus or click; Escape or an outside click closes it. */

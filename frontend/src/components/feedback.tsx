@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { Warning as AlertTriangle, CheckCircle as CheckCircle2, Info, X } from "@phosphor-icons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui";
 

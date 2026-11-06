@@ -1,4 +1,4 @@
-import { AlertTriangle, Copy, Microscope } from "lucide-react";
+import { Warning as AlertTriangle, Copy, Microscope } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import Modal from "@/components/Modal";
 import { Badge, Button } from "@/components/ui";

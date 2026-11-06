@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConfirm, useToast } from "@/components/feedback";
-import { RefreshCw, Trash2, Upload } from "lucide-react";
+import { ArrowsClockwise as RefreshCw, Trash as Trash2, UploadSimple as Upload } from "@phosphor-icons/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Input, Label, Spinner, Textarea, statusTone } from "@/components/ui";

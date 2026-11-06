@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, Sparkles, Trash2 } from "lucide-react";
+import { FloppyDisk as Save, Sparkle as Sparkles, Trash as Trash2 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";

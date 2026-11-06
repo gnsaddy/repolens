@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Check, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { Check, ShieldCheck, ShieldWarning as ShieldQuestion } from "@phosphor-icons/react";
 import { ConnectionCard, StatusPill } from "@/components/ConnectionCard";
 import { Badge } from "@/components/ui";
 import { api, type Outbound } from "@/lib/api";

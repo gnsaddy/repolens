@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/Modal";
 import FixProposals from "@/components/FixProposals";
-import { CheckCircle2, CircleDot, FileText, FlaskConical, GitCommit, GitPullRequest, Network, ThumbsDown, ThumbsUp, Ticket } from "lucide-react";
+import { CheckCircle as CheckCircle2, RadioButton as CircleDot, FileText, Flask as FlaskConical, GitCommit, GitPullRequest, Graph as Network, ThumbsDown, ThumbsUp, Ticket } from "@phosphor-icons/react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link, useNavigate, useParams } from "react-router-dom";
