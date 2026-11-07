@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, Search } from "lucide-react";
+import { ArrowElbowDownLeft as CornerDownLeft, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type GraphNode, type Repo } from "@/lib/api";
 
 export const PAGES = [
   { label: "Dashboard", to: "/", hint: "overview" },
-  { label: "Ask: chat with your knowledge base", to: "/ask", hint: "questions, follow-ups, attach a log" },
+  { label: "Ask: chat with your knowledge base", to: "/ask", hint: "questions, follow ups, attach a log" },
   { label: "Investigations", to: "/investigations", hint: "find the root cause of a bug" },
   { label: "Knowledge: ask & search", to: "/knowledge", hint: "ask questions over code and docs" },
   { label: "Knowledge: graph", to: "/knowledge?tab=graph", hint: "explore connections and heat map" },
@@ -51,27 +51,27 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   if (!open) return null;
   const go = (to: string) => { onClose(); nav(to); };
   return (
-    <div className="fixed inset-0 z-50 grid place-items-start bg-slate-900/40 p-4 pt-[15vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-start bg-slate-900/40 p-4 pt-24" onMouseDown={onClose}>
       <div role="dialog" aria-label="Command palette" className="mx-auto w-full max-w-xl overflow-hidden rounded-xl bg-white shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-line px-3">
           <Search className="h-4 w-4 text-muted" />
           <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setIdx(0); }} aria-label="Search pages, repositories and symbols"
-            placeholder="Jump to a page, repository or symbol…" className="h-11 flex-1 bg-transparent text-sm outline-none"
+            placeholder="Jump to a page, repository or symbol…" className="h-11 flex-1 bg-transparent body-6 outline-none"
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") { e.preventDefault(); setIdx((i) => Math.min(i + 1, items.length - 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
               else if (e.key === "Enter" && items[idx]) go(items[idx].to);
               else if (e.key === "Escape") onClose();
             }} />
-          <kbd className="rounded border border-line px-1.5 text-[10px] text-muted">esc</kbd>
+          <kbd className="rounded-md border border-line px-2 text-[10px] text-muted">esc</kbd>
         </div>
         <ul role="listbox" className="max-h-80 overflow-auto p-1">
           {items.map((it, i) => (
             <li key={it.key} role="option" aria-selected={i === idx}>
-              <button onClick={() => go(it.to)} onMouseEnter={() => setIdx(i)} className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm ${i === idx ? "bg-indigo-50" : ""}`}>
-                <span className="truncate font-medium">{it.label}</span><span className="ml-auto shrink-0 text-xs text-muted">{it.hint}</span>{i === idx && <CornerDownLeft className="h-3.5 w-3.5 text-muted" />}
+              <button onClick={() => go(it.to)} onMouseEnter={() => setIdx(i)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left body-6 ${i === idx ? "bg-indigo-50" : ""}`}>
+                <span className="truncate font-medium">{it.label}</span><span className="ml-auto shrink-0 caption-5 text-muted">{it.hint}</span>{i === idx && <CornerDownLeft className="h-3.5 w-3.5 text-muted" />}
               </button></li>))}
-          {!items.length && <li className="px-3 py-6 text-center text-sm text-muted">Nothing matches “{q}”.</li>}
+          {!items.length && <li className="px-3 py-6 text-center body-6 text-muted">Nothing matches “{q}”.</li>}
         </ul>
       </div>
     </div>

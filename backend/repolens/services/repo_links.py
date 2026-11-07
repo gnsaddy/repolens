@@ -67,6 +67,17 @@ def _norm(path: str) -> str:
     return _PARAM.sub("{}", path.split("?")[0].split("#")[0].rstrip("/")).lower()
 
 
+_DOCSTRING = re.compile(r"(?ms)^[ \t]*[rRuUbB]*(\"\"\"|''').*?\1")  # a string that is a statement of its own
+_COMMENTS = re.compile(r"(?m)^[ \t]*(?:#|//).*$|(?s:/\*.*?\*/)")
+
+
+def without_prose(code: str) -> str:
+    """The code with its docstrings and comments taken out. A URL written in a comment or a docstring explains or
+    gives an example; the function never calls it. (RepoLens's own `joined_urls` quotes `/api/orders/{order_id}/status`
+    to show what it reads, and was drawn as a caller of an orders service because of it.)"""
+    return _COMMENTS.sub(" ", _DOCSTRING.sub(" ", code))
+
+
 def _specific(path: str) -> bool:
     """A route worth matching: at least two fixed words (`/pricing/quote/{}`), or one long one. `/users/{}` and
     `/runs/{}` are in every project, so a URL that merely looks like them says nothing; neither does a health check."""
@@ -130,6 +141,7 @@ def _http_links(db: Session, ids: list[str]) -> list[dict]:
         for cid, repo_id, file, sym, content in rows:
             if "/" not in content or routes_svc.TESTISH.search(file) or _EXAMPLE.search(file):
                 continue
+            content = without_prose(content)
             pieces = _CONCAT.sub(" ", content)  # a piece of a longer URL says nothing on its own
             for lit in [*(lit for _, lit in _QUOTED.findall(pieces)), *joined_urls(content)]:
                 for run in _PATHRUN.findall(lit):
@@ -537,7 +549,7 @@ CODE_EXT = {  # by file extension, because the parser files most languages under
 }
 # Change this whenever a detector finds links differently or coverage changes shape: stored links are then worked out
 # again even though no repository was indexed (the same idea as `answer_memory.PIPELINE`).
-DETECTION_VERSION = "d7"
+DETECTION_VERSION = "d8"
 KEEP_GONE_DAYS = 180  # a link that disappeared stays listed as removed this long
 SYMBOLS = ("function", "method", "class")
 

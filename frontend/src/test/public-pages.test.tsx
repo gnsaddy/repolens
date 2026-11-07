@@ -23,7 +23,7 @@ function open(route: string, signedIn = false) {
 describe("Security page", () => {
   it("opens without signing in and lists exactly where data can go", async () => {
     open("/security");
-    expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument(); // not bounced to the sign-in page
+    expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument(); // not bounced to the sign in page
     const table = screen.getByRole("table", { name: "Where data can go" });
     expect(within(table).getByText("A language model you choose")).toBeInTheDocument();
     expect(within(table).getByText(/Only if you connect a model/)).toBeInTheDocument();
@@ -62,20 +62,20 @@ describe("About page", () => {
 });
 
 describe("how people reach them", () => {
-  it("are one click from the sign-in page", async () => {
+  it("are one click from the sign in page", async () => {
     open("/login");
-    const nav = await screen.findByRole("navigation", { name: "More about RepoLens AI" });
+    const nav = await screen.findByRole("navigation", { name: "Trust" }); // the footer of the landing page
     await userEvent.click(within(nav).getByRole("link", { name: "Security" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument();
-    await userEvent.click(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "About" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "About" }));
     expect(await screen.findByRole("heading", { level: 1, name: "About RepoLens AI" })).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   });
 
   it("stay readable while signed in, and offer the way back into the app", async () => {
     open("/security", true);
     expect(await screen.findByRole("heading", { level: 1, name: "Security" })).toBeInTheDocument();
-    expect(await within(screen.getByRole("navigation", { name: "Public pages" })).findByRole("link", { name: "Open the app" })).toHaveAttribute("href", "/"); // waits for the signed-in user to load
+    expect(await within(screen.getByRole("navigation", { name: "Main" })).findByRole("link", { name: "Open the app" })).toHaveAttribute("href", "/"); // waits for the signed-in user to load
   });
 });
 
@@ -84,9 +84,9 @@ describe("control status", () => {
     open("/security");
     const table = await screen.findByRole("table", { name: "Control status" });
     const row = (name: RegExp) => within(table).getByText(name).closest("tr")!;
-    expect(row(/^Roles and per-repository access$/)).toHaveTextContent("Built");
-    expect(row(/^SAML single sign-on$/)).toHaveTextContent("Not yet");
-    expect(row(/^Single sign-on \(OpenID Connect\)$/)).toHaveTextContent("Partly"); // it works, but only through the API
+    expect(row(/^Roles and per repository access$/)).toHaveTextContent("Built");
+    expect(row(/^SAML single sign on$/)).toHaveTextContent("Not yet");
+    expect(row(/^Single sign on \(OpenID Connect\)$/)).toHaveTextContent("Partly"); // it works, but only through the API
     expect(row(/^Encryption in transit/)).toHaveTextContent("Partly"); // we serve HTTP behind your proxy
     expect(row(/^SOC 2, ISO 27001/)).toHaveTextContent("Not yet");
     expect(row(/^Independent penetration test$/)).toHaveTextContent("Not yet");
@@ -109,16 +109,27 @@ describe("FAQ page", () => {
     expect(document.body.textContent).not.toMatch(/SOC ?2 (Type|compliant|certified)|ISO ?27001 certified|HIPAA compliant|GDPR compliant/i);
   });
 
-  it("opens and closes an answer, and is linked from the sign-in page, the navigation and the footer", async () => {
+  it("opens and closes an answer, and is linked from the sign in page, the navigation and the footer", async () => {
     open("/login");
-    await userEvent.click(within(await screen.findByRole("navigation", { name: "More about RepoLens AI" })).getByRole("link", { name: "FAQ" }));
+    await userEvent.click(within(await screen.findByRole("navigation", { name: "Product" })).getByRole("link", { name: "FAQ" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Questions about trust" })).toBeInTheDocument();
     const second = screen.getByText("Does RepoLens send my code or documents anywhere?").closest("details")!;
     expect(second.open).toBe(false);
     await userEvent.click(screen.getByText("Does RepoLens send my code or documents anywhere?"));
     expect(second.open).toBe(true);
-    expect(within(screen.getByRole("navigation", { name: "Public pages" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
+    expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
     expect(within(screen.getByRole("navigation", { name: "Product" })).getByRole("link", { name: "FAQ" })).toHaveAttribute("href", "/faq");
+  });
+});
+
+describe("links to a section of a page", () => {
+  it("scroll to the section, which the router does not do by itself", async () => {
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    open("/security#report");
+    await screen.findByRole("heading", { level: 1, name: "Security" });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+    expect(spy.mock.instances.at(-1)).toHaveProperty("id", "report");
   });
 });
 
@@ -138,14 +149,14 @@ describe("footer", () => {
 });
 
 describe("day and night mode before signing in", () => {
-  it("can be switched on the sign-in page, the public pages and the reset page, and is remembered", async () => {
+  it("can be switched on the sign in page, the public pages and the reset page, and is remembered", async () => {
     document.documentElement.classList.remove("dark");
     open("/login");
     await userEvent.click(await screen.findByRole("button", { name: "Switch to night mode" }));
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("repolens.theme")).toBe("dark");
     expect(screen.getByRole("button", { name: "Switch to day mode" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(within(screen.getByRole("navigation", { name: "More about RepoLens AI" })).getByRole("link", { name: "About" }));
+    await userEvent.click(within(screen.getByRole("navigation", { name: "Product" })).getByRole("link", { name: "About" }));
     await screen.findByRole("heading", { level: 1, name: "About RepoLens AI" });
     expect(document.documentElement.classList.contains("dark")).toBe(true); // the choice follows you to the next page
     await userEvent.click(screen.getByRole("button", { name: "Switch to day mode" })); // the same switch in the public header

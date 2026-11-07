@@ -1,4 +1,4 @@
-import { Bug, ExternalLink, Lightbulb, MessageSquarePlus } from "lucide-react";
+import { Bug, ArrowSquareOut as ExternalLink, Lightbulb, ChatCircleDots as MessageSquarePlus } from "@phosphor-icons/react";
 import { useState } from "react";
 import Modal from "@/components/Modal";
 
@@ -15,15 +15,15 @@ export default function ReportIssue() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-slate-300 hover:bg-white/10"><MessageSquarePlus className="h-4 w-4" />Report a bug / request a feature</button>
+      <button onClick={() => setOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-slate-600 hover:bg-slate-100"><MessageSquarePlus className="h-4 w-4" />Report a bug / request a feature</button>
       {open && (
         <Modal title="Help improve RepoLens" subtitle="Opens the project's public issue form on GitHub in a new tab." onClose={() => setOpen(false)}>
           <ul className="space-y-3">
             {choices.map(({ icon: Icon, title, text, href }) => (
               <li key={title}><a href={href} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 rounded-lg border border-line p-3 hover:bg-slate-50">
-                <Icon className="mt-0.5 h-5 w-5 text-brand" /><span className="flex-1"><span className="block text-sm font-medium">{title}</span><span className="block text-xs text-muted">{text}</span></span><ExternalLink className="h-4 w-4 text-muted" /></a></li>))}
+                <Icon className="mt-0.5 h-5 w-5 text-brand" /><span className="flex-1"><span className="block body-5">{title}</span><span className="block caption-5 text-muted">{text}</span></span><ExternalLink className="h-4 w-4 text-muted" /></a></li>))}
           </ul>
-          <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Issues on GitHub are public. Nothing from your workspace is sent for you: do not paste private code, tickets, tokens or customer data. Security problems: please follow <a className="underline" href={`${ISSUES_URL.replace(/\/issues$/, "")}/blob/main/SECURITY.md`} target="_blank" rel="noopener noreferrer">SECURITY.md</a> instead.</p>
+          <p className="mt-4 rounded-lg bg-amber-50 p-3 caption-5 text-amber-900">Issues on GitHub are public. Nothing from your workspace is sent for you: do not paste private code, tickets, tokens or customer data. Security problems: please follow <a className="underline" href={`${ISSUES_URL.replace(/\/issues$/, "")}/blob/main/SECURITY.md`} target="_blank" rel="noopener noreferrer">SECURITY.md</a> instead.</p>
         </Modal>)}
     </>
   );

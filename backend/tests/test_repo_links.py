@@ -291,3 +291,39 @@ def test_a_front_end_that_adds_a_url_together_is_linked_to_the_exact_route_it_ca
     session.expire_all()
     rows = session.query(RepoLink).filter_by(kind="http", gone_at=None).all()
     assert [(r.src_label, r.dst_label) for r in rows] == [("web/app.js:reserveItem", "service/api.py:reserve")]
+
+
+def test_a_url_in_a_comment_or_a_docstring_is_not_a_call():
+    code = (
+        'def joined(code):\n    """Reads URLs such as "/api/orders/" + id + "/status", like /api/orders/{order_id}/status."""\n'
+        '    # fetch("/api/orders/1/status") is only an example\n    return code\n\n'
+        '/** calls "/api/orders/1/status" */\n// fetch("/api/orders/2/status")\n'
+        'x = fetch("/api/real/path")\n'
+    )
+    cleaned = rl.without_prose(code)
+    assert "/api/orders" not in cleaned
+    assert '"/api/real/path"' in cleaned  # a real call stays
+
+
+def test_a_function_that_only_quotes_a_route_in_its_docstring_is_not_linked_to_the_service_that_serves_it(
+    client, auth, tmp_path, session
+):
+    from tests.test_lang_imports import two
+
+    provider = {
+        "service/api.py": (
+            "from fastapi import FastAPI\n\napp = FastAPI()\n\n\n"
+            '@app.get("/api/orders/{order_id}/status")\ndef order_status(order_id: int):\n    return {"ok": True}\n'
+        )
+    }
+    consumer = {
+        "lib/explain.py": (
+            "def explain(x):\n"
+            '    """Matches a caller that builds "/api/orders/{order_id}/status" to the route that serves it."""\n'
+            "    return x\n"
+        )
+    }
+    repos = two(client, auth, tmp_path, provider, consumer)
+    client.get("/api/groups/analysis", headers=auth, params={"repo_ids": ids(*repos)})
+    session.expire_all()
+    assert session.query(RepoLink).filter_by(kind="http", gone_at=None).count() == 0

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { Warning as AlertTriangle, CheckCircle as CheckCircle2, Info, X } from "@phosphor-icons/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui";
 
@@ -46,7 +46,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => {
           const Icon = ICON[t.tone];
           return (
-            <div key={t.id} role={t.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg ${TONE[t.tone]}`}>
+            <div key={t.id} role={t.tone === "error" ? "alert" : "status"} className={`pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 body-6 shadow-lg ${TONE[t.tone]}`}>
               <Icon className="mt-0.5 h-4 w-4 shrink-0" /><span className="flex-1">{t.text}</span>
               <button aria-label="Dismiss" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}><X className="h-3.5 w-3.5" /></button>
             </div>);
@@ -54,16 +54,16 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       </div>
       {dialog && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" onMouseDown={() => close(false)}>
-          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
-            <h2 id="confirm-title" className="text-base font-semibold">{dialog.title}</h2>
-            {dialog.warning && <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-medium text-red-800">{dialog.warning}</div>}
-            {dialog.message && <div className="mt-2 text-sm text-muted">{dialog.message}</div>}
+          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" className="w-full max-w-md rounded-xl bg-white p-4 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
+            <h2 id="confirm-title" className="body-1">{dialog.title}</h2>
+            {dialog.warning && <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 body-5 text-red-800">{dialog.warning}</div>}
+            {dialog.message && <div className="mt-2 body-6 text-muted">{dialog.message}</div>}
             {dialog.acknowledge && (
-              <label className="mt-3 flex items-start gap-2 text-sm">
+              <label className="mt-3 flex items-start gap-2 body-6">
                 <input type="checkbox" className="mt-0.5" checked={acked} onChange={(e) => setAcked(e.target.checked)} />
                 <span>{dialog.acknowledge}</span>
               </label>)}
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" onClick={() => close(false)}>Cancel</Button>
               <Button variant={dialog.danger ? "danger" : "primary"} autoFocus={!dialog.acknowledge} disabled={!!dialog.acknowledge && !acked} onClick={() => close(true)}>{dialog.confirmLabel ?? "Confirm"}</Button>
             </div>

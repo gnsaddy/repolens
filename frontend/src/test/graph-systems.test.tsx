@@ -326,7 +326,7 @@ describe("Graph: systems", () => {
     await userEvent.click(await screen.findByLabelText("orders-svc"));
     await userEvent.click(screen.getByLabelText("pricing-svc"));
     const card = await screen.findByLabelText("Code dependencies");
-    expect(await within(card).findByText(/No code-level link was found/)).toBeInTheDocument();
+    expect(await within(card).findByText(/No code level link was found/)).toBeInTheDocument();
     expect(card).toHaveTextContent("12 calls match a name that exists in the other repository");
     expect(card).toHaveTextContent("usually coincidences");
   });

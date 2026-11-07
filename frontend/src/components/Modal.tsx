@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@phosphor-icons/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** A centred card over a dimmed page: Escape or a click outside closes it; focus moves into it and returns afterwards. */
@@ -14,13 +14,13 @@ export default function Modal({ title, subtitle, onClose, children, icon, wide }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="fixed inset-0 z-40 grid place-items-center overflow-auto bg-slate-900/40 p-4" onMouseDown={onClose}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-2xl bg-white shadow-2xl`} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3 border-b border-line p-5">
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-xl bg-white shadow-2xl`} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 border-b border-line p-4">
           {icon}
-          <div className="min-w-0 flex-1"><h2 id="modal-title" className="text-lg font-semibold">{title}</h2>{subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}</div>
-          <button aria-label="Close" onClick={onClose} className="rounded-md p-1 text-muted hover:bg-slate-100"><X className="h-5 w-5" /></button>
+          <div className="min-w-0 flex-1"><h2 id="modal-title" className="title-2">{title}</h2>{subtitle && <p className="mt-0.5 body-6 text-muted">{subtitle}</p>}</div>
+          <button aria-label="Close" onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-slate-100"><X className="h-5 w-5" /></button>
         </div>
-        <div className="max-h-[70vh] overflow-auto p-5">{children}</div>
+        <div className="max-h-[70vh] overflow-auto p-4">{children}</div>
       </div>
     </div>
   );

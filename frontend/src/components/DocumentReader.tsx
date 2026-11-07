@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, ExternalLink, Maximize2, Minimize2, Minus, Plus, Search } from "lucide-react";
+import { ArrowLeft, CaretLeft as ChevronLeft, CaretRight as ChevronRight, DownloadSimple as Download, ArrowSquareOut as ExternalLink, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Minus, Plus, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Markdown from "@/pages/wiki/Markdown";
@@ -64,17 +64,17 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={onClose}><ArrowLeft className="h-4 w-4" />All documents</Button>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold" title={path}>{page?.title || path}</h2>
-          <p className="truncate text-xs text-muted">{path}{page ? ` · ${sections.length} section${sections.length === 1 ? "" : "s"} · ${kb} KB` : ""}</p>
+          <h2 className="truncate body-1" title={path}>{page?.title || path}</h2>
+          <p className="truncate caption-5 text-muted">{path}{page ? ` · ${sections.length} section${sections.length === 1 ? "" : "s"} · ${kb} KB` : ""}</p>
         </div>
         {page && <Badge tone="gray">{page.source.type}</Badge>}
         <div role="group" aria-label="Text size" className="flex items-center gap-1">
-          <button className="grid h-8 w-8 place-items-center rounded-md border border-line hover:bg-slate-50" aria-label="Smaller text" disabled={size === 0} onClick={() => setSize((s) => Math.max(0, s - 1))}><Minus className="h-3.5 w-3.5" /></button>
-          <span className="w-9 text-center text-xs tabular-nums text-muted" aria-label="Current text size">{SIZES[size]}px</span>
-          <button className="grid h-8 w-8 place-items-center rounded-md border border-line hover:bg-slate-50" aria-label="Larger text" disabled={size === SIZES.length - 1} onClick={() => setSize((s) => Math.min(SIZES.length - 1, s + 1))}><Plus className="h-3.5 w-3.5" /></button>
+          <button className="grid h-8 w-8 place-items-center rounded-lg border border-line hover:bg-slate-50" aria-label="Smaller text" disabled={size === 0} onClick={() => setSize((s) => Math.max(0, s - 1))}><Minus className="h-3.5 w-3.5" /></button>
+          <span className="w-9 text-center caption-5 tabular-nums text-muted" aria-label="Current text size">{SIZES[size]}px</span>
+          <button className="grid h-8 w-8 place-items-center rounded-lg border border-line hover:bg-slate-50" aria-label="Larger text" disabled={size === SIZES.length - 1} onClick={() => setSize((s) => Math.min(SIZES.length - 1, s + 1))}><Plus className="h-3.5 w-3.5" /></button>
         </div>
         <Button size="sm" variant="outline" onClick={download} disabled={!page}><Download className="h-4 w-4" />Download</Button>
-        {page && <Link className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-3 text-sm hover:bg-slate-50" to={`/wiki?tab=browse&repo=${encodeURIComponent(repoId)}&path=${encodeURIComponent(path)}`}><ExternalLink className="h-3.5 w-3.5" />Open in wiki</Link>}
+        {page && <Link className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-3 body-6 hover:bg-slate-50" to={`/wiki?tab=browse&repo=${encodeURIComponent(repoId)}&path=${encodeURIComponent(path)}`}><ExternalLink className="h-3.5 w-3.5" />Open in wiki</Link>}
         <Button size="sm" variant="outline" aria-pressed={full} onClick={() => setFull((f) => !f)}>{full ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{full ? "Exit full screen" : "Full screen"}</Button>
       </div>
 
@@ -83,35 +83,35 @@ export default function DocumentReader({ repoId, path, onClose }: { repoId: stri
           <aside className="flex min-h-0 flex-col border-b border-line p-3 lg:border-b-0 lg:border-r" aria-label="Contents">
             <label className="relative block"><Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted" />
               <Input aria-label="Find in document" className="pl-8" placeholder="Find in this document…" value={find} onChange={(e) => setFind(e.target.value)} /></label>
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <label className="flex items-center gap-1.5"><input type="checkbox" checked={showAll} onChange={(e) => setAll(e.target.checked)} />Show all sections together</label>
+            <div className="mt-2 flex items-center gap-2 caption-5">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={showAll} onChange={(e) => setAll(e.target.checked)} />Show all sections together</label>
             </div>
             <nav className="mt-2 min-h-0 flex-1 overflow-auto" aria-label={find.trim().length >= 2 ? "Search results" : "Sections"}>
               {find.trim().length >= 2 ? (
                 matches.length ? (
-                  <ul className="space-y-1.5 text-xs">
+                  <ul className="space-y-2 caption-5">
                     <li className="text-muted">{matches.reduce((n, m) => n + m.count, 0)} match{matches.reduce((n, m) => n + m.count, 0) === 1 ? "" : "es"} in {matches.length} section{matches.length === 1 ? "" : "s"}</li>
                     {matches.slice(0, 60).map((m) => (
-                      <li key={m.i}><button className="w-full rounded-md p-1.5 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
+                      <li key={m.i}><button className="w-full rounded-lg p-2 text-left hover:bg-slate-50" onClick={() => jump(m.i)}>
                         <span className="font-medium">{m.title}</span> <span className="text-muted">({m.count})</span><span className="mt-0.5 block text-muted">{m.snippet}</span></button></li>))}
-                  </ul>) : <p className="text-xs text-muted">Nothing in this document matches “{find.trim()}”.</p>
+                  </ul>) : <p className="caption-5 text-muted">Nothing in this document matches “{find.trim()}”.</p>
               ) : (
-                <ol className="space-y-0.5 text-sm">
+                <ol className="space-y-0.5 body-6">
                   {sections.map((s, i) => (
                     <li key={i}><button aria-current={!showAll && i === current ? "true" : undefined} onClick={() => jump(i)}
-                      className={cn("w-full truncate rounded-md px-2 py-1 text-left hover:bg-slate-50", !showAll && i === current && "bg-indigo-50 font-medium text-brand")}>{s.title}</button></li>))}
+                      className={cn("w-full truncate rounded-lg px-2 py-1 text-left hover:bg-slate-50", !showAll && i === current && "bg-indigo-50 font-medium text-brand")}>{s.title}</button></li>))}
                 </ol>)}
             </nav>
           </aside>
-          <article className="reader min-h-0 overflow-auto p-5" style={{ "--reader-size": `${SIZES[size]}px` } as React.CSSProperties} aria-label="Document text">
+          <article className="reader min-h-0 overflow-auto p-4" style={{ "--reader-size": `${SIZES[size]}px` } as React.CSSProperties} aria-label="Document text">
             <div className="mx-auto max-w-3xl">
               {showAll
                 ? <Markdown text={page.markdown} onOpen={(repo, p) => nav(`/wiki?tab=browse&repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(p)}`)} />
                 : (<>
                   <Markdown key={current} text={sections[current].text} onOpen={(repo, p) => nav(`/wiki?tab=browse&repo=${encodeURIComponent(repo)}&path=${encodeURIComponent(p)}`)} />
-                  <div className="mt-8 flex items-center justify-between border-t border-line pt-3 text-sm">
+                  <div className="mt-8 flex items-center justify-between border-t border-line pt-3 body-6">
                     <Button size="sm" variant="outline" disabled={current === 0} onClick={() => setIdx(current - 1)}><ChevronLeft className="h-4 w-4" />Previous</Button>
-                    <span className="text-xs text-muted" aria-label="Position">{current + 1} of {sections.length}</span>
+                    <span className="caption-5 text-muted" aria-label="Position">{current + 1} of {sections.length}</span>
                     <Button size="sm" variant="outline" disabled={current >= sections.length - 1} onClick={() => setIdx(current + 1)}>Next<ChevronRight className="h-4 w-4" /></Button>
                   </div></>)}
             </div>
