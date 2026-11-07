@@ -337,7 +337,7 @@ export default function Landing({ card }: { card: ReactNode }) {
 
         <section aria-label="Get started" className="mx-auto max-w-[1200px] px-4 py-24 text-center">
           <Reveal>
-            <h2 className="heading-4 md:heading-3 mx-auto max-w-[680px] text-l-text">Sign in and ask your first question.</h2>
+            <h2 className="heading-4 md:heading-3 mx-auto max-w-[680px] text-l-text">Ask your first question.</h2>
             <p className="body-3 mx-auto mt-4 max-w-[680px] text-l-muted">Free and open source. It runs on your own server, so there is no account with us and no credit card.</p>
             <a href="#sign-in" className="button-lg mt-8 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-brand px-3 py-2 text-white transition-colors duration-300 ease-land hover:bg-brand-600 active:scale-[0.98]">Sign in or create a workspace <ArrowRight size={20} aria-hidden /></a>
           </Reveal>
