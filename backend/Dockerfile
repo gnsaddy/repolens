@@ -8,7 +8,8 @@ RUN pip install --default-timeout=120 --retries=6 --prefix=/install .
 
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 REPOLENS_REPOS_DIR=/data/repos
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates tini \
+# `upgrade` picks up the Debian security fixes published since the base image was built, so the image scan (HIGH and CRITICAL, fixed only) stays green.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends git ca-certificates tini \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home --home-dir /home/app app \
     && mkdir -p /data/repos && chown -R app /data \
