@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import JiraPicker from "@/components/JiraPicker";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Textarea, statusTone } from "@/components/ui";
-import { Ticket } from "lucide-react";
+import { Ticket } from "@phosphor-icons/react";
 import { api, type CiPreview, type InvestigationSummary, type JiraConnection, type Repo } from "@/lib/api";
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn, pct, timeAgo } from "@/lib/utils";
@@ -29,15 +29,15 @@ export default function Investigations() {
 
   return (
     <div>
-      <PageHeader title="Investigations" subtitle="Root-cause analysis across your repositories, commits and past incidents."
+      <PageHeader title="Investigations" subtitle="Root cause analysis across your repositories, commits and past incidents."
         actions={jira.data?.base_url ? <Button variant="outline" onClick={() => setPicker(true)}><Ticket className="h-4 w-4" />Start from Jira</Button> : undefined} />
       {picker && <JiraPicker canInvestigate={canWrite(user)} onClose={() => setPicker(false)} />}
       {canWrite(user) && (
         <Card className="mb-6">
           <CardTitle>New investigation</CardTitle>
-          <div role="tablist" className="mb-4 inline-flex rounded-lg border border-line p-0.5 text-sm">
+          <div role="tablist" className="mb-4 inline-flex rounded-lg border border-line p-0.5 body-6">
             {([["describe", "Describe a bug"], ["ci", "From a CI log"]] as const).map(([k, label]) => (
-              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={cn("rounded-md px-3 py-1", mode === k ? "bg-brand text-white" : "text-muted hover:text-ink")}>{label}</button>))}
+              <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={cn("rounded-lg px-3 py-1", mode === k ? "bg-brand text-white" : "text-muted hover:text-ink")}>{label}</button>))}
           </div>
           {mode === "describe" && (<>
             <Label>Bug report, error message or stack trace</Label>
@@ -45,8 +45,8 @@ export default function Investigations() {
           <div className="mt-3"><Label>Repositories (none selected = search all)</Label>
             <div className="flex flex-wrap gap-2">{ready.map((r) => (
               <button key={r.id} type="button" onClick={() => toggle(r.id)} aria-pressed={repoIds.includes(r.id)}
-                className={`rounded-full border px-3 py-1 text-xs ${repoIds.includes(r.id) ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted hover:bg-slate-50"}`}>{r.name}</button>))}
-              {!ready.length && <span className="text-xs text-muted">No indexed repositories yet — add one under Repositories.</span>}</div></div>
+                className={`rounded-full border px-3 py-1 caption-5 ${repoIds.includes(r.id) ? "border-brand bg-indigo-50 text-brand" : "border-line text-muted hover:bg-slate-50"}`}>{r.name}</button>))}
+              {!ready.length && <span className="caption-5 text-muted">No indexed repositories yet — add one under Repositories.</span>}</div></div>
           {mode === "describe" ? (
             <div className="mt-4 flex items-center gap-3">
               <Button onClick={() => start.mutate()} disabled={query.trim().length < 5 || start.isPending}>Investigate</Button>
@@ -56,8 +56,8 @@ export default function Investigations() {
       <Card>
         <CardTitle>History</CardTitle>
         {!list.data?.length ? <Empty>No investigations yet.</Empty> : (
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs text-muted"><tr><th className="pb-2 font-medium">Title</th><th className="font-medium">Status</th><th className="font-medium">Confidence</th><th className="font-medium">Jira</th><th className="text-right font-medium">Started</th></tr></thead>
+          <table className="w-full body-6">
+            <thead className="text-left caption-5 text-muted"><tr><th className="pb-2 font-medium">Title</th><th className="font-medium">Status</th><th className="font-medium">Confidence</th><th className="font-medium">Jira</th><th className="text-right font-medium">Started</th></tr></thead>
             <tbody>{list.data.map((i) => (
               <tr key={i.id} className="border-t border-line">
                 <td className="max-w-sm truncate py-2"><Link className="text-brand hover:underline" to={`/investigations/${i.id}`}>{i.title}</Link></td>
@@ -95,22 +95,22 @@ function CiPanel({ repoIds, onStarted }: { repoIds: string[]; onStarted: (firstI
   const r = parse.data;
   return (
     <div>
-      <p className="mb-2 text-xs text-muted">Works with JUnit XML, pytest, Jest and Go test output, or any log containing stack traces. Secrets in the log are redacted before anything is stored.</p>
-      <label className="mb-2 block text-sm">Upload a report or log <input type="file" accept=".xml,.log,.txt" aria-label="CI log file" className="ml-2 text-xs" onChange={(e) => onFile(e.target.files?.[0])} /></label>
+      <p className="mb-2 caption-5 text-muted">Works with JUnit XML, pytest, Jest and Go test output, or any log containing stack traces. Secrets in the log are redacted before anything is stored.</p>
+      <label className="mb-2 block body-6">Upload a report or log <input type="file" accept=".xml,.log,.txt" aria-label="CI log file" className="ml-2 caption-5" onChange={(e) => onFile(e.target.files?.[0])} /></label>
       <Textarea rows={6} value={log} onChange={(e) => { setLog(e.target.value); parse.reset(); }} placeholder="…or paste the failing job's output here" aria-label="CI log" />
       <div className="mt-3 flex items-center gap-3">
         <Button variant="outline" onClick={() => parse.mutate()} disabled={!log.trim() || parse.isPending}>Find failures</Button>
         <ErrorNote error={parse.error || go.error} />
       </div>
-      {r && (!r.failures.length ? <p className="mt-3 text-sm text-muted">No failures found in this {KIND[r.format] ?? r.format} log.</p> : (
+      {r && (!r.failures.length ? <p className="mt-3 body-6 text-muted">No failures found in this {KIND[r.format] ?? r.format} log.</p> : (
         <div className="mt-4">
-          <div className="mb-2 text-xs text-muted">{r.failures.length} failure(s) found in {KIND[r.format] ?? r.format}. Pick up to 10 to investigate.</div>
+          <div className="mb-2 caption-5 text-muted">{r.failures.length} failure(s) found in {KIND[r.format] ?? r.format}. Pick up to 10 to investigate.</div>
           <ul className="divide-y divide-line rounded-lg border border-line">{r.failures.map((f) => (
-            <li key={f.index} className="flex items-start gap-3 p-3 text-sm">
+            <li key={f.index} className="flex items-start gap-3 p-3 body-6">
               <input type="checkbox" aria-label={`Investigate ${f.name}`} className="mt-1" checked={picked.includes(f.index)} disabled={!picked.includes(f.index) && picked.length >= 10}
                 onChange={() => setPicked((p) => (p.includes(f.index) ? p.filter((x) => x !== f.index) : [...p, f.index]))} />
               <div className="min-w-0"><div className="truncate font-medium">{f.name}{f.count > 1 && <Badge className="ml-2">×{f.count}</Badge>}</div>
-                <div className="truncate text-xs text-muted">{f.message}</div>{f.file && <div className="text-xs text-muted">{f.file}{f.line ? `:${f.line}` : ""}</div>}</div>
+                <div className="truncate caption-5 text-muted">{f.message}</div>{f.file && <div className="caption-5 text-muted">{f.file}{f.line ? `:${f.line}` : ""}</div>}</div>
             </li>))}</ul>
           <Button className="mt-3" onClick={() => go.mutate()} disabled={!picked.length || go.isPending}>Investigate {picked.length} failure{picked.length === 1 ? "" : "s"}</Button>
         </div>))}

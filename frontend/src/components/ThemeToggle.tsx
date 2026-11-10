@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "@phosphor-icons/react";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -7,7 +7,7 @@ export default function ThemeToggle({ className }: { className?: string }) {
   const theme = useTheme();
   return (
     <button type="button" onClick={theme.toggle} aria-label={theme.dark ? "Switch to day mode" : "Switch to night mode"} aria-pressed={theme.dark}
-      title={theme.dark ? "Day mode" : "Night mode"} className={cn("grid h-9 w-9 place-items-center rounded-md text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2", className)}>
+      title={theme.dark ? "Day mode" : "Night mode"} className={cn("grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2", className)}>
       {theme.dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );

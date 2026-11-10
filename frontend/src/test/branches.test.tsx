@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import ForceGraph, { heatColor } from "@/components/ForceGraph";
+import ForceGraph, { heatColor, NODE_COLORS } from "@/components/ForceGraph";
 import StoragePanel, { fmtBytes } from "@/components/StoragePanel";
 import { AuthProvider } from "@/lib/auth";
 import type { GraphEdge, GraphNode } from "@/lib/api";
@@ -48,7 +48,7 @@ describe("StoragePanel", () => {
     });
     wrap(<StoragePanel />);
     expect(await screen.findByText("proj, proj@dev")).toBeInTheDocument();
-    expect(screen.getByText("blob-less")).toBeInTheDocument();
+    expect(screen.getByText("blobless")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Preview" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Would free 2.5 GB from 1 clone(s)");
     expect(fmtBytes(1500)).toBe("2 KB");
@@ -74,6 +74,6 @@ describe("graph heat and connections", () => {
   });
   it("keeps type colours when there is no heat", () => {
     const { container } = render(<ForceGraph nodes={[node("a")]} edges={[]} selectedId={null} onSelect={() => {}} />);
-    expect(container.querySelector("svg[aria-label='Knowledge graph'] g[role='button'] > circle")?.getAttribute("fill")).toBe("#4f46e5");
+    expect(container.querySelector("svg[aria-label='Knowledge graph'] g[role='button'] > circle")?.getAttribute("fill")).toBe(NODE_COLORS.function);  // the colour of its type, whatever the palette is
   });
 });

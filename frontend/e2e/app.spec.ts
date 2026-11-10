@@ -14,9 +14,9 @@ test("sign in and sign out use real sessions", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText(/Welcome back/)).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
   await page.goto("/");  // the old token no longer works: the session ended on the server
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("a wrong password is refused and says so", async ({ page }) => {

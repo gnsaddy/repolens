@@ -33,7 +33,7 @@ describe("Skills", () => {
     expect(parseSkillMarkdown("just text").title).toBe("");
   });
 
-  it("lists skills with what they apply to, and the built-in ones", async () => {
+  it("lists skills with what they apply to, and the built in ones", async () => {
     open([row(), row({ id: "s2", title: "Runbook layout", status: "pending", tasks: [], always: true })], true);
     const list = await screen.findByRole("list", { name: "Skill list" });
     expect(list).toHaveTextContent("How we write API endpoints");

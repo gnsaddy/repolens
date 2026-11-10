@@ -56,12 +56,26 @@ Open a GitHub issue with the question. Inside the app, **Report a bug / request 
 ## Reporting security problems
 Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 
+## UI conventions
+- **One corner-radius scale:** `rounded-md` (6px) for chips and code, `rounded-lg` (8px) for controls and inset blocks, `rounded-xl` (12px) for cards and dialogs, `rounded-full` for pills and dots. Do not add other radii.
+- **Cards are flat** (a border, no shadow) and never hold another card. Inside a card use `Panel` (a tinted block), `Section`, or a list divided by rules (`divide-y divide-line`). Several numbers in a row use `StatGroup`.
+- **A badge says something unusual** (failed, needs attention, shared). The normal state is plain text or a `StatusDot`: do not badge "ready", "done", "private" or "connected".
+- **Icons are Phosphor icons** (`@phosphor-icons/react`), passed as the `icon` of `CardTitle`/`Section` (typed `IconType`) or placed beside the label with a size class such as `h-4 w-4`. Do not use text characters such as ✓, ✗ or ▾ as icons, and do not add another icon set.
+- **The sidebar is grouped** (Work, Knowledge, Sources, Monitor); a new page goes in the group of what people do with it.
+- **One typeface, named text styles.** The font is Geist. Text uses the named styles in `index.css` (`heading-1` to `heading-6`, `title-1` to `title-5`, `body-1` to `body-6`, `button-lg` to `button-xsm`, `caption-1` to `caption-5`), never a loose size and weight such as `text-sm font-medium`. A new style is the next number in its group, built from a Tailwind size step.
+- **Spacing is 0, 0.5, 1, 2, 3, 4, 6, 8, 10, 12, 16, 20 or 24** (2 to 96 pixels). Do not use 1.5, 2.5, 3.5, 5, 7, 9, 11 or 14.
+- **Night mode backgrounds** come only from #181818 (page), #1f1f1f (cards), #272727 (blocks and tinted badges), #313131 (hover, borders) and #000000 (code and tooltips), set once in the `.dark` block of `index.css`. Do not add another dark background.
+- **No hyphens in interface copy.** Write "sign in", "read only", "root cause", "email" and "reindex"; keep hyphens only in names, ids, paths and model names (`gpt-4o-mini`, `cert-manager`).
+- **The landing page** (`components/Landing.tsx`) follows the landing page design rules in full, including no hyphens in its copy, flat backgrounds from the dark palette, and scroll animation on transform and opacity only. Keep its copy to facts the code backs.
+- **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
+
 ## How a version is made (maintainers)
 Work for a version happens on a branch named after it, for example `0.2.2`; nothing is committed straight to `main`.
 1. Branch from `main`, change the version number (see `docs/operations.md`) if it is a new version, and commit there.
 2. Push the branch and open a pull request into `main`. CI runs on the pull request.
 3. When CI passes, merge it. CI runs again on `main`.
 4. When that CI run passes, the CD workflow publishes the images to GHCR tagged with the version (`0.2.2`). A tag is only needed to deploy to a cluster.
+`main` is protected: nothing is pushed to it directly, a pull request can only be merged when the `backend`, `frontend`, `browser tests` and `images` checks have passed and the branch is up to date with `main`, and this applies to maintainers too.
 Fixes before the next version go on the same branch and the same kind of pull request; the images of that version are replaced each time `main` passes CI. A new version is a new branch.
 
 ## Commit messages

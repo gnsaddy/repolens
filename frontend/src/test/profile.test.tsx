@@ -112,7 +112,7 @@ describe("Insights", () => {
     const h = await screen.findByRole("region", { name: "RepoLens health" });
     expect(within(h).getByText("needs attention")).toBeInTheDocument();
     expect(within(h).getByRole("alert")).toHaveTextContent("The retention loop is late");
-    expect(within(h).getByText("Daily re-index")).toBeInTheDocument();
+    expect(within(h).getByText("Daily reindex")).toBeInTheDocument();
     expect(within(h).getByText("late")).toBeInTheDocument();
     expect(h).toHaveTextContent("Saved questions: 4 of 5 passed");
     expect(h).toHaveTextContent("checked by itself after indexing");

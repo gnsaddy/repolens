@@ -44,13 +44,13 @@ function setup(initial: State, role = "admin", url = "/settings") {
 const none: State = { jira: null, confluence: { connected: false } };
 
 describe("Settings: integrations", () => {
-  it("lists every integration as available with a Connect button, and shows no single sign-on", async () => {
+  it("lists every integration as available with a Connect button, and shows no single sign on", async () => {
     setup(none);
     const available = await screen.findByRole("list", { name: "Available integrations" });
     for (const n of ["GitHub", "Bitbucket", "Jira", "Confluence", "Slack", "Notion", "Google Docs", "SharePoint"]) expect(within(available).getByText(n)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Connected" })).toBeInTheDocument();
     expect(screen.getByText(/Nothing connected yet/)).toBeInTheDocument();
-    expect(screen.queryByText(/Single sign-on/i)).toBeNull();
+    expect(screen.queryByText(/Single sign on/i)).toBeNull();
     expect(screen.queryByText(/SCIM/i)).toBeNull();
   });
 

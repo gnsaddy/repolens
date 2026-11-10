@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FilePlus2 } from "lucide-react";
+import { FilePlus as FilePlus2 } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Button, Spinner } from "@/components/ui";
@@ -32,14 +32,14 @@ export default function ChatGaps() {
   });
   if (gaps.isLoading) return <Spinner />;
   const items = gaps.data?.items ?? [];
-  if (!items.length) return <p className="p-2 text-sm text-muted">No gaps found. Questions your sources cannot answer will be listed here so you know which pages to write.</p>;
+  if (!items.length) return <p className="p-2 body-6 text-muted">No gaps found. Questions your sources cannot answer will be listed here so you know which pages to write.</p>;
   return (
     <div aria-label="Unanswered questions">
-      <p className="mb-2 px-2 text-xs text-muted">From your own chats only. Nobody else sees this list.</p>
+      <p className="mb-2 px-2 caption-5 text-muted">From your own chats only. Nobody else sees this list.</p>
       <ul className="space-y-2">{items.map((g) => (
-        <li key={g.chat_id + g.question} className="rounded-lg border border-line p-2.5 text-sm">
+        <li key={g.chat_id + g.question} className="rounded-lg border border-line p-3 body-6">
           <Link to={`/ask/${g.chat_id}`} className="block font-medium hover:text-brand">{g.question}</Link>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 caption-5 text-muted">
             <span>{g.count === 1 ? "asked once" : `asked ${g.count} times`}</span><span>{timeAgo(g.last_asked)}</span><span className="truncate">topic: {g.topic}</span></div>
           <Button size="sm" variant="outline" className="mt-2" disabled={draft.isPending} onClick={() => draft.mutate(g)}><FilePlus2 className="h-3.5 w-3.5" />Draft a page</Button>
         </li>))}</ul>

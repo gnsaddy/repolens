@@ -8,7 +8,7 @@ const json = (b: unknown, status = 200) => Promise.resolve(new Response(JSON.str
 afterEach(() => vi.restoreAllMocks());
 
 describe("AccessPanel", () => {
-  it("restricts a repository to chosen non-admin users", async () => {
+  it("restricts a repository to chosen non admin users", async () => {
     let put: Record<string, unknown> | undefined;
     vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
       const u = String(input);

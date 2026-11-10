@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import type { SystemLink, SystemRepo, SystemRisk } from "@/lib/api";
 
 export type HeatMetric = "none" | keyof SystemRisk;
-export const TRUST_COLOR = { fact: "#4f46e5", inferred: "#d97706", uncertain: "#94a3b8" } as const;
+export const TRUST_COLOR = { fact: "#6366f1", inferred: "#f59e0b", uncertain: "#cbd5e1" } as const;
 const W = 720, H = 440, CX = W / 2, CY = H / 2, NODE = 28;
 
 /** White to red, so the repositories where something concentrates stand out. */
 export const heatColor = (h: number) => `hsl(${Math.round(8 + (1 - h) * 30)}, ${Math.round(30 + h * 55)}%, ${Math.round(94 - h * 42)}%)`;
+/** Two letters that tell repositories apart: the first letters of the first two words (demo-catalog-service becomes DC). */
+const initials = (name: string) => { const w = name.split(/[^A-Za-z0-9]+/).filter(Boolean); return ((w[0]?.[0] ?? "") + (w[1]?.[0] ?? w[0]?.[1] ?? "")).toUpperCase(); };
 const clip = (s: string, n = 18) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** The repositories of a system on a ring, with an arrow from each one to those it depends on. Width is how many links
@@ -53,7 +55,7 @@ export default function SystemGraph({ repos, links, metric, selected, onRepo, on
           <g key={r.id} role="button" tabIndex={0} aria-label={`Repository ${r.name}`} aria-pressed={selected === r.id} className="cursor-pointer" opacity={selected && !linked(r.id) ? 0.35 : 1}
             onClick={() => onRepo(r.id)} onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") onRepo(r.id); }}>
             <circle cx={p.x} cy={p.y} r={NODE} fill={metric === "none" ? (r.source === "docs" ? "#e0f2fe" : r.role === "infrastructure" ? "#ccfbf1" : "#eef2ff") : heatColor(h)} stroke={selected === r.id ? "#4f46e5" : "#94a3b8"} strokeWidth={selected === r.id ? 3 : 1.5} />
-            <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#334155">{r.name.slice(0, 2).toUpperCase()}</text>
+            <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="11" fontWeight="600" fill="#334155">{initials(r.name)}</text>
             <text x={p.x} y={p.y + NODE + 14} textAnchor="middle" fontSize="11" fill="currentColor">{clip(r.name)}</text>
             {r.role === "infrastructure" && <text x={p.x} y={p.y + NODE + 26} textAnchor="middle" fontSize="9" fill="#0f766e">infrastructure</text>}
           </g>);

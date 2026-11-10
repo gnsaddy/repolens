@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, FileText, Trash2 } from "lucide-react";
+import { CaretDown as ChevronDown, CaretRight as ChevronRight, FileText, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Badge, Card, CardTitle, Empty, ErrorNote, Spinner, statusTone } from "@/components/ui";
 import { useConfirm, useToast } from "@/components/feedback";
@@ -26,10 +26,10 @@ export default function Collections({ sources, onChanged }: { sources: WikiSourc
       {!cols.length ? <Empty>Nothing here yet. Add a README or notes below and they show up as a collection.</Empty> : (
         <ul className="divide-y divide-line">{cols.map((c) => (
           <li key={c.repo_id} className="py-2">
-            <div className="flex items-center gap-2 text-sm">
-              <button className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-expanded={openId === c.repo_id} onClick={() => setOpenId(openId === c.repo_id ? null : c.repo_id)}>
+            <div className="flex items-center gap-2 body-6">
+              <button className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={openId === c.repo_id} onClick={() => setOpenId(openId === c.repo_id ? null : c.repo_id)}>
                 {openId === c.repo_id ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-                <span className="truncate font-medium">{c.name}</span><span className="text-xs text-muted">{c.pages} pages</span></button>
+                <span className="truncate font-medium">{c.name}</span><span className="caption-5 text-muted">{c.pages} pages</span></button>
               <Badge tone={statusTone(c.status)}>{c.status}</Badge>
               {user?.role === "admin" && c.origin !== "confluence" && (
                 <button aria-label={`Delete collection ${c.name}`} title="Delete collection" className="text-muted hover:text-red-600"
@@ -37,14 +37,14 @@ export default function Collections({ sources, onChanged }: { sources: WikiSourc
             </div>
             {openId === c.repo_id && (
               <div className="mt-2 rounded-lg bg-slate-50 p-2">
-                {docs.isLoading ? <Spinner /> : !docs.data?.length ? <p className="p-2 text-xs text-muted">No pages.</p> : (
+                {docs.isLoading ? <Spinner /> : !docs.data?.length ? <p className="p-2 caption-5 text-muted">No pages.</p> : (
                   <ul className="space-y-0.5">{docs.data.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-white">
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="truncate">{d.path}</span><span className="ml-auto text-xs text-muted">{(d.size / 1024).toFixed(1)} KB</span>
+                    <li key={d.id} className="flex items-center gap-2 rounded-md px-2 py-1 body-6 hover:bg-white">
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted" /><span className="truncate">{d.path}</span><span className="ml-auto caption-5 text-muted">{(d.size / 1024).toFixed(1)} KB</span>
                       {writable && d.deletable !== false && (
                         <button aria-label={`Delete ${d.path}`} className="text-muted hover:text-red-600"
                           onClick={async () => { if (await ask({ title: `Delete ${d.path}?`, message: "The page is removed from search, the graph and the wiki.", confirmLabel: "Delete page", danger: true })) delDoc.mutate({ repo: c.repo_id, id: d.id }); }}><Trash2 className="h-3.5 w-3.5" /></button>)}
-                      {d.deletable === false && <span className="text-xs text-muted" title="Synced from a connected source. Remove the source to delete it.">synced</span>}
+                      {d.deletable === false && <span className="caption-5 text-muted" title="Synced from a connected source. Remove the source to delete it.">synced</span>}
                     </li>))}</ul>)}
               </div>)}
           </li>))}</ul>)}

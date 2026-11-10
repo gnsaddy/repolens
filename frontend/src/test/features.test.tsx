@@ -137,7 +137,7 @@ describe("Build a feature", () => {
     expect(screen.queryByRole("button", { name: /Draft the feature/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete draft" })).toBeNull();
   });
-  it("offers the other indexed repositories to show read-only, never the chosen one, and sends the ticked ones", async () => {
+  it("offers the other indexed repositories to show read only, never the chosen one, and sends the ticked ones", async () => {
     const calls = open();
     const group = await screen.findByRole("group", { name: "Other repositories" });
     expect(within(group).getByLabelText("billing")).not.toBeChecked();
@@ -179,7 +179,7 @@ describe("Build a feature", () => {
     });
     await userEvent.click(await screen.findByRole("button", { name: /^Add a discount/ }));
     const card = await screen.findByLabelText("Context");
-    expect(card).toHaveTextContent("Code shown read-only from: billing.");
+    expect(card).toHaveTextContent("Code shown read only from: billing.");
     expect(card).toHaveTextContent("1 more repository was used that you cannot access.");
     expect(card).toHaveTextContent("billing: billing/invoice.py linked to app/pricing.py");
     expect(card).toHaveTextContent("app/pricing.py is used by billing");
