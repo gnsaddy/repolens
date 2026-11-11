@@ -2,7 +2,7 @@
 
 # RepoLens AI
 
-**Version v0.2.2.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
+**Version v0.2.3.** Usable and tested, but early: expect rough edges and changes between releases. Releases are listed in the [changelog](changelog/README.md). The running version is shown in the app's sidebar and on the sign-in page, and returned by `/healthz`.
 
 **DeepMind Wiki: a living wiki for your code and docs.** Point RepoLens at your repositories, READMEs, Confluence, Jira, Slack, Notion, Google Docs or SharePoint, and it builds a wiki you can browse and ask questions of, with a code atlas for every repository and an at-a-glance card (kind, owner, warnings, commands) for every page. Answers cite their sources. It also keeps the wiki honest: it flags pages that may be out of date when the code they describe changes, finds orphaned, duplicated and broken pages, and drafts edits that a person reviews before anything changes.
 
@@ -76,7 +76,7 @@ curl -O https://raw.githubusercontent.com/gnsaddy/repolens/main/docker-compose.r
 docker compose -f docker-compose.release.yml up -d      # web http://localhost:8080 , API docs http://localhost:8000/docs
 ```
 
-Open http://localhost:8080 and create a workspace (the first user is the admin). It runs in development mode with nothing to configure; for anything shared, set `REPOLENS_ENV=prod` and the secrets from `.env.example` first. `REPOLENS_VERSION=0.2.2` in the environment picks another release.
+Open http://localhost:8080 and create a workspace (the first user is the admin). It runs in development mode with nothing to configure; for anything shared, set `REPOLENS_ENV=prod` and the secrets from `.env.example` first. `REPOLENS_VERSION=0.2.3` in the environment picks another release.
 
 From a clone, without Docker (Python 3.11+ and Node 20+): `./run-local.sh` installs what it needs, starts the API and the web UI on SQLite at http://127.0.0.1:5173, and `./run-local.sh stop` ends it. To build the images yourself: `cp .env.example .env && docker compose up --build`.
 
@@ -107,7 +107,7 @@ Tests: `pytest` (SQLite) and `REPOLENS_TEST_DATABASE_URL=postgresql+psycopg://..
 * HTTPS and GitOps: `docs/operations.md` explains how to attach a certificate (your own, or automatic with cert-manager or Caddy) and how to deploy with Argo CD (`deploy/argocd`, `deploy/overlays`).
 * Backups: a nightly `CronJob` dumps PostgreSQL to its own volume; `docs/operations.md` has the restore steps, the secrets you must keep, and `make backup` / `make restore` for Compose.
 * CI (`.github/workflows/ci.yml`): lint, mypy, tests on SQLite and pgvector, migrations, frontend lint/type/test/build,
-  image builds, Trivy scan. CD (`cd.yml`): after CI passes on `main` (and for a `v*.*.*` tag or manual run on a commit that passed CI), pushes images to GHCR tagged with the app version (`0.2.2` until the number changes) (free for public images; see `docs/operations.md`) and, only if the repository variable `DEPLOY_MODE=kubectl` is set, rolls out to a cluster (approval via the
+  image builds, Trivy scan. CD (`cd.yml`): after CI passes on `main` (and for a `v*.*.*` tag or manual run on a commit that passed CI), pushes images to GHCR tagged with the app version (`0.2.3` until the number changes) (free for public images; see `docs/operations.md`) and, only if the repository variable `DEPLOY_MODE=kubectl` is set, rolls out to a cluster (approval via the
   `production` environment; needs the `KUBECONFIG_B64` secret).
 
 ## License
