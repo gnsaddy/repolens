@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Brain, CheckCircle as CheckCircle2, Key as KeyRound, Plugs as Plug, MagnifyingGlass as SearchCheck, ShieldCheck, Sparkle as Sparkles, UserGear as UserCog } from "@phosphor-icons/react";
+import { Brain, CheckCircle as CheckCircle2, Key as KeyRound, Plugs as Plug, Robot, MagnifyingGlass as SearchCheck, ShieldCheck, Sparkle as Sparkles, UserGear as UserCog } from "@phosphor-icons/react";
 import Logo from "@/components/Logo";
 import { ISSUES_URL } from "@/components/ReportIssue";
 import { APP_VERSION } from "@/lib/version";
@@ -7,6 +7,7 @@ import { PeoplePanel } from "@/pages/People";
 import { Link, useSearchParams } from "react-router-dom";
 import { ConnectionCard, TINTS } from "@/components/ConnectionCard";
 import AccessTokens from "@/components/AccessTokens";
+import AutomationPanel from "@/components/AutomationPanel";
 import GithubLoginCard from "@/components/GithubLoginCard";
 import IntegrationsPanel from "@/components/IntegrationsPanel";
 import LanguageModelCard from "@/components/LanguageModelCard";
@@ -19,15 +20,15 @@ import { api, type ModelRegistry, type RetrievalStatus } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain], ["skills", "Skills", Sparkles], ["quality", "Quality", CheckCircle2], ["mcp", "MCP & tokens", KeyRound], ["people", "People", UserCog]] as const;
+const TABS = [["integrations", "Integrations", Plug], ["ai", "AI & search", Brain], ["skills", "Skills", Sparkles], ["quality", "Quality", CheckCircle2], ["mcp", "MCP & tokens", KeyRound], ["automation", "Automation", Robot], ["people", "People", UserCog]] as const;
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const admin = user?.role === "admin";
   const [sp, setSp] = useSearchParams();
   const asked = sp.get("tab");
-  const tab = asked === "ai" ? "ai" : asked === "skills" ? "skills" : asked === "quality" ? "quality" : asked === "mcp" ? "mcp" : asked === "people" && admin ? "people" : "integrations";
-  const tabs = TABS.filter(([k]) => k !== "people" || admin);
+  const tab = asked === "ai" ? "ai" : asked === "skills" ? "skills" : asked === "quality" ? "quality" : asked === "mcp" ? "mcp" : asked === "people" && admin ? "people" : asked === "automation" && admin ? "automation" : "integrations";
+  const tabs = TABS.filter(([k]) => (k !== "people" && k !== "automation") || admin);
   const registry = useQuery({ queryKey: ["model-registry"], queryFn: () => api<ModelRegistry>("/settings/models") });
   const managed = !!registry.data?.connections?.some((c) => !c.legacy); // once models are managed below, one card is enough
 
@@ -40,7 +41,7 @@ export default function SettingsPage() {
             className={cn("-mb-px flex items-center gap-2 border-b-2 px-4 py-3 body-6", tab === k ? "border-brand font-medium text-brand" : "border-transparent text-muted hover:text-ink")}><Icon className="h-4 w-4" />{label}</button>))}
       </div>
       <div className={tab === "people" ? "" : "max-w-4xl"}>
-        {tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <div className="space-y-4"><IntegrationsPanel admin={admin} />{admin && <GithubLoginCard />}</div> : tab === "quality" ? <QualityPanel canWrite={!!user && user.role !== "viewer"} /> : tab === "skills" ? <SkillsPanel admin={admin} canSubmit={!!user && user.role !== "viewer"} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
+        {tab === "automation" ? <AutomationPanel /> : tab === "people" ? <PeoplePanel /> : tab === "integrations" ? <div className="space-y-4"><IntegrationsPanel admin={admin} />{admin && <GithubLoginCard />}</div> : tab === "quality" ? <QualityPanel canWrite={!!user && user.role !== "viewer"} /> : tab === "skills" ? <SkillsPanel admin={admin} canSubmit={!!user && user.role !== "viewer"} /> : tab === "mcp" ? (user ? <AccessTokens canWrite={user.role !== "viewer"} /> : null) : (
           <div className="space-y-4">
             <OutboundCard />
             {!managed && <LanguageModelCard admin={admin} />}

@@ -424,6 +424,10 @@ code and document nodes; **surprising connections** are the rarest links between
 cached per repository until it is indexed again and rendered as the Start here report (`GET /api/graph/report`, `/api/graph/communities`, and a
 `community` field on node dicts). The MCP server exposes `graph_overview`, `graph_neighbors` and `graph_path`.
 
+## Automations
+
+`services/automations.py`, `api/automations.py`, tables `agent_rules` (an admin's switch: event, repository or all, daily limit, every branch, and the admin it runs as) and `agent_runs` (one row each time a rule fired or was skipped; unique on workspace, event and event key, which is what stops a retried delivery being handled twice). `api/webhooks.py` passes a verified `workflow_run` event to `automations.on_workflow_run`, which only decides and records; `work` runs on a small thread pool (inline in tests), reads the failed jobs through `GitHubClient.failed_jobs` and `job_log`, parses them with `ci_logs`, and calls the normal `create_investigation` and `submit`. The investigation carries `source = "ci_auto"` (migration 0035). It runs as the rule's admin through the same access scope as any investigation, and the policy gateway has `automation.read` and `automation.configure`, both admin. Nothing in this path writes to GitHub.
+
 ## Real-bug evaluation, calibration and injection tests
 `agents/workflow.py` ranks suspects with one entry per file, down-weights commits that share no words with the report and context files (docs, tests, changelogs) unless a stack trace names them. `evals/suites/bugs.py` mines fix commits from a local repository, snapshots the repository at each parent commit (a shared clone whose
 only reachable history ends there), indexes it with the offline stack and scores retrieval and the investigation shortlist against the

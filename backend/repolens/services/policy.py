@@ -51,6 +51,8 @@ ACTION_MIN_ROLE = {
     "group.write": "member",  # a saved set of repositories, shared in the workspace
     "group.overview": "member",  # writing an overview uses the model
     "group.ask": "viewer",  # a question about chosen repositories, answered like Ask
+    "automation.read": "admin",  # which rules are on and what they started
+    "automation.configure": "admin",  # lets RepoLens start work by itself; runs as the admin who sets it
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}
 

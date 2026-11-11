@@ -19,7 +19,7 @@ export interface Hypothesis {
 export interface TimelineStep { step: string; agent: string; summary: string; duration_ms: number; at: string }
 export interface InvestigationSummary {
   id: string; title: string; status: "queued" | "running" | "completed" | "failed"; confidence: number;
-  root_cause: string; repo_ids: string[]; jira_issue_key: string | null; created_at: string; finished_at: string | null;
+  root_cause: string; repo_ids: string[]; jira_issue_key: string | null; source?: string; created_at: string; finished_at: string | null;
 }
 export interface Investigation extends InvestigationSummary {
   query: string; root_cause_status: "unconfirmed" | "confirmed" | "rejected"; suggested_fix: string;
@@ -362,4 +362,7 @@ export interface PersonaDesign { hld: string; lld: string; diagram: string; comp
 export interface PersonaRunShort { id: string; persona: string; persona_name: string; mode?: string; title: string; status: string; repo: string; repo_id: string; created_at: string; found: number; high: number; tokens: FeatureTokens; shared: boolean; mine: boolean; author_name: string }
 export interface PersonaFinding { title: string; severity: string; file: string; line: number; evidence: string; explanation: string; suggestion: string; code: string; code_ok: boolean | null }
 export interface PersonaRunView extends PersonaRunShort { request: string; summary: string; findings: PersonaFinding[]; notes: { mode?: string; coverage: { file: string; whole: boolean; outline?: boolean }[]; main_files?: string[]; design?: PersonaDesign; dropped: number; reasons: string[]; limit: string; dependencies?: { facts: FeatureFact[]; hidden: number } }; model: string; error: string; base_sha: string; reused?: boolean }
+export interface AutomationRule { enabled: boolean; daily_limit: number; all_branches: boolean }
+export interface AutomationRun { id: string; repo: string; title: string; status: "started" | "skipped" | "failed"; reason: string; link: string; investigation_ids: string[]; created_at: string }
+export interface AutomationOverview { event: string; all: AutomationRule; repositories: (AutomationRule & { id: string; name: string; own_rule: boolean })[]; used_today: number; runs: AutomationRun[] }
 export interface GithubLoginSettings { configured: boolean; app_configured: boolean; redirect_uri: string; allowed_domains?: string[]; default_role?: string; auto_provision?: boolean; enabled?: boolean }

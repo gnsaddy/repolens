@@ -295,6 +295,9 @@ class Investigation(Base):
     evidence: Mapped[dict] = mapped_column(JSON, default=dict)
     verification: Mapped[dict] = mapped_column(JSON, default=dict)
     jira_issue_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(20), default=""
+    )  # "" = a person started it | ci_auto = an automation did
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -987,3 +990,42 @@ class GithubLoginConfig(Base):
     auto_provision: Mapped[bool] = mapped_column(Boolean, default=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentRule(Base):
+    """An admin's switch that lets RepoLens start work by itself when something happens (today: a CI run fails).
+    Off until an admin turns it on. The work runs as the admin who set it up, with that person's access."""
+
+    __tablename__ = "agent_rules"
+    __table_args__ = (UniqueConstraint("org_id", "repo_id", "event"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), default="")  # "" = every repository in the workspace
+    event: Mapped[str] = mapped_column(String(30), default="ci_failure")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    daily_limit: Mapped[int] = mapped_column(Integer, default=5)  # investigations started per day, at most
+    all_branches: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # false: only failures on the repository's branch
+    created_by: Mapped[str] = mapped_column(String(32), default="")  # the work runs as this person
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentRun(Base):
+    """One time a rule fired (or was skipped, with the reason). It also stops the same CI run being handled twice."""
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (UniqueConstraint("org_id", "event", "event_key"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    rule_id: Mapped[str] = mapped_column(String(32), default="")
+    repo_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    event: Mapped[str] = mapped_column(String(30), default="ci_failure")
+    event_key: Mapped[str] = mapped_column(String(100))  # for a CI run: its id on the host
+    status: Mapped[str] = mapped_column(String(10), default="started")  # started | skipped | failed
+    reason: Mapped[str] = mapped_column(Text, default="")
+    title: Mapped[str] = mapped_column(String(300), default="")
+    link: Mapped[str] = mapped_column(String(500), default="")  # the CI run's page
+    investigation_ids: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

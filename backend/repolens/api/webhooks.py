@@ -41,6 +41,10 @@ async def github(
         "ready_for_review",
     ):
         return _on_pull_request(db, payload)
+    if x_github_event == "workflow_run":
+        from ..services import automations
+
+        return automations.on_workflow_run(db, payload)
     if x_github_event != "push":
         return {"ignored": x_github_event}
     clone_url = _norm(payload.get("repository", {}).get("clone_url", ""))

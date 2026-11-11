@@ -122,6 +122,7 @@ class InvestigationSummary(ORM):
     root_cause: str
     repo_ids: list
     jira_issue_key: str | None
+    source: str = ""
     created_at: datetime
     finished_at: datetime | None
 

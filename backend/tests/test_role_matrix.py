@@ -263,6 +263,7 @@ ADMIN_ONLY_READS = {
     "/api/audit",
     "/api/audit/export.csv",
     "/api/audit/facets",
+    "/api/automations",  # which automatic rules are on and what they started
     "/api/auth/people",
     "/api/auth/users",  # emails, roles and whether two-step sign-in is on, for everyone
     "/api/feedback/export",
