@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AutomationPanel from "@/components/AutomationPanel";
+import AgentPage from "@/pages/Agent";
 import { FeedbackProvider } from "@/components/feedback";
 import type { AutomationOverview } from "@/lib/api";
 
@@ -79,5 +80,17 @@ describe("automation panel", () => {
     expect(within(runs).getByRole("link", { name: "Investigation 1" })).toHaveAttribute("href", "/investigations/i1");
     expect(runs).toHaveTextContent("Not the main branch");
     expect(within(runs).getByText("skipped")).toBeInTheDocument();
+  });
+});
+
+describe("agent page", () => {
+  it("explains the four steps and what it never does, above the switches", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => (String(input).endsWith("/automations") ? json(overview) : json({}, 404)));
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><FeedbackProvider><MemoryRouter><AgentPage /></MemoryRouter></FeedbackProvider></QueryClientProvider>);
+    const how = await screen.findByLabelText("How the agent works");
+    for (const t of ["A CI run fails", "It reads the failed jobs", "It starts investigations", "You decide"]) expect(how).toHaveTextContent(t);
+    expect(how).toHaveTextContent("Nothing is posted, commented or changed on GitHub");
+    expect(how).toHaveTextContent("stops if they are no longer an admin");
+    expect(await screen.findByLabelText("Investigate failures of shop")).toBeChecked();
   });
 });
