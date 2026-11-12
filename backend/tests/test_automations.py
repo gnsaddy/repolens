@@ -9,9 +9,11 @@ import pytest
 
 from repolens.api import github as gh_api
 from repolens.config import get_settings
-from repolens.models import AgentRun, AuditEvent, Investigation
+from repolens.models import AgentRun, AuditEvent, Investigation, PersonaRun, Repository
+from repolens.services import automations as svc
 from tests.test_chat import make_user
 from tests.test_github import TOKEN, connect
+from tests.test_personas import AUTH, SECURITY, model  # noqa: F401  (fixture: a fake model)
 
 CLONE = "https://github.com/acme/shop.git"
 PYTEST_LOG = (
@@ -34,7 +36,22 @@ def ci(client, auth, monkeypatch):
     get_settings.cache_clear()
     started: list[str] = []
     monkeypatch.setattr("repolens.services.automations.submit", started.append)  # no model work: only what was started
-    state = {"log": PYTEST_LOG, "jobs": [{"id": 11, "name": "tests", "conclusion": "failure"}], "requests": []}
+    state = {
+        "log": PYTEST_LOG,
+        "jobs": [{"id": 11, "name": "tests", "conclusion": "failure"}],
+        "requests": [],
+        "pr_files": [
+            {
+                "filename": "app/auth.py",
+                "status": "modified",
+                "additions": 3,
+                "deletions": 1,
+                "patch": "@@ -1,3 +1,6 @@\n+import sqlite3\n",
+            },
+            {"filename": "logo.png", "status": "added", "additions": 0, "deletions": 0},
+            {"filename": "old.py", "status": "removed", "additions": 0, "deletions": 9},
+        ],
+    }
 
     def handler(request: httpx.Request) -> httpx.Response:
         state["requests"].append(request)
@@ -43,6 +60,16 @@ def ci(client, auth, monkeypatch):
             return httpx.Response(200, content=state["log"].encode())
         if p == "/user":
             return httpx.Response(200, json={"login": "bot"})
+        if p == "/repos/acme/shop/pulls/7":
+            return httpx.Response(
+                200, json={"title": "Fix the user lookup", "head": {"sha": "abc123def4567890"}, "base": {"ref": "main"}}
+            )
+        if p == "/repos/acme/shop/pulls/7/files":
+            return httpx.Response(200, json=state["pr_files"])
+        if p == "/repos/acme/shop/contents/app/auth.py":
+            return httpx.Response(200, content=AUTH.encode())
+        if p == "/repos/acme/shop/contents/logo.png":
+            return httpx.Response(200, content=b"\x89PNG\x00\x00binary")
         if p.endswith("/actions/runs/501/jobs"):
             return httpx.Response(200, json={"jobs": state["jobs"]})
         if p.endswith("/actions/jobs/11/logs"):
@@ -77,7 +104,29 @@ def ci(client, auth, monkeypatch):
         assert r.status_code == 200, r.text
         return r.json()
 
+    def send_pr(number=7, action="opened", draft=False, base="main", sha="abc123def4567890"):
+        body = json.dumps(
+            {
+                "action": action,
+                "pull_request": {
+                    "number": number,
+                    "title": "Fix the user lookup",
+                    "draft": draft,
+                    "head": {"sha": sha},
+                    "base": {"ref": base},
+                    "html_url": f"https://github.com/acme/shop/pull/{number}",
+                },
+                "repository": {"clone_url": CLONE, "full_name": "acme/shop"},
+            }
+        ).encode()
+        sig = "sha256=" + hmac.new(b"whsec", body, hashlib.sha256).hexdigest()
+        hdr = {"X-GitHub-Event": "pull_request", "Content-Type": "application/json", "X-Hub-Signature-256": sig}
+        r = client.post("/api/webhooks/github", content=body, headers=hdr)
+        assert r.status_code == 200, r.text
+        return r.json()
+
     state["send"] = send
+    state["send_pr"] = send_pr
     return state
 
 
@@ -160,6 +209,31 @@ def test_a_log_with_no_test_failure_still_gets_an_investigation_from_its_end(cli
     assert "left-pad" in inv.query and inv.source == "ci_auto"
 
 
+def test_a_log_with_no_test_failure_is_read_where_github_marks_the_error_not_at_its_end(client, auth, ci, session):
+    scan = "\n".join(f"2026-11-10T16:26:2{i % 10}.0000000Z scanning layer {i}" for i in range(80))
+    ci["log"] = (
+        "2026-11-10T16:26:01.0000000Z Run trivy image repolens-api:ci\n" + scan + "\n"
+        "2026-11-10T16:26:22.0000000Z zlib1g CVE-2026-76844 HIGH fixed in 1.3.1-1+deb13u1\n"
+        "2026-11-10T16:26:22.5000000Z ##[error]Process completed with exit code 1.\n"
+        + "\n".join(f"2026-11-10T16:26:3{i % 10}.0000000Z Uploading artifact part {i}" for i in range(200))
+        + "\nFinalizing artifact upload\n"
+    )
+    turn_on(client, auth)
+    ci["send"]()
+    q = session.query(Investigation).one().query
+    assert "CVE-2026-76844" in q and "Process completed with exit code 1" in q
+    assert (
+        "Uploading artifact part" not in q and "2026-11-10T16" not in q
+    )  # the steps after the failure, and the time stamps, are left out
+
+
+def test_the_excerpt_falls_back_to_the_first_line_about_a_failure_and_then_to_the_end():
+    plain = "start\n" + "ok\n" * 100 + "fatal: could not read from remote\n" + "after\n" * 100
+    assert "fatal: could not read from remote" in svc.failure_excerpt(plain)
+    assert svc.failure_excerpt("a\nb\nc").splitlines() == ["a", "b", "c"]  # nothing says failure: the end of the log
+    assert len(svc.failure_excerpt("##[error]" + "x" * 20000)) == svc.TAIL
+
+
 def test_a_secret_in_the_log_is_never_stored(client, auth, ci, session):
     ci["log"] = "Build failed. token=" + TOKEN + "\nDeploy aborted\n"
     turn_on(client, auth)
@@ -218,17 +292,20 @@ def test_only_admins_see_or_change_the_rules_and_only_for_their_own_repositories
         == 404
     )
     seen = client.get("/api/automations", headers=stranger).json()
-    assert seen["repositories"] == [] and seen["runs"] == []
+    assert seen["events"]["ci_failure"]["repositories"] == [] and seen["runs"] == []
 
 
 def test_the_overview_lists_repositories_rules_and_recent_runs(client, auth, ci):
     turn_on(client, auth, ci["repo"]["id"], daily_limit=3)
     ci["send"]()
     o = client.get("/api/automations", headers=auth).json()
-    row = o["repositories"][0]
+    row = o["events"]["ci_failure"]["repositories"][0]
     assert row["name"] == "shop" and row["enabled"] is True and row["daily_limit"] == 3 and row["own_rule"] is True
-    assert o["all"]["enabled"] is False and o["used_today"] == 1
-    assert o["runs"][0]["status"] == "started" and o["runs"][0]["repo"] == "shop"
+    assert o["events"]["ci_failure"]["all"]["enabled"] is False and o["events"]["ci_failure"]["used_today"] == 1
+    assert o["events"]["pr_review"]["repositories"][0]["enabled"] is False  # each event has its own rules
+    assert (
+        o["runs"][0]["status"] == "started" and o["runs"][0]["repo"] == "shop" and o["runs"][0]["event"] == "ci_failure"
+    )
 
 
 def test_a_bad_limit_is_refused(client, auth, ci):
@@ -253,3 +330,142 @@ def test_the_log_is_read_from_an_https_address_only(client, auth, ci, session, m
     ci["send"]()
     run = session.query(AgentRun).one()
     assert run.status == "failed" and "not https" in run.reason
+
+
+# ------------------------------------------------------------------------------------------------ which model, and is it AI
+def test_the_overview_says_there_is_no_model_when_none_is_connected(client, auth, ci):
+    m = client.get("/api/automations", headers=auth).json()["model"]
+    assert m["ai"] is False and all(r["model"] is None for r in m["routing"])
+
+
+def test_the_overview_names_the_model_when_one_is_connected(client, auth, ci, model):
+    m = client.get("/api/automations", headers=auth).json()["model"]
+    assert m["ai"] is True and m["provider"] == "anthropic" and m["model"]
+    tasks = {r["task"]: r for r in m["routing"]}
+    assert set(tasks) == {"Investigation reports", "Pull request reviews"}
+    assert tasks["Pull request reviews"]["tier"] == "standard"  # the one model is on one tier, which every task uses
+    assert tasks["Pull request reviews"]["model"] == m["model"] == tasks["Investigation reports"]["model"]
+    assert m["multi"] is False  # one model: it does everything
+
+
+def test_an_investigation_started_without_a_model_is_marked_as_not_ai_written(client, auth, ci, session, monkeypatch):
+    monkeypatch.setattr("repolens.services.automations.submit", lambda i: None)
+    turn_on(client, auth)
+    ci["send"]()
+    run = client.get("/api/automations", headers=auth).json()["runs"][0]
+    inv = run["investigations"][0]
+    assert inv["ai"] is False and inv["models"] == [] and inv["title"].startswith("CI failure:")
+
+
+# ------------------------------------------------------------------------------------------------ pull request review
+def index_it(session, repo_id):
+    session.query(Repository).filter_by(id=repo_id).one().indexed_sha = "abc123"
+    session.commit()
+
+
+def turn_on_pr(client, auth, repo_id="all", **body):
+    r = client.put(
+        f"/api/automations/rules/{repo_id}", headers=auth, json={"enabled": True, "event": "pr_review", **body}
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_a_pull_request_is_not_reviewed_until_an_admin_turns_it_on(client, auth, ci, session, model):
+    assert ci["send_pr"]()["review"] == []
+    assert session.query(AgentRun).count() == 0 and session.query(PersonaRun).count() == 0
+    turn_on(client, auth)  # the CI rule does not turn on pull request reviews
+    assert ci["send_pr"](number=8)["review"] == []
+
+
+def test_a_new_pull_request_is_reviewed_by_two_specialists_from_its_own_files(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    assert len(ci["send_pr"]()["review"]) == 1
+    session.expire_all()
+    run = session.query(AgentRun).one()
+    assert run.event == "pr_review" and run.status == "started" and "2 review(s) of 1 file(s)" in run.reason
+    assert run.detail["pull_request"] == 7 and run.detail["files"] == [
+        "app/auth.py"
+    ]  # the binary and the removed file are not read
+    assert [r["persona"] for r in run.detail["reviews"]] == ["developer", "security-auditor"]
+    rows = session.query(PersonaRun).all()
+    assert len(rows) == 2 and all(r.status == "done" and r.model and r.created_by for r in rows)
+    assert all("Review pull request #7" in r.request and "abc123d" in r.request for r in rows)
+    assert all(r.findings and r.findings[0]["title"] == "SQL injection in find_user" for r in rows)
+    ev = session.query(AuditEvent).filter_by(action="automation.pr_review").one()
+    assert ev.target == "shop" and ev.detail["pull_request"] == 7 and ev.detail["reviews"] == 2
+    shown = client.get("/api/automations", headers=auth).json()["runs"][0]
+    assert shown["reviews"][0]["ai"] is True and shown["reviews"][0]["model"] and shown["reviews"][0]["findings"] == 1
+
+
+def test_nothing_is_posted_to_github_by_a_review(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    assert [r.method for r in ci["requests"] if r.url.host == "api.github.com"] == ["GET"] * len(
+        [r for r in ci["requests"] if r.url.host == "api.github.com"]
+    )
+
+
+def test_without_a_model_the_review_says_so_instead_of_making_one_up(client, auth, ci, session):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    run = session.query(AgentRun).one()
+    assert run.status == "skipped" and "No language model" in run.reason and session.query(PersonaRun).count() == 0
+
+
+def test_a_draft_a_new_commit_or_a_closed_pull_request_is_not_reviewed(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    assert ci["send_pr"](draft=True)["review"] == "ignored"
+    assert ci["send_pr"](action="synchronize")["review"] == "ignored"
+    assert ci["send_pr"](action="closed")["review"] == "ignored"
+    assert session.query(AgentRun).count() == 0
+    assert len(ci["send_pr"](action="ready_for_review")["review"]) == 1  # taken out of draft: now it is
+
+
+def test_the_same_pull_request_at_the_same_commit_is_reviewed_once(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    assert ci["send_pr"](action="reopened")["review"] == []
+    assert session.query(AgentRun).count() == 1
+
+
+def test_only_pull_requests_into_the_repositorys_branch_unless_all_branches_is_on(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"](base="release")
+    run = session.query(AgentRun).one()
+    assert run.status == "skipped" and "Not a pull request into main" in run.reason
+
+
+def test_the_daily_limit_counts_reviewed_pull_requests(client, auth, ci, session, model):
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth, daily_limit=1)
+    ci["send_pr"]()
+    ci["send_pr"](number=7, sha="ffffffffffff0000")
+    session.expire_all()
+    last = session.query(AgentRun).order_by(AgentRun.created_at.desc()).first()
+    assert last.status == "skipped" and "limit of 1 reviewed pull requests" in last.reason
+    assert svc.used_today(session, session.query(AgentRun).first().org_id, "pr_review") == 1
+
+
+def test_the_two_events_have_separate_switches_and_limits(client, auth, ci):
+    turn_on_pr(client, auth, ci["repo"]["id"], daily_limit=2)
+    e = client.get("/api/automations", headers=auth).json()["events"]
+    assert (
+        e["pr_review"]["repositories"][0]["enabled"] is True and e["pr_review"]["repositories"][0]["daily_limit"] == 2
+    )
+    assert e["ci_failure"]["repositories"][0]["enabled"] is False
+    assert (
+        client.put("/api/automations/rules/all", headers=auth, json={"enabled": True, "event": "deploy"}).status_code
+        == 422
+    )
+
+
+def test_the_changed_line_ranges_come_from_the_diff():
+    patch = "@@ -1,3 +1,6 @@\n a\n@@ -20 +23,2 @@\n b\n@@ -40,2 +45,0 @@\n c\n"
+    assert svc.hunks(patch) == [(1, 6), (23, 24)]  # a hunk that only deletes lines has nothing in the new file
+    assert svc.hunks("") == []

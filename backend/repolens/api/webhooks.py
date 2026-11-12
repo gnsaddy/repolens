@@ -71,4 +71,6 @@ def _on_pull_request(db: Session, payload: dict) -> dict:
                 synced.append(r.id)
             except Exception:  # no GitHub connection for that org: nothing to do
                 continue
-    return {"pr_synced": synced}
+    from ..services import automations
+
+    return {"pr_synced": synced, **automations.on_pull_request(db, payload)}

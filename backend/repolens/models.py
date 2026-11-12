@@ -1028,4 +1028,5 @@ class AgentRun(Base):
     title: Mapped[str] = mapped_column(String(300), default="")
     link: Mapped[str] = mapped_column(String(500), default="")  # the CI run's page
     investigation_ids: Mapped[list] = mapped_column(JSON, default=list)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)  # a pull request review: its files and the reviews made
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

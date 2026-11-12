@@ -123,6 +123,22 @@ class GitHubClient:
         except httpx.HTTPError as e:
             raise GitHubError(f"GitHub unreachable: {type(e).__name__}") from e
 
+    def file_text(self, repo: str, path: str, ref: str, cap: int = 120_000) -> str | None:
+        """A file as it is at a commit, or None when it is not there, is binary or is too large to be worth reading."""
+        try:
+            r = self.http.get(
+                f"/repos/{repo}/contents/{path}",
+                params={"ref": ref},
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+        except httpx.HTTPError as e:
+            raise GitHubError(f"GitHub unreachable: {type(e).__name__}") from e
+        if r.status_code in (404, 403, 422) or r.status_code >= 400:
+            return None
+        if len(r.content) > cap or b"\x00" in r.content[:2000]:
+            return None
+        return r.content.decode("utf-8", "replace")
+
     def default_branch(self, repo: str) -> str:
         d = self._get(f"/repos/{repo}")
         return str(d.get("default_branch", "main")) if isinstance(d, dict) else "main"
