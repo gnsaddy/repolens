@@ -28,7 +28,12 @@ function open(drafts: AgentDraft[], fail?: { status: number; detail: string }) {
     if (method !== "GET") calls.push({ method, url: u, body: init?.body ? JSON.parse(String(init.body)) : null });
     if (method === "POST" && fail) return json({ detail: fail.detail }, fail.status);
     if (method !== "GET") return json({ ok: true });
-    if (u.endsWith("/automations/inbox")) return json({ drafts });
+    if (u.includes("/automations/inbox")) {
+      const tab = new URL(u, "http://x").searchParams.get("status") ?? "open";
+      const states: Record<string, string[]> = { open: ["new", "read"], posted: ["posted"], archived: ["archived"] };
+      const count = (t: string) => drafts.filter((d) => states[t].includes(d.status)).length;
+      return json({ drafts: drafts.filter((d) => (states[tab] ?? []).includes(d.status)), counts: { open: count("open"), posted: count("posted"), archived: count("archived") } });
+    }
     return json({}, 404);
   });
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><FeedbackProvider><MemoryRouter><AgentInbox /></MemoryRouter></FeedbackProvider></QueryClientProvider>);
@@ -42,6 +47,9 @@ describe("agent inbox", () => {
     await within(box).findByText("PR #7: Fix the user lookup");
     expect(box).toHaveTextContent("Nothing the agent writes goes to GitHub by itself");
     expect(box).toHaveTextContent("2 waiting");
+    expect(within(box).getByRole("tab", { name: "Waiting 2" })).toHaveAttribute("aria-selected", "true");
+    expect(within(box).getByRole("tab", { name: "Posted 0" })).toBeInTheDocument();
+    expect(within(box).getByRole("tab", { name: "Archived 0" })).toBeInTheDocument();
     expect(within(box).getByRole("link", { name: "Investigation 1" })).toHaveAttribute("href", "/investigations/i1");
     expect(box).toHaveTextContent("AI written · claude-sonnet-5-5");
     expect(within(box).getByText("new")).toBeInTheDocument();
@@ -85,17 +93,17 @@ describe("agent inbox", () => {
     expect(screen.getByText("PR #7: Fix the user lookup")).toBeInTheDocument();
   });
 
-  it("marks a draft read and dismisses it, and a CI pointer has nothing to post", async () => {
+  it("marks a draft read and archives it, and a CI pointer has nothing to post", async () => {
     const calls = open([comment, ci]);
     const box = await screen.findByLabelText("Inbox");
     await within(box).findByText("CI failed on main");
     const rows = within(box).getAllByRole("listitem").filter((li) => li.textContent?.includes("CI failed on main") && li.querySelector("button"));
     expect(within(rows[0]).queryByRole("button", { name: "Post to the pull request" })).toBeNull();
     await userEvent.click(within(box).getByRole("button", { name: "Mark read" }));
-    await userEvent.click(within(box).getAllByRole("button", { name: "Dismiss" })[0]);
+    await userEvent.click(within(box).getAllByRole("button", { name: "Archive" })[0]);
     await waitFor(() => expect(calls.map((c) => c.method)).toEqual(["PATCH", "PATCH"]));
     expect(calls[0].body).toEqual({ status: "read" });
-    expect(calls[1].body).toEqual({ status: "dismissed" });
+    expect(calls[1].body).toEqual({ status: "archived" });
   });
 
   it("shows a comment that waits for its investigation, and cannot be posted yet", async () => {
@@ -116,5 +124,49 @@ describe("agent inbox", () => {
     expect(box).toHaveTextContent("drafted page update");
     expect(box).toHaveTextContent("- `billing.md` since 2026-10-01");
     expect(within(box).queryByRole("button", { name: "Post to the pull request" })).toBeNull();
+  });
+
+  const posted: AgentDraft = {
+    ...comment, id: "d6", status: "posted", title: "PR #4: v0.2.3", body: "### RepoLens review of #4\n\nNo findings.\n\n---\n_Written by an AI model through RepoLens and posted after a person approved it._",
+    posted_url: "https://github.com/acme/shop/pull/4#issuecomment-9", decided_by: "Ana", decided_at: new Date().toISOString(),
+  };
+
+  it("lists what was posted, with where, when and by whom, the exact text, and a link to the comment on GitHub", async () => {
+    open([comment, posted]);
+    const box = await screen.findByLabelText("Inbox");
+    await userEvent.click(await within(box).findByRole("tab", { name: "Posted 1" }));
+    await within(box).findByText("PR #4: v0.2.3");
+    expect(within(box).queryByText("PR #7: Fix the user lookup")).toBeNull(); // that one is still waiting
+    expect(box).toHaveTextContent("Posted just now by Ana");
+    expect(within(box).getByRole("link", { name: /View on GitHub/ })).toHaveAttribute("href", "https://github.com/acme/shop/pull/4#issuecomment-9");
+    await userEvent.click(within(box).getByText("View the posted comment"));
+    expect(within(box).getByLabelText("Posted comment for PR #4: v0.2.3")).toHaveTextContent("posted after a person approved it");
+    expect(within(box).queryByRole("button", { name: "Post to the pull request" })).toBeNull(); // it cannot be posted twice
+  });
+
+  it("archives a posted comment and restores it, and says it stays on GitHub", async () => {
+    const calls = open([posted, { ...posted, id: "d7", status: "archived", title: "PR #3: Dockerfile" }]);
+    const box = await screen.findByLabelText("Inbox");
+    await userEvent.click(await within(box).findByRole("tab", { name: "Posted 1" }));
+    await within(box).findByText("PR #4: v0.2.3");
+    await userEvent.click(within(box).getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ method: "PATCH", body: { status: "archived" } });
+    await userEvent.click(within(box).getByRole("tab", { name: /Archived/ }));
+    const row = (await within(box).findByText("PR #3: Dockerfile")).closest("li")!;
+    expect(row).toHaveTextContent("was posted");
+    await userEvent.click(within(row).getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(calls[1].body).toEqual({ status: "restore" });
+    expect(box).toHaveTextContent("a posted comment stays on GitHub");
+  });
+
+  it("says when a tab is empty", async () => {
+    open([comment]);
+    const box = await screen.findByLabelText("Inbox");
+    await userEvent.click(await within(box).findByRole("tab", { name: "Posted 0" }));
+    expect(await within(box).findByText("Nothing has been posted on a pull request yet.")).toBeInTheDocument();
+    await userEvent.click(within(box).getByRole("tab", { name: "Archived 0" }));
+    expect(await within(box).findByText("Nothing is archived.")).toBeInTheDocument();
   });
 });

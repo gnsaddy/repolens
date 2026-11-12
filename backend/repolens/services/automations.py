@@ -268,6 +268,7 @@ def on_workflow_run(db: Session, payload: dict) -> dict:
         prs = [int(x["number"]) for x in (wr.get("pull_requests") or []) if isinstance(x, dict) and x.get("number")][:3]
         if prs:
             run.detail = {"pull_requests": prs, "head": str(wr.get("head_sha") or "")[:40]}
+        agent_controls.mark_working(run)
         agent_controls.trace(
             run,
             f"GitHub reported that workflow run {run_id} failed on {wr.get('head_branch') or 'a branch'}. "
@@ -312,24 +313,29 @@ def _finish(
     run.status, run.reason = status, reason[:500]
     if ids is not None:
         run.investigation_ids = ids
-    run.detail = {**(detail or {k: v for k, v in (run.detail or {}).items()}), **keep}
+    base = dict(detail) if detail is not None else dict(run.detail or {})
+    base.pop("working", None)  # finished
+    run.detail = {**base, **keep}
     agent_controls.trace(run, f"{status}: {reason}")
     db.commit()
 
 
-def _again(db: Session, run: AgentRun, e: GitHubError, fn, args: tuple) -> bool:  # type: ignore[no-untyped-def]
+def _again(db: Session, run: AgentRun, e: Exception, fn, args: tuple) -> bool:  # type: ignore[no-untyped-def]
     """GitHub could not be reached, or was rate limiting: try the same work again after a wait, a few times."""
-    if not agent_controls.transient(e):
+    if not (
+        isinstance(e, agent_controls.TransientError) or (isinstance(e, GitHubError) and agent_controls.transient(e))
+    ):
         return False
     delays = get_settings().automation_retry_delays
     wait = agent_controls.next_delay(run, delays)
     if wait is None:
         return False
     tried = int((run.detail or {}).get("attempts", 1))
-    run.detail = {**(run.detail or {}), "attempts": tried + 1}
+    run.detail = {**(run.detail or {}), "attempts": tried + 1, "working": True}
     run.status = "started"
     run.reason = (
-        f"GitHub could not be reached ({e}); trying again in {wait / 60:g} minute(s), "
+        f"{'The AI model was busy' if isinstance(e, agent_controls.TransientError) else 'GitHub could not be reached'} "
+        f"({e}); trying again in {wait / 60:g} minute(s), "
         f"try {tried + 1} of {len(delays) + 1}"
     )
     agent_controls.trace(run, run.reason)
@@ -505,6 +511,7 @@ def on_pull_request(db: Session, payload: dict) -> dict:
             title=title,
             link=link,
         )
+        agent_controls.mark_working(run)
         agent_controls.trace(
             run,
             f"GitHub reported that pull request #{number} was {action}. The rule for "
@@ -516,6 +523,24 @@ def on_pull_request(db: Session, payload: dict) -> dict:
         _submit(work_pr, run.id, full, int(number))
         started.append(run.id)
     return {"review": started}
+
+
+_SECRET = re.compile(r"(^|/)(\.env[^/]*|[^/]*\.(pem|key|crt|p12|pfx)|id_(rsa|ed25519|ecdsa)[^/]*)$", re.I)
+_LOCKFILE = re.compile(
+    r"(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|pipfile\.lock|go\.sum|cargo\.lock|gemfile\.lock|composer\.lock)$",
+    re.I,
+)
+
+
+def skip_reason(path: str) -> str | None:
+    """Why a changed file is not sent to the model for a review, or None. Only files that may hold a secret and lock
+    files (long and machine written) are left out: a Dockerfile, a CI workflow or a manifest is what a reviewer should
+    read. (The list a suggested fix must never edit is a different list, and was wrongly used here before.)"""
+    if _SECRET.search(path):
+        return "it may hold a secret"
+    if _LOCKFILE.search(path):
+        return "it is a lock file"
+    return None
 
 
 def hunks(patch: str) -> list[tuple[int, int]]:
@@ -539,7 +564,7 @@ def work_pr(agent_run_id: str, full_name: str, number: int) -> None:
             return
         try:
             _work_pr(db, run, full_name, number, make_client)
-        except GitHubError as e:
+        except (GitHubError, agent_controls.TransientError) as e:
             db.rollback()
             if _again(db, run, e, work_pr, (agent_run_id, full_name, number)):
                 return
@@ -551,7 +576,7 @@ def work_pr(agent_run_id: str, full_name: str, number: int) -> None:
 
 
 def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_client) -> None:  # type: ignore[no-untyped-def]
-    from . import fixes, personas
+    from . import personas
 
     who = _who(db, run)
     if who is None:
@@ -574,24 +599,31 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
     head = str((pull.get("head") or {}).get("sha") or "")
     title = str(pull.get("title") or "")
     files = [f for f in client.pull_files(full_name, number) if f.get("status") != "removed" and f.get("filename")]
-    files = [f for f in files if not fixes.forbidden(str(f["filename"]))]
+    skipped: list[dict] = [
+        {"file": str(f["filename"]), "why": w} for f in files if (w := skip_reason(str(f["filename"])))
+    ]
+    files = [f for f in files if not skip_reason(str(f["filename"]))]
     files.sort(key=lambda f: -(int(f.get("additions") or 0) + int(f.get("deletions") or 0)))
     texts: dict[str, str] = {}
     spans: dict[str, list[tuple[int, int]]] = {}
     for f in files:
-        if len(texts) >= MAX_PR_FILES:
-            break
         path = str(f["filename"])
+        if len(texts) >= MAX_PR_FILES:
+            skipped.append({"file": path, "why": f"only the {MAX_PR_FILES} largest changes are read"})
+            continue
         text = client.file_text(full_name, path, head, MAX_FILE_CHARS)
         if text is None:
+            skipped.append({"file": path, "why": "it is binary, too large or could not be read"})
             continue
         texts[path] = text
         spans[path] = hunks(str(f.get("patch") or "")) or [(1, 1)]
     agent_controls.trace(
         run,
         f"Read {len(texts)} changed file(s) at {head[:7]} (at most {MAX_PR_FILES}; binary, removed and "
-        "secret looking files are skipped).",
+        "files that may hold a secret and lock files are skipped).",
     )
+    if skipped:
+        agent_controls.trace(run, "Not read: " + "; ".join(f"{s['file']} ({s['why']})" for s in skipped[:10]))
     if not texts:
         _finish(db, run, "skipped", "The pull request changes no text file that can be read")
         return
@@ -599,6 +631,14 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
         f"Review pull request #{number}: {title}\n\nChanged files: {', '.join(texts)}\n"
         f"Read at the pull request's latest commit {head[:7]}; the lines it changed are the ones to look at."
     )
+    if skipped:
+        request += (
+            "\n\nChanged but NOT shown to you: "
+            + "; ".join(f"{s['file'][:80]} ({s['why']})" for s in skipped[:6])
+            + ". Do not say anything about what these contain, and do not say the pull request "
+            "changes only what you were shown."
+        )
+    request = request[: personas.REQUEST_MAX]
     scope = scope_for_user_id(db, rule.created_by)
     reviews: list[dict] = []
     for key in PR_PERSONAS:
@@ -637,6 +677,11 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
                 )
                 break
     done = [r for r in reviews if r["status"] == "done"]
+    if not done and all(agent_controls.busy(r["summary"]) for r in reviews):
+        if agent_controls.next_delay(run, get_settings().automation_retry_delays) is not None:
+            raise agent_controls.TransientError(
+                reviews[0]["summary"][:160]
+            )  # the model is busy: try the whole review later
     db.add(
         AuditEvent(
             org_id=run.org_id,
@@ -647,7 +692,14 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
             detail={"pull_request": number, "link": run.link, "reviews": len(done), "rule": rule.id},
         )
     )
-    detail = {"kind": PR, "pull_request": number, "head": head[:12], "files": list(texts), "reviews": reviews}
+    detail = {
+        "kind": PR,
+        "pull_request": number,
+        "head": head[:12],
+        "files": list(texts),
+        "skipped": skipped[:20],
+        "reviews": reviews,
+    }
     if not done:
         _finish(
             db,
@@ -718,7 +770,7 @@ def describe_runs(db: Session, runs: list[AgentRun]) -> list[dict]:
                 "id": r.id,
                 "event": r.event,
                 "retry": retry_kind(r),
-                "can_cancel": r.status == "started",
+                "can_cancel": r.status == "started" and agent_controls.working(r),
                 "trace": d.get("trace", []),
                 "tokens": per_run.get(r.id, 0),
                 "repo_id": r.repo_id,
@@ -732,6 +784,7 @@ def describe_runs(db: Session, runs: list[AgentRun]) -> list[dict]:
                     {**x, "ai": bool(x.get("model")), "present": x.get("id") in pr_runs} for x in d.get("reviews", [])
                 ],
                 "files": d.get("files", []),
+                "skipped": d.get("skipped", []),
             }
         )
     return out
@@ -861,7 +914,7 @@ def retry_kind(run: AgentRun) -> str | None:
         return "try_again"
     if run.status == "skipped":
         return "run_anyway"
-    if run.event == PR and run.status == "started":
+    if run.event == PR and run.status == "started" and not agent_controls.working(run):
         return "review_again"
     return None
 
@@ -879,9 +932,9 @@ def retry_run(db: Session, run: AgentRun, user_id: str) -> AgentRun:
         raise ValueError("This run cannot be tried again")
     target = int(run.event_key.split("-")[0])
     for d in db.scalars(select(AgentDraft).where(AgentDraft.run_id == run.id, AgentDraft.status.in_(("new", "read")))):
-        d.status, d.error = "dismissed", "Replaced by a newer try"
+        db.delete(d)  # the newer try replaces it: an old review is not kept unless it was posted or archived
     run.status, run.reason = "started", "Trying again"
-    run.detail = {"trace": (run.detail or {}).get("trace", [])}
+    run.detail = {"trace": (run.detail or {}).get("trace", []), "working": True}
     agent_controls.trace(run, f"An admin chose: {kind.replace('_', ' ')}")
     db.add(
         AuditEvent(

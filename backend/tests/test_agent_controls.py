@@ -104,13 +104,19 @@ def test_only_an_admin_sets_the_controls_and_a_bad_budget_is_refused(client, aut
 def test_a_run_that_is_going_on_can_be_cancelled_and_its_drafts_step_aside(client, auth, ci, session):
     turn_on(client, auth)
     ci["send"]()
+    (done,) = runs(client, auth)
+    assert done["can_cancel"] is False  # its work is finished: there is nothing to stop
+    assert client.post(f"/api/automations/runs/{done['id']}/cancel", headers=auth).status_code == 409
+    run = session.query(AgentRun).one()
+    run.detail = {**run.detail, "working": True}  # as it is while its work goes on
+    session.commit()
     (r,) = runs(client, auth)
     assert r["can_cancel"] is True and r["status"] == "started"
     assert client.post(f"/api/automations/runs/{r['id']}/cancel", headers=auth).status_code == 200
     session.expire_all()
     run = session.query(AgentRun).one()
     assert run.status == "cancelled" and run.reason == "Cancelled by an admin"
-    assert {d.status for d in session.query(AgentDraft).all()} == {"dismissed"}
+    assert session.query(AgentDraft).count() == 0  # what a cancelled run drafted is not kept
     assert session.query(AuditEvent).filter_by(action="automation.cancel").count() == 1
     (again,) = runs(client, auth)
     assert again["can_cancel"] is False and again["retry"] is None
@@ -222,12 +228,80 @@ def test_a_rate_limit_is_tried_again(client, auth, ci, session, monkeypatch):
     assert session.query(AgentRun).one().status == "started"
 
 
+BUSY = "The AI model could not write the review. generativelanguage.googleapis.com returned 503: This model is currently experiencing high demand. (model: gemini / x)"
+
+
+def busy_model(monkeypatch, calls_failing):
+    """The model provider answers with `busy` for the first `calls_failing` reviews, then works."""
+    from repolens.services import personas
+
+    real, n = personas.run, {"calls": 0}
+
+    def run(*a, **kw):
+        n["calls"] += 1
+        if n["calls"] <= calls_failing:
+            raise personas.PersonaError(BUSY)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(personas, "run", run)
+    return n
+
+
+def test_a_review_is_tried_again_later_when_the_model_provider_is_busy(client, auth, ci, session, model, monkeypatch):
+    monkeypatch.setenv("REPOLENS_AUTOMATION_RETRY_DELAYS", "[0, 0]")
+    get_settings.cache_clear()
+    n = busy_model(monkeypatch, 4)  # both specialists, twice each: the whole first try
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    session.expire_all()
+    run = session.query(AgentRun).one()
+    assert (
+        run.status == "started"
+        and run.detail["attempts"] == 2
+        and [r["status"] for r in run.detail["reviews"]] == ["done", "done"]
+    )
+    assert "The AI model was busy" in " | ".join(t["what"] for t in run.detail["trace"]) and n["calls"] == 6
+
+
+def test_a_review_gives_up_when_the_model_stays_busy_and_says_why(client, auth, ci, session, model, monkeypatch):
+    monkeypatch.setenv("REPOLENS_AUTOMATION_RETRY_DELAYS", "[0]")
+    get_settings.cache_clear()
+    busy_model(monkeypatch, 100)
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    session.expire_all()
+    run = session.query(AgentRun).one()
+    assert run.status == "failed" and "high demand" in run.reason and run.detail["attempts"] == 2
+
+
+def test_a_model_error_that_is_not_about_load_is_not_waited_for(client, auth, ci, session, model, monkeypatch):
+    from repolens.services import personas
+
+    monkeypatch.setenv("REPOLENS_AUTOMATION_RETRY_DELAYS", "[0, 0]")
+    get_settings.cache_clear()
+    calls = []
+
+    def bad(*a, **kw):
+        calls.append(1)
+        raise personas.PersonaError("The AI model could not write the review. The provider rejected the API key.")
+
+    monkeypatch.setattr(personas, "run", bad)
+    index_it(session, ci["repo"]["id"])
+    turn_on_pr(client, auth)
+    ci["send_pr"]()
+    run = session.query(AgentRun).one()
+    assert run.status == "failed" and "attempts" not in run.detail and len(calls) == 4  # each specialist twice, once
+
+
 # ------------------------------------------------------------------------------------------------ health
 def test_a_run_that_never_finished_is_marked_failed_and_the_health_page_says_so(client, auth, ci, session):
     turn_on(client, auth)
     ci["send"]()
     run = session.query(AgentRun).one()
     run.status, run.created_at = "started", datetime.now(UTC) - timedelta(hours=2)
+    run.detail = {**run.detail, "working": True}  # its work never finished
     session.commit()
     h = client.get("/api/metrics/health", headers=auth).json()
     assert h["agent"]["stuck"] == 1 and any("going on for over 45 minutes" in p for p in h["problems"])
@@ -239,6 +313,19 @@ def test_a_run_that_never_finished_is_marked_failed_and_the_health_page_says_so(
     assert (
         h["agent"]["failed_24h"] == 1 and any("failed in the last day" in p for p in h["problems"]) and h["ok"] is False
     )
+
+
+def test_a_run_that_finished_long_ago_is_never_marked_failed(client, auth, ci, session, model):
+    reviewed(client, auth, ci, session)
+    run = session.query(AgentRun).one()
+    assert run.status == "started" and "working" not in run.detail  # finished: it keeps the status started
+    run.created_at = datetime.now(UTC) - timedelta(hours=5)
+    session.commit()
+    assert agent_controls.reap_stuck(session) == 0
+    h = client.get("/api/metrics/health", headers=auth).json()
+    assert h["agent"]["stuck"] == 0 and h["agent"]["failed_24h"] == 0
+    (r,) = runs(client, auth)
+    assert r["status"] == "started" and r["can_cancel"] is False and r["retry"] == "review_again"
 
 
 def test_a_quiet_agent_adds_no_problem_to_the_health_page(client, auth, ci):
@@ -315,7 +402,7 @@ def test_if_the_investigation_fails_there_is_no_comment(client, auth, ci, sessio
     failed_on_pr(client, ci)
     finish(session, "failed")
     assert [d for d in inbox(client, auth) if d["kind"] == "pr_comment"] == []
-    assert session.query(AgentDraft).filter_by(kind="pr_comment").one().status == "dismissed"
+    assert session.query(AgentDraft).filter_by(kind="pr_comment").count() == 0
 
 
 def test_a_failed_run_that_is_not_on_a_pull_request_makes_no_comment(client, auth, ci, session):
@@ -433,3 +520,63 @@ def test_the_four_events_each_have_their_own_rules(client, auth, ci):
         client.put("/api/automations/rules/all", headers=auth, json={"enabled": True, "event": "nightly"}).status_code
         == 422
     )
+
+
+# ------------------------------------------------------------------------------------------------ the agent at a glance
+def summary(client, auth):
+    r = client.get("/api/automations/summary", headers=auth)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_a_workspace_that_never_used_the_agent_sees_it_as_off(client, auth, ci):
+    s = summary(client, auth)
+    assert (
+        s["rules_on"] == 0
+        and s["runs_24h"] == 0
+        and s["waiting"] == 0
+        and s["last_run"] is None
+        and s["paused"] is False
+    )
+    assert set(s["by_event"]) == {"ci_failure", "pr_review", "drift_draft", "watch"}
+
+
+def test_the_summary_counts_runs_failures_what_waits_and_the_last_run(client, auth, ci, session, model):
+    reviewed(client, auth, ci, session)
+    s = summary(client, auth)
+    assert s["rules_on"] == 1 and s["runs_24h"] == 1 and s["failed_24h"] == 0 and s["working_now"] == 0
+    assert s["waiting"] == 1 and s["tokens_used"] > 0
+    assert s["by_event"]["pr_review"] == {"runs": 1, "failed": 0} and s["by_event"]["ci_failure"] == {
+        "runs": 0,
+        "failed": 0,
+    }
+    assert (
+        s["last_run"]["event"] == "pr_review"
+        and s["last_run"]["status"] == "started"
+        and "PR #7" in s["last_run"]["title"]
+    )
+    controls(client, auth, paused=True, token_budget=9000)
+    s = summary(client, auth)
+    assert s["paused"] is True and s["token_budget"] == 9000
+
+
+def test_the_summary_shows_a_failed_run_and_a_run_going_on(client, auth, ci, session):
+    turn_on(client, auth)
+    ci["send"]()
+    run = session.query(AgentRun).one()
+    run.status, run.detail = "failed", {**run.detail}
+    session.commit()
+    assert summary(client, auth)["failed_24h"] == 1 and summary(client, auth)["by_event"]["ci_failure"]["failed"] == 1
+    run.status, run.detail = "started", {**run.detail, "working": True}
+    session.commit()
+    assert summary(client, auth)["working_now"] == 1
+
+
+def test_only_an_admin_sees_the_summary_and_only_for_their_workspace(client, auth, ci, session, model):
+    reviewed(client, auth, ci, session)
+    member = make_user(client, auth, "dev@acme.io")
+    assert client.get("/api/automations/summary", headers=member).status_code == 403
+    from tests.conftest import register
+
+    other = summary(client, register(client, "x@other.io", "Other"))
+    assert other["runs_24h"] == 0 and other["waiting"] == 0 and other["last_run"] is None

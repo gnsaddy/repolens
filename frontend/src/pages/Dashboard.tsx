@@ -6,6 +6,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { Spark } from "@/components/charts";
 import { Button, Card, CardTitle, Empty, Input, PageHeader, StatGroup, StatusDot } from "@/components/ui";
 import { api, type DashInsights, type Dashboard as D, type LLMSettings, type WikiOverview } from "@/lib/api";
+import AgentSummary from "@/components/AgentSummary";
 import { useAuth } from "@/lib/auth";
 import { cn, fmtTokens, pct, timeAgo } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ export default function Dashboard() {
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Describe a bug, paste a stack trace or ask about your codebase…" aria-label="Investigate" />
         <Button type="submit"><Search className="h-4 w-4" />Investigate</Button>
       </form>
+      <AgentSummary />
       {!finished && data && (
         <Card className="mb-6" aria-label="Getting started">
           <CardTitle icon={Rocket} right={<span className="caption-5 text-muted">{doneCount} of {steps.length} done</span>}>Getting started</CardTitle>

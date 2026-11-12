@@ -85,6 +85,7 @@ def _draft_for(db: Session, alert: DriftAlert) -> None:
         reason="Drafting the page",
         title=title,
     )
+    agent_controls.mark_working(run)
     agent_controls.trace(
         run,
         f"After an index, {alert.doc_path} describes code that changed ({len(alert.symbols)} symbol(s)); "
@@ -191,7 +192,7 @@ def on_investigation_done(db: Session, inv: Investigation) -> None:
             if d.meta.get("investigation_id") != inv.id or not d.meta.get("pending"):
                 continue
             if inv.status != "completed":
-                d.status, d.error = "dismissed", "The investigation did not finish, so there is no comment"
+                db.delete(d)  # the investigation did not finish, so there is no comment to keep
             else:
                 d.body = compose_ci_comment(db, inv, d.meta.get("link", ""))
                 d.meta = {**d.meta, "pending": False}

@@ -1,7 +1,7 @@
 name: CD
 # Images are published under the app's own version (backend/repolens/__init__.py) and only for a commit whose CI run
 # passed: after CI succeeds on a push to main, or when a version tag (or a manual run) is on a commit that already
-# passed CI. Until the version number changes, each green commit on main replaces the images of that version.
+# passed CI. Until the version number changes, each green commit on main replaces the images of that version; the first one also gets the tag v<version>.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -62,6 +62,29 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/repolens-web:${{ steps.meta.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release_tag:
+    # Once the images of a green commit on main are published, the commit gets the tag v<version> (once: an existing tag is
+    # never moved). A tag made with the workflow token does not start another run, so nothing is built twice and nothing is
+    # rolled out to a cluster by it; push the tag yourself to deploy.
+    needs: publish
+    if: ${{ github.event_name == 'workflow_run' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Tag the commit with the app version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.publish.outputs.tag }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION exists already, so it is left where it is"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$SHA" >/dev/null
+            echo "tagged $SHA as v$VERSION"
+          fi
 
   deploy:
     needs: publish

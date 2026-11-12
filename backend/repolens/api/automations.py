@@ -5,12 +5,12 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import Principal, current_principal
-from ..models import AgentDraft, AgentRule, AgentRun, AgentSetting, Repository
+from ..models import AgentDraft, AgentRule, AgentRun, AgentSetting, Repository, User
 from ..services import agent_controls as controls
 from ..services import automations as svc
 from ..services.github import GitHubError
@@ -136,14 +136,14 @@ def set_rule(target: str, body: RuleIn, p: Principal = Depends(current_principal
 
 # ------------------------------------------------------------------------------------------------ the inbox
 class DraftPatch(BaseModel):
-    status: str = Field(pattern="^(new|read|dismissed)$")
+    status: str = Field(pattern="^(new|read|dismissed|archived|restore)$")
 
 
 class ApproveIn(BaseModel):
     body: str | None = Field(default=None, max_length=svc.MAX_COMMENT)  # the comment as edited; none = as drafted
 
 
-def _draft_view(d: AgentDraft, run: dict | None, repo: str) -> dict:
+def _draft_view(d: AgentDraft, run: dict | None, repo: str, decided_by: str = "") -> dict:
     return {
         "id": d.id,
         "kind": d.kind,
@@ -157,6 +157,7 @@ def _draft_view(d: AgentDraft, run: dict | None, repo: str) -> dict:
         "link": (d.meta or {}).get("link", ""),
         "created_at": d.created_at,
         "decided_at": d.decided_at,
+        "decided_by": decided_by,
         "investigations": (run or {}).get("investigations", []),
         "reviews": (run or {}).get("reviews", []),
         "files": (run or {}).get("files", []),
@@ -178,14 +179,38 @@ def retry(run_id: str, p: Principal = Depends(current_principal), db: Session = 
     return {"id": run.id, "status": run.status, "reason": run.reason}
 
 
+@router.get("/summary")
+def summary(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """The agent at a glance for the Dashboard and Insights (admins)."""
+    authorize(db, p, "automation.read", "summary")
+    return controls.summary(db, p.org_id)
+
+
+TABS = {
+    "open": ("new", "read"),  # waiting for a person
+    "posted": ("posted",),  # put on GitHub after an approval
+    "archived": ("archived",),  # set aside by a person; a draft the agent replaces or cancels is removed, not kept
+}
+
+
 @router.get("/inbox")
 def inbox(status: str = "open", p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    """What the agent made. `open` is new and read; `all` adds dismissed and posted."""
+    """What the agent made. `open` is waiting, `posted` is what was put on GitHub, `archived` is what was set aside."""
     authorize(db, p, "automation.inbox", "list")
-    q = select(AgentDraft).where(AgentDraft.org_id == p.org_id).order_by(AgentDraft.created_at.desc())
-    if status == "open":
-        q = q.where(AgentDraft.status.in_(("new", "read")))
-    drafts = db.scalars(q.limit(50)).all()
+    counts = {
+        tab: db.scalar(
+            select(func.count())
+            .select_from(AgentDraft)
+            .where(AgentDraft.org_id == p.org_id, AgentDraft.status.in_(states))
+        )
+        or 0
+        for tab, states in TABS.items()
+    }
+    q = select(AgentDraft).where(AgentDraft.org_id == p.org_id)
+    if status in TABS:
+        q = q.where(AgentDraft.status.in_(TABS[status]))
+    order = AgentDraft.decided_at.desc() if status in ("posted", "archived") else AgentDraft.created_at.desc()
+    drafts = db.scalars(q.order_by(order, AgentDraft.created_at.desc()).limit(50)).all()
     runs = (
         {r.id: r for r in db.scalars(select(AgentRun).where(AgentRun.id.in_([d.run_id for d in drafts])))}
         if drafts
@@ -193,7 +218,20 @@ def inbox(status: str = "open", p: Principal = Depends(current_principal), db: S
     )
     described = {r["id"]: r for r in svc.describe_runs(db, list(runs.values()))}
     names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == p.org_id))}
-    return {"drafts": [_draft_view(d, described.get(d.run_id), names.get(d.repo_id, "")) for d in drafts]}
+    who = (
+        {
+            u.id: (u.name or u.email)
+            for u in db.scalars(select(User).where(User.id.in_([d.decided_by for d in drafts if d.decided_by])))
+        }
+        if drafts
+        else {}
+    )
+    return {
+        "counts": counts,
+        "drafts": [
+            _draft_view(d, described.get(d.run_id), names.get(d.repo_id, ""), who.get(d.decided_by, "")) for d in drafts
+        ],
+    }
 
 
 def _own_draft(db: Session, p: Principal, draft_id: str) -> AgentDraft:
@@ -205,12 +243,27 @@ def _own_draft(db: Session, p: Principal, draft_id: str) -> AgentDraft:
 
 @router.patch("/inbox/{draft_id}")
 def mark(draft_id: str, body: DraftPatch, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Mark read, archive, or restore. A posted comment can only be archived (it stays on GitHub); restoring an archived
+    comment that was posted puts it back under Posted, and any other archived draft back to waiting."""
     d = _own_draft(db, p, draft_id)
     authorize(db, p, "automation.inbox", draft_id, status=body.status)
-    if d.status == "posted":
+    if d.status == "posted" and body.status != "archived":
         raise HTTPException(409, "It was posted already")
-    d.status = body.status
-    d.decided_by, d.decided_at = (p.user_id, datetime.now(UTC)) if body.status == "dismissed" else ("", None)
+    status = "archived" if body.status == "dismissed" else body.status  # "dismissed" is the old name for archive
+    if status == "restore":
+        if d.status != "archived":
+            raise HTTPException(409, "Only an archived draft can be restored")
+        d.status = "posted" if d.posted_url else "new"
+    elif status == "archived":
+        if d.status == "archived":
+            raise HTTPException(409, "It is archived already")
+        d.status = "archived"
+        if not d.posted_url:  # who set a draft aside; a posted comment keeps who posted it
+            d.decided_by, d.decided_at = p.user_id, datetime.now(UTC)
+    else:
+        d.status = status
+        if not d.posted_url:
+            d.decided_by, d.decided_at = "", None
     db.commit()
     return {"id": d.id, "status": d.status}
 

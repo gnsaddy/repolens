@@ -5,16 +5,29 @@ Everything here is about the agent's own runs (`agent_runs`). It reads what the 
 model client keeps, so the budget counts what really happened.
 """
 
+import re
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import AgentDraft, AgentRun, AgentSetting, AuditEvent, LLMCallEvent
+from ..models import AgentDraft, AgentRule, AgentRun, AgentSetting, AuditEvent, LLMCallEvent
 from .github import GitHubError
 
 STUCK_AFTER = timedelta(minutes=45)  # a run that has said "started" this long was cut short (a restart, a hung call)
 TRACE_MAX = 40
+
+
+class TransientError(Exception):
+    """A failure that can pass by itself and is worth trying again after a wait: a model provider that is busy."""
+
+
+_BUSY = re.compile(r"\b(429|500|502|503|504)\b|high demand|overloaded|rate limit|quota|timed out|unavailable", re.I)
+
+
+def busy(message: str) -> bool:
+    """Whether a model's error says the provider is busy or limiting requests, not that the request was wrong."""
+    return bool(_BUSY.search(message))
 
 
 def setting(db: Session, org_id: str) -> AgentSetting | None:
@@ -29,6 +42,16 @@ def is_paused(db: Session, org_id: str) -> bool:
 def token_budget(db: Session, org_id: str) -> int:
     row = setting(db, org_id)
     return int(row.token_budget) if row else 0
+
+
+def working(run: AgentRun) -> bool:
+    """Whether the run's work is still going on. A finished run keeps the status `started` (it did start things), so the
+    status alone cannot say; the run is marked from its start until `_finish`."""
+    return bool((run.detail or {}).get("working"))
+
+
+def mark_working(run: AgentRun) -> None:
+    run.detail = {**(run.detail or {}), "working": True}
 
 
 def workflow_ids(run: AgentRun) -> list[str]:
@@ -93,12 +116,12 @@ def cancelled(db: Session, run: AgentRun) -> bool:
 def cancel(db: Session, run: AgentRun, user_id: str) -> AgentRun:
     """Stop a run that is going on: the work ends at its next step and what it drafted steps aside. A model call
     that is already in flight is not interrupted, and an investigation already handed over finishes by itself."""
-    if run.status != "started":
+    if run.status != "started" or not working(run):
         raise ValueError("Only a run that is going on can be cancelled")
     run.status, run.reason = "cancelled", "Cancelled by an admin"
     trace(run, "Cancelled by an admin")
     for d in db.scalars(select(AgentDraft).where(AgentDraft.run_id == run.id, AgentDraft.status.in_(("new", "read")))):
-        d.status, d.error = "dismissed", "The run was cancelled"
+        db.delete(d)  # what a cancelled run drafted is not kept
     db.add(
         AuditEvent(
             org_id=run.org_id,
@@ -134,6 +157,8 @@ def reap_stuck(db: Session, org_id: str | None = None) -> int:
         q = q.where(AgentRun.org_id == org_id)
     n = 0
     for run in db.scalars(q):
+        if not working(run):
+            continue  # it finished; `started` is also what a finished run says
         run.status, run.reason = "failed", "It did not finish (the server was restarted or a call hung). Try again."
         trace(run, "Marked as failed: it had been going on for over 45 minutes")
         n += 1
@@ -153,18 +178,14 @@ def health(db: Session, org_id: str) -> dict:
         )
         or 0
     )
-    stuck = (
-        db.scalar(
-            select(func.count())
-            .select_from(AgentRun)
-            .where(
-                AgentRun.org_id == org_id,
-                AgentRun.status == "started",
-                AgentRun.created_at < datetime.now(UTC) - STUCK_AFTER,
-            )
+    old = db.scalars(
+        select(AgentRun).where(
+            AgentRun.org_id == org_id,
+            AgentRun.status == "started",
+            AgentRun.created_at < datetime.now(UTC) - STUCK_AFTER,
         )
-        or 0
     )
+    stuck = sum(1 for r in old if working(r))
     budget, used = token_budget(db, org_id), tokens_used(db, org_id)
     problems = []
     if failed:
@@ -180,4 +201,39 @@ def health(db: Session, org_id: str) -> dict:
         "failed_24h": failed,
         "stuck": stuck,
         "problems": problems,
+    }
+
+
+def summary(db: Session, org_id: str) -> dict:
+    """The agent at a glance, for the Dashboard and Insights: is it on, what it did in the last day, what waits."""
+    since = datetime.now(UTC) - timedelta(hours=24)
+    runs = db.scalars(select(AgentRun).where(AgentRun.org_id == org_id, AgentRun.created_at >= since)).all()
+    by_event = {e: {"runs": 0, "failed": 0} for e in ("ci_failure", "pr_review", "drift_draft", "watch")}
+    for r in runs:
+        row = by_event.setdefault(r.event, {"runs": 0, "failed": 0})
+        row["runs"] += 1
+        row["failed"] += 1 if r.status == "failed" else 0
+    going = db.scalars(select(AgentRun).where(AgentRun.org_id == org_id, AgentRun.status == "started")).all()
+    last = db.scalar(select(AgentRun).where(AgentRun.org_id == org_id).order_by(AgentRun.created_at.desc()).limit(1))
+    return {
+        "paused": is_paused(db, org_id),
+        "rules_on": db.scalar(
+            select(func.count()).select_from(AgentRule).where(AgentRule.org_id == org_id, AgentRule.enabled.is_(True))
+        )
+        or 0,
+        "runs_24h": len(runs),
+        "failed_24h": sum(1 for r in runs if r.status == "failed"),
+        "working_now": sum(1 for r in going if working(r)),
+        "waiting": db.scalar(
+            select(func.count())
+            .select_from(AgentDraft)
+            .where(AgentDraft.org_id == org_id, AgentDraft.status.in_(("new", "read")))
+        )
+        or 0,
+        "tokens_used": tokens_used(db, org_id),
+        "token_budget": token_budget(db, org_id),
+        "by_event": by_event,
+        "last_run": {"title": last.title, "event": last.event, "status": last.status, "created_at": last.created_at}
+        if last
+        else None,
     }

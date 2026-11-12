@@ -91,7 +91,16 @@ class GitHubClient:
 
     def comment_pull(self, repo: str, number: int, body: str) -> str:
         """Add a comment to a pull request (GitHub treats it as an issue comment). Returns the comment's address."""
-        out = self._send("POST", f"/repos/{repo}/issues/{number}/comments", {"body": body})
+        try:
+            out = self._send("POST", f"/repos/{repo}/issues/{number}/comments", {"body": body})
+        except GitHubError as e:
+            if e.status in (401, 403, 404):  # a comment needs pull request access, not the contents a fix needs
+                raise GitHubError(
+                    f"GitHub refused ({e.status}). The saved token needs write access to pull requests "
+                    "(Pull requests: Read and write, or the repo scope) on this repository.",
+                    e.status,
+                ) from e
+            raise
         return str(out.get("html_url") or "")
 
     # ---- reading CI: the jobs of a workflow run that failed, and their logs ----

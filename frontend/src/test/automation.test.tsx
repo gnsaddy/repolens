@@ -39,7 +39,7 @@ const overview: AutomationOverview = {
     },
     {
       id: "a3", event: "pr_review", repo: "shop", title: "PR #7: Fix the user lookup", status: "started", reason: "2 review(s) of 1 file(s): 1 finding(s)", link: "https://github.com/acme/shop/pull/7",
-      created_at: new Date().toISOString(), files: ["app/auth.py"], investigations: [], retry: "review_again", can_cancel: false, trace: [], tokens: 0,
+      created_at: new Date().toISOString(), files: ["app/auth.py"], skipped: [{ file: ".env", why: "it may hold a secret" }], investigations: [], retry: "review_again", can_cancel: false, trace: [], tokens: 0,
       reviews: [
         { id: "p1", persona: "developer", status: "done", model: "claude-sonnet-5-5", findings: 1, summary: "", ai: true },
         { id: "", persona: "security-auditor", status: "failed", model: "", findings: 0, summary: "The AI model could not write the review.", ai: false, attempts: 2 },
@@ -126,6 +126,7 @@ describe("recent runs", () => {
     expect(runs).toHaveTextContent("1 finding");
     expect(runs).toHaveTextContent("Security auditor review");
     expect(runs).toHaveTextContent("Read: app/auth.py");
+    expect(runs).toHaveTextContent("Not read: .env (it may hold a secret)");
   });
 });
 

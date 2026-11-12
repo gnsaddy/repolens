@@ -115,6 +115,7 @@ function RunItem({ r }: { r: AutomationRun }) {
           {v.id ? <Link className="text-brand hover:underline" to={`/personas?run=${v.id}`}>{PERSONA_NAMES[v.persona] ?? v.persona} review</Link> : <span>{PERSONA_NAMES[v.persona] ?? v.persona} review</span>}
           <span className="text-muted">{v.status === "done" ? `${v.findings} finding${v.findings === 1 ? "" : "s"}${(v.attempts ?? 1) > 1 ? " (second try)" : ""}` : `${v.status}: ${v.summary}`}</span>{v.status === "done" && modelNote(v.ai, v.model ? [v.model] : [])}</p>))}
       {r.files.length > 0 && <p className="caption-5 text-muted">Read: {r.files.join(", ")}</p>}
+      {!!r.skipped?.length && <p className="caption-5 text-muted">Not read: {r.skipped.map((s) => `${s.file} (${s.why})`).join(", ")}</p>}
       {r.trace.length > 0 && (
         <details className="caption-5">
           <summary className="cursor-pointer text-muted hover:text-ink">Why it ran, and what it did</summary>

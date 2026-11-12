@@ -362,17 +362,21 @@ export interface PersonaDesign { hld: string; lld: string; diagram: string; comp
 export interface PersonaRunShort { id: string; persona: string; persona_name: string; mode?: string; title: string; status: string; repo: string; repo_id: string; created_at: string; found: number; high: number; tokens: FeatureTokens; shared: boolean; mine: boolean; author_name: string }
 export interface PersonaFinding { title: string; severity: string; file: string; line: number; evidence: string; explanation: string; suggestion: string; code: string; code_ok: boolean | null }
 export interface PersonaRunView extends PersonaRunShort { request: string; summary: string; findings: PersonaFinding[]; notes: { mode?: string; coverage: { file: string; whole: boolean; outline?: boolean }[]; main_files?: string[]; design?: PersonaDesign; dropped: number; reasons: string[]; limit: string; dependencies?: { facts: FeatureFact[]; hidden: number } }; model: string; error: string; base_sha: string; reused?: boolean }
+export interface AgentSummary {
+  paused: boolean; rules_on: number; runs_24h: number; failed_24h: number; working_now: number; waiting: number; tokens_used: number; token_budget: number;
+  by_event: Record<string, { runs: number; failed: number }>; last_run: { title: string; event: string; status: string; created_at: string } | null;
+}
 export interface AutomationRule { enabled: boolean; daily_limit: number; all_branches: boolean; re_review?: boolean }
 export interface AutomationEvent { all: AutomationRule; repositories: (AutomationRule & { id: string; name: string; own_rule: boolean })[]; used_today: number }
 export interface AutomationInvestigation { id: string; title: string; status: string; ai: boolean; models: string[]; tokens: number }
 export interface AutomationReview { id: string; persona: string; status: string; model: string; findings: number; summary: string; ai: boolean; attempts?: number }
 export interface AutomationRun {
   id: string; event: "ci_failure" | "pr_review" | "drift_draft" | "watch"; repo: string; title: string; status: "started" | "skipped" | "failed" | "cancelled"; reason: string; link: string; created_at: string;
-  investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[]; retry: "try_again" | "run_anyway" | "review_again" | null;
+  investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[]; skipped?: { file: string; why: string }[]; retry: "try_again" | "run_anyway" | "review_again" | null;
   can_cancel: boolean; trace: { at: string; what: string }[]; tokens: number;
 }
 export interface AgentDraft {
-  id: string; kind: "pr_comment" | "investigation" | "wiki_proposal" | "watch"; pending?: boolean; title: string; body: string; status: "new" | "read" | "dismissed" | "posted"; error: string; posted_url: string;
+  id: string; kind: "pr_comment" | "investigation" | "wiki_proposal" | "watch"; pending?: boolean; title: string; body: string; status: "new" | "read" | "dismissed" | "archived" | "posted"; error: string; posted_url: string; decided_by?: string; decided_at?: string | null;
   repo: string; link: string; created_at: string; investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[];
 }
 export interface AutomationRouting { task: string; tier: string; provider: string | null; model: string | null; why: string }
