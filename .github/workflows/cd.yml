@@ -63,28 +63,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  release_tag:
-    # Once the images of a green commit on main are published, the commit gets the tag v<version> (once: an existing tag is
-    # never moved). A tag made with the workflow token does not start another run, so nothing is built twice and nothing is
-    # rolled out to a cluster by it; push the tag yourself to deploy.
+  release:
+    # Once the images of a green commit on main are published, the commit gets the tag v<version> and a GitHub Release with
+    # the changelog as its notes. Both are made once: an existing tag or Release is never changed. A tag made with the
+    # workflow token does not start another run, so nothing is built twice and nothing is rolled out to a cluster by it;
+    # push the tag yourself to deploy.
     needs: publish
     if: ${{ github.event_name == 'workflow_run' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Tag the commit with the app version
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.event.workflow_run.head_sha }}", fetch-depth: 0 }
+      - name: Tag the commit and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.publish.outputs.tag }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "v$VERSION exists already, so it is left where it is"
-          else
-            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$SHA" >/dev/null
-            echo "tagged $SHA as v$VERSION"
-          fi
+        run: .github/scripts/release.sh "${{ needs.publish.outputs.tag }}" "${{ github.event.workflow_run.head_sha }}"
 
   deploy:
     needs: publish
