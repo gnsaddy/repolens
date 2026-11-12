@@ -89,6 +89,11 @@ class GitHubClient:
         out = r.json() if r.content else {}
         return out if isinstance(out, dict) else {}
 
+    def comment_pull(self, repo: str, number: int, body: str) -> str:
+        """Add a comment to a pull request (GitHub treats it as an issue comment). Returns the comment's address."""
+        out = self._send("POST", f"/repos/{repo}/issues/{number}/comments", {"body": body})
+        return str(out.get("html_url") or "")
+
     # ---- reading CI: the jobs of a workflow run that failed, and their logs ----
     def failed_jobs(self, repo: str, run_id: int) -> list[dict]:
         d = self._get(f"/repos/{repo}/actions/runs/{run_id}/jobs", per_page=100, filter="latest")

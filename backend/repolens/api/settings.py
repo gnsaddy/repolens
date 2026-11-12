@@ -322,6 +322,7 @@ def _registry_view(db: Session, org_id: str) -> dict:
         "connections": out,
         "savings_mode": savings,
         "independent_review": llm_router.review_enabled(db, org_id),
+        "explorer": llm_router.explorer_enabled(db, org_id),
         "plan": llm_router.plan(routes, savings),
         "multi": len(routes) > 1,
         "active": len(routes),
@@ -477,11 +478,29 @@ def delete_connection(conn_id: str, p: Principal = Depends(current_principal), d
 def set_routing(body: RoutingIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Savings mode: send plain tasks to cheaper models. Off means every task uses its normal tier."""
     authorize(db, p, "llm.configure", "routing", savings_mode=body.savings_mode)
-    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == p.org_id))
-    if row is None:
-        row = LLMSetting(org_id=p.org_id)
-        db.add(row)
+    row = _toggle_row(db, p.org_id)
     row.savings_mode, row.updated_by = body.savings_mode, p.user_id
+    db.commit()
+    return _registry_view(db, p.org_id)
+
+
+def _toggle_row(db: Session, org_id: str) -> LLMSetting:
+    """The organisation's model setting. When it has none yet the row is created from the model it uses now, so
+    switching a toggle never changes which model is used (a bare new row would default to the offline provider)."""
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
+    if row is None:
+        cfg = resolve_config(db, org_id)
+        row = LLMSetting(org_id=org_id, provider=cfg.provider, model=cfg.model, base_url=cfg.base_url)
+        db.add(row)
+    return row
+
+
+@router.put("/explorer")
+def set_explorer(body: IndependentReviewIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Let investigations look further: up to five read only looks at the code chosen by the model. Off by default."""
+    authorize(db, p, "llm.configure", "explorer", enabled=body.enabled)
+    row = _toggle_row(db, p.org_id)
+    row.explorer, row.updated_by = body.enabled, p.user_id
     db.commit()
     return _registry_view(db, p.org_id)
 
@@ -490,10 +509,7 @@ def set_routing(body: RoutingIn, p: Principal = Depends(current_principal), db: 
 def set_review(body: IndependentReviewIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Independent review: a second model pass over each investigation's evidence. Off by default; one call each."""
     authorize(db, p, "llm.configure", "independent review", enabled=body.enabled)
-    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == p.org_id))
-    if row is None:
-        row = LLMSetting(org_id=p.org_id)
-        db.add(row)
+    row = _toggle_row(db, p.org_id)
     row.independent_review, row.updated_by = body.enabled, p.user_id
     db.commit()
     return _registry_view(db, p.org_id)

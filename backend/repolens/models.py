@@ -493,6 +493,9 @@ class LLMSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     savings_mode: Mapped[bool] = mapped_column(Boolean, default=True)  # route simple tasks to cheaper models
     independent_review: Mapped[bool] = mapped_column(Boolean, default=False)  # a second, evidence-only look in each RCA
+    explorer: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # the investigation may look further, with read only tools
 
 
 class LLMConnection(Base):
@@ -1007,6 +1010,7 @@ class AgentRule(Base):
     all_branches: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # false: only failures on the repository's branch
+    re_review: Mapped[bool] = mapped_column(Boolean, default=False)  # pull requests: review again after a new commit
     created_by: Mapped[str] = mapped_column(String(32), default="")  # the work runs as this person
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -1030,3 +1034,36 @@ class AgentRun(Base):
     investigation_ids: Mapped[list] = mapped_column(JSON, default=list)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)  # a pull request review: its files and the reviews made
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class AgentDraft(Base):
+    """What the agent made, waiting for a person: a comment for a pull request (posted only after an approval), or a
+    pointer to the investigations a CI failure started. This is the inbox."""
+
+    __tablename__ = "agent_drafts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    run_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # pr_comment | investigation
+    title: Mapped[str] = mapped_column(String(300), default="")
+    body: Mapped[str] = mapped_column(Text, default="")  # the comment, in Markdown, as it would be posted
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)  # pr_comment: {repo (owner/name), number, head, link}
+    status: Mapped[str] = mapped_column(String(10), default="new", index=True)  # new | read | dismissed | posted
+    error: Mapped[str] = mapped_column(Text, default="")  # why the last attempt to post failed
+    posted_url: Mapped[str] = mapped_column(String(500), default="")
+    decided_by: Mapped[str] = mapped_column(String(32), default="")
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class AgentSetting(Base):
+    """Workspace wide controls over the agent: a pause switch and a daily token budget."""
+
+    __tablename__ = "agent_settings"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), unique=True)
+    paused: Mapped[bool] = mapped_column(Boolean, default=False)  # true: nothing starts by itself
+    token_budget: Mapped[int] = mapped_column(Integer, default=0)  # tokens the agent may use in a day; 0 = no limit
+    updated_by: Mapped[str] = mapped_column(String(32), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

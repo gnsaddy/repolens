@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..models import CacheEntry, Change, CodeChunk, PullRequest, Repository
 from ..services import cause_hints, llm_router, retrieval, skills, usage, walkthrough
+from ..services import explorer as explorer_svc
 from ..services.access import UNRESTRICTED, Scope
 from ..services.embeddings import Embedder
 from ..services.links import commit_url, file_url
@@ -50,6 +51,7 @@ class State(TypedDict, total=False):
     code_hits: list[dict]
     commits: list[dict]
     memory: list[dict]
+    explored: list[dict]
     callers: list[dict]
     docs: list[dict]
     tests: list[dict]
@@ -87,6 +89,7 @@ class Ctx:
     jira_issue_key: str | None = None
     features: Features = field(default_factory=Features)
     scope: Scope = UNRESTRICTED
+    explorer: bool = False  # the model may look further with read only tools (an admin's opt in)
 
 
 def _snippet(text: str, n: int = 14) -> str:
@@ -270,6 +273,80 @@ def build_graph(ctx: Ctx):
             f"{len(code_hits)} code chunks, {len(commit_map)} commits, {len(mem)} similar incidents, "
             f"{len(callers)} callers, {len(related_docs)} related docs, {len(related_tests)} tests",
         )
+
+    # ---- Explorer: a few read only looks chosen by the model (opt in) ------------------------------------------------
+    def explore(state: State):
+        if state.get("loops", 0) > 0:  # looked on the first pass; a wider search does not need it again
+            return {}, "already looked"
+        names = _repo_names(ctx, state["repo_ids"])
+        known = {h["chunk_id"] for h in state.get("code_hits", [])}
+
+        def to_hit(c: CodeChunk, tool: str) -> dict:
+            return {
+                "chunk_id": c.id,
+                "repo_id": c.repo_id,
+                "repo": names.get(c.repo_id, ""),
+                "file": c.file_path,
+                "symbol": c.symbol_name,
+                "parent": c.parent_symbol,
+                "start_line": c.start_line,
+                "end_line": c.end_line,
+                "snippet": _snippet(c.content),
+                "score": 0.04,
+                "symbol_match": False,
+                "matched_terms": [],
+                "sha": c.commit_sha,
+                "calls": c.calls[:15],
+                "explored": tool,
+            }
+
+        def run_tool(a: explorer_svc.Action) -> tuple[str, list[dict]]:
+            if a.tool == "search":
+                chunks = [
+                    h.chunk
+                    for h in retrieval.search_chunks(
+                        ctx.db,
+                        ctx.org_id,
+                        a.args["query"],
+                        state["repo_ids"],
+                        k=6,
+                        embedder=ctx.embedder,
+                        mode=ctx.features.search_mode,
+                        rerank=ctx.features.rerank,
+                    )
+                ]
+            elif a.tool == "open":
+                q = select(CodeChunk).where(CodeChunk.org_id == ctx.org_id, CodeChunk.file_path == a.args["file"])
+                if state["repo_ids"]:
+                    q = q.where(CodeChunk.repo_id.in_(state["repo_ids"]))
+                rows = list(ctx.db.scalars(q.order_by(CodeChunk.start_line).limit(60)).all())
+                start = a.args.get("start")
+                chunks = sorted(rows, key=lambda c: abs(c.start_line - start))[:3] if start else rows[:3]
+            else:
+                chunks = retrieval.find_callers(ctx.db, ctx.org_id, state["repo_ids"], a.args["symbol"], limit=5)
+            fresh = [c for c in chunks if c.id not in known]
+            known.update(c.id for c in fresh)
+            text = (
+                "; ".join(
+                    f"{c.file_path}:{c.start_line}-{c.end_line} {c.symbol_name or ''}".strip() for c in chunks[:8]
+                )
+                or "nothing found"
+            )
+            if a.tool == "open" and chunks:
+                text += "\n" + _snippet(chunks[0].content, 10)
+            return text, [to_hit(c, a.tool) for c in fresh]
+
+        def ask(prompt: str) -> str:
+            return ctx.llm.complete(
+                "explorer", explorer_svc.SYSTEM, prompt, max_tokens=500, task=Task("explorer", prompt_chars=len(prompt))
+            ).text
+
+        evidence = [
+            f"{h['file']}:{h['start_line']}-{h['end_line']} {h.get('symbol') or ''}"
+            for h in state.get("code_hits", [])[:8]
+        ]
+        added, steps = explorer_svc.explore(ask, run_tool, state["query"], evidence)
+        return {"code_hits": [*state.get("code_hits", []), *added], "explored": steps}, explorer_svc.describe(steps)
 
     # ---- Triage / ranking ----------------------------------------------------------------------------------
     def rank(state: State):
@@ -657,7 +734,12 @@ def build_graph(ctx: Ctx):
     g.add_node("verify", timed("verify", "verifier", ctx, verify))
     g.add_edge(START, "planner")
     g.add_edge("planner", "gather")
-    g.add_edge("gather", "rank")
+    if ctx.explorer and not ctx.llm.offline:
+        g.add_node("explore", timed("explore", "explorer", ctx, explore))
+        g.add_edge("gather", "explore")
+        g.add_edge("explore", "rank")
+    else:
+        g.add_edge("gather", "rank")
     g.add_conditional_edges(
         "rank",
         lambda s: "synthesize" if s.get("enough") else "gather",

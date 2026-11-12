@@ -52,6 +52,9 @@ ACTION_MIN_ROLE = {
     "group.overview": "member",  # writing an overview uses the model
     "group.ask": "viewer",  # a question about chosen repositories, answered like Ask
     "automation.read": "admin",  # which rules are on and what they started
+    "automation.inbox": "admin",  # read, mark and dismiss what the agent made
+    "automation.run": "admin",  # try a run again, or review a pull request again, on purpose
+    "automation.post": "admin",  # put a drafted comment on a pull request: the only way the agent writes to GitHub
     "automation.configure": "admin",  # lets RepoLens start work by itself; runs as the admin who sets it
 }
 _RANK = {"viewer": 0, "member": 1, "admin": 2}

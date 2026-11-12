@@ -15,6 +15,7 @@ every start is written to the audit log. Which model wrote what is kept on the r
 
 import logging
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
@@ -22,9 +23,19 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..models import AgentRule, AgentRun, AuditEvent, Investigation, LLMCallEvent, PersonaRun, Repository, User
+from ..models import (
+    AgentDraft,
+    AgentRule,
+    AgentRun,
+    AuditEvent,
+    Investigation,
+    LLMCallEvent,
+    PersonaRun,
+    Repository,
+    User,
+)
 from ..security import redact_stored
-from . import ci_logs
+from . import agent_controls, ci_logs
 from .access import scope_for_user_id
 from .github import GitHubError
 from .investigations import create_investigation, submit
@@ -34,7 +45,9 @@ _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="automation")
 
 CI = "ci_failure"
 PR = "pr_review"
-EVENTS = (CI, PR)
+DRIFT = "drift_draft"
+WATCH = "watch"
+EVENTS = (CI, PR, DRIFT, WATCH)
 EVENT = CI  # kept for callers that mean the first event
 MAX_JOBS = 3  # failed jobs read from one run
 MAX_PER_RUN = 3  # investigations started from one run
@@ -42,6 +55,7 @@ TAIL = 6000  # characters of a log kept when no test or trace can be told apart 
 PR_PERSONAS = ("developer", "security-auditor")
 MAX_PR_FILES = 10  # changed files read for one review
 MAX_FILE_CHARS = 120_000
+MAX_REVIEWS_PER_PR = 5  # a pull request reviewed again after new commits is reviewed at most this often
 PR_ACTIONS = ("opened", "reopened", "ready_for_review")
 
 
@@ -64,14 +78,14 @@ def rule_for(db: Session, org_id: str, repo_id: str, event: str = CI) -> AgentRu
 def used_today(db: Session, org_id: str, event: str = CI) -> int:
     """What the daily limit counts: investigations started (CI failures) or pull requests reviewed, in the last day."""
     since = datetime.now(UTC) - timedelta(hours=24)
-    if event == PR:
+    if event != CI:
         return (
             db.scalar(
                 select(func.count())
                 .select_from(AgentRun)
                 .where(
                     AgentRun.org_id == org_id,
-                    AgentRun.event == PR,
+                    AgentRun.event == event,
                     AgentRun.status == "started",
                     AgentRun.created_at >= since,
                 )
@@ -209,6 +223,10 @@ def on_workflow_run(db: Session, payload: dict) -> dict:
         if rule is None or _seen(db, repo.org_id, CI, key):  # GitHub sends an event again when delivery is retried
             continue
         branch = repo.branch or repo.default_branch
+        blocked = agent_controls.gate(db, repo.org_id)
+        if blocked:
+            _skip(db, repo.org_id, rule, repo, CI, key, blocked, title, link)
+            continue
         if not rule.all_branches and wr.get("head_branch") != branch:
             _skip(
                 db,
@@ -247,6 +265,15 @@ def on_workflow_run(db: Session, payload: dict) -> dict:
             title=title,
             link=link,
         )
+        prs = [int(x["number"]) for x in (wr.get("pull_requests") or []) if isinstance(x, dict) and x.get("number")][:3]
+        if prs:
+            run.detail = {"pull_requests": prs, "head": str(wr.get("head_sha") or "")[:40]}
+        agent_controls.trace(
+            run,
+            f"GitHub reported that workflow run {run_id} failed on {wr.get('head_branch') or 'a branch'}. "
+            f"The rule for {'this repository' if rule.repo_id else 'every repository'} is on ({rule.daily_limit} a day"
+            f"{', every branch' if rule.all_branches else f', branch {branch}'}); {left} investigation(s) left today.",
+        )
         db.add(run)
         db.commit()
         _submit(work, run.id, full, int(run_id), min(left, MAX_PER_RUN))
@@ -267,6 +294,8 @@ def work(agent_run_id: str, full_name: str, gh_run_id: int, room: int) -> None:
             _work(db, run, full_name, gh_run_id, room, make_client)
         except GitHubError as e:
             db.rollback()
+            if _again(db, run, e, work, (agent_run_id, full_name, gh_run_id, room)):
+                return
             _finish(db, run, "failed", f"GitHub said no: {e}")
         except Exception as e:  # the record is the only place anyone will see why nothing started
             log.exception("automation failed")
@@ -277,12 +306,41 @@ def work(agent_run_id: str, full_name: str, gh_run_id: int, room: int) -> None:
 def _finish(
     db: Session, run: AgentRun, status: str, reason: str, ids: list[str] | None = None, detail: dict | None = None
 ) -> None:
+    if run.status == "cancelled":
+        return  # an admin cancelled it: that stands
+    keep = {k: v for k, v in (run.detail or {}).items() if k in ("trace", "attempts", "pull_requests", "workflow_ids")}
     run.status, run.reason = status, reason[:500]
     if ids is not None:
         run.investigation_ids = ids
-    if detail is not None:
-        run.detail = detail
+    run.detail = {**(detail or {k: v for k, v in (run.detail or {}).items()}), **keep}
+    agent_controls.trace(run, f"{status}: {reason}")
     db.commit()
+
+
+def _again(db: Session, run: AgentRun, e: GitHubError, fn, args: tuple) -> bool:  # type: ignore[no-untyped-def]
+    """GitHub could not be reached, or was rate limiting: try the same work again after a wait, a few times."""
+    if not agent_controls.transient(e):
+        return False
+    delays = get_settings().automation_retry_delays
+    wait = agent_controls.next_delay(run, delays)
+    if wait is None:
+        return False
+    tried = int((run.detail or {}).get("attempts", 1))
+    run.detail = {**(run.detail or {}), "attempts": tried + 1}
+    run.status = "started"
+    run.reason = (
+        f"GitHub could not be reached ({e}); trying again in {wait / 60:g} minute(s), "
+        f"try {tried + 1} of {len(delays) + 1}"
+    )
+    agent_controls.trace(run, run.reason)
+    db.commit()
+    if get_settings().run_jobs_inline or wait <= 0:
+        fn(*args)
+    else:
+        timer = threading.Timer(wait, lambda: _pool.submit(fn, *args))
+        timer.daemon = True  # a wait must not keep the server from stopping
+        timer.start()
+    return True
 
 
 def _who(db: Session, run: AgentRun) -> tuple[AgentRule, Repository, User] | None:
@@ -307,6 +365,7 @@ def _work(db: Session, run: AgentRun, full_name: str, gh_run_id: int, room: int,
         _finish(db, run, "failed", "GitHub is not connected, so the log cannot be read")
         return
     jobs = client.failed_jobs(full_name, gh_run_id)[:MAX_JOBS]
+    agent_controls.trace(run, f"GitHub lists {len(jobs)} failed job(s); their logs are read from the end.")
     if not jobs:
         _finish(db, run, "skipped", "GitHub lists no failed job for this run")
         return
@@ -337,6 +396,8 @@ def _work(db: Session, run: AgentRun, full_name: str, gh_run_id: int, room: int,
         return
     ids: list[str] = []
     for query, title in queries[:room]:
+        if agent_controls.cancelled(db, run):
+            return
         inv = create_investigation(db, run.org_id, rule.created_by, query, [repo.id], title)
         inv.source = "ci_auto"
         db.commit()
@@ -352,6 +413,26 @@ def _work(db: Session, run: AgentRun, full_name: str, gh_run_id: int, room: int,
             detail={"run": run.link, "started": len(ids), "rule": rule.id},
         )
     )
+    for number in (run.detail or {}).get("pull_requests", []):
+        db.add(
+            AgentDraft(
+                org_id=run.org_id,
+                repo_id=repo.id,
+                run_id=run.id,
+                kind="pr_comment",
+                title=f"CI failure on pull request #{number}",
+                body="",
+                meta={
+                    "repo": full_name,
+                    "number": number,
+                    "head": (run.detail or {}).get("head", ""),
+                    "link": run.link,
+                    "pending": True,
+                    "investigation_id": ids[0],
+                },
+            )
+        )
+    draft_investigations(db, run, repo, ids)
     more = len(queries) - len(ids)
     note = f"; {more} more not started (daily limit or the {MAX_PER_RUN} a run cap)" if more > 0 else ""
     _finish(db, run, "started", f"Started {len(ids)} investigation(s)" + note, ids)
@@ -363,7 +444,8 @@ def on_pull_request(db: Session, payload: dict) -> dict:
     pr = payload.get("pull_request") or {}
     full = (payload.get("repository") or {}).get("full_name") or ""
     number = pr.get("number")
-    if payload.get("action") not in PR_ACTIONS or not number or not full:
+    action = payload.get("action")
+    if action not in (*PR_ACTIONS, "synchronize") or not number or not full:
         return {"review": "ignored"}
     if pr.get("draft"):
         return {"review": "ignored"}  # reviewed when it is taken out of draft
@@ -376,7 +458,16 @@ def on_pull_request(db: Session, payload: dict) -> dict:
         rule = rule_for(db, repo.org_id, repo.id, PR)
         if rule is None or _seen(db, repo.org_id, PR, key):
             continue
+        if action == "synchronize" and not rule.re_review:
+            continue  # a new commit is only reviewed when the rule says so
+        if reviews_of(db, repo.org_id, number) >= MAX_REVIEWS_PER_PR:
+            _skip(db, repo.org_id, rule, repo, PR, key, f"Already reviewed {MAX_REVIEWS_PER_PR} times", title, link)
+            continue
         branch = repo.branch or repo.default_branch
+        blocked = agent_controls.gate(db, repo.org_id)
+        if blocked:
+            _skip(db, repo.org_id, rule, repo, PR, key, blocked, title, link)
+            continue
         if not rule.all_branches and base != branch:
             _skip(
                 db,
@@ -414,6 +505,12 @@ def on_pull_request(db: Session, payload: dict) -> dict:
             title=title,
             link=link,
         )
+        agent_controls.trace(
+            run,
+            f"GitHub reported that pull request #{number} was {action}. The rule for "
+            f"{'this repository' if rule.repo_id else 'every repository'} is on ({rule.daily_limit} a day"
+            f"{', every branch' if rule.all_branches else f', pull requests into {branch}'}).",
+        )
         db.add(run)
         db.commit()
         _submit(work_pr, run.id, full, int(number))
@@ -444,6 +541,8 @@ def work_pr(agent_run_id: str, full_name: str, number: int) -> None:
             _work_pr(db, run, full_name, number, make_client)
         except GitHubError as e:
             db.rollback()
+            if _again(db, run, e, work_pr, (agent_run_id, full_name, number)):
+                return
             _finish(db, run, "failed", f"GitHub said no: {e}")
         except Exception as e:
             log.exception("pull request review failed")
@@ -488,6 +587,11 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
             continue
         texts[path] = text
         spans[path] = hunks(str(f.get("patch") or "")) or [(1, 1)]
+    agent_controls.trace(
+        run,
+        f"Read {len(texts)} changed file(s) at {head[:7]} (at most {MAX_PR_FILES}; binary, removed and "
+        "secret looking files are skipped).",
+    )
     if not texts:
         _finish(db, run, "skipped", "The pull request changes no text file that can be read")
         return
@@ -498,24 +602,40 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
     scope = scope_for_user_id(db, rule.created_by)
     reviews: list[dict] = []
     for key in PR_PERSONAS:
-        try:
-            row, _ = personas.run(
-                db, run.org_id, rule.created_by, scope, repo, key, request, fresh=True, material=(texts, spans)
-            )
-            reviews.append(
-                {
-                    "id": row.id,
-                    "persona": key,
-                    "status": row.status,
-                    "model": row.model,
-                    "findings": len(row.findings or []),
-                    "summary": (row.summary or "")[:300],
-                }
-            )
-        except personas.PersonaError as e:
-            reviews.append(
-                {"id": "", "persona": key, "status": "failed", "model": "", "findings": 0, "summary": str(e)[:300]}
-            )
+        if agent_controls.cancelled(db, run):
+            return
+        for attempt in (1, 2):  # a model that answers with something unusable is tried once more
+            try:
+                row, _ = personas.run(
+                    db, run.org_id, rule.created_by, scope, repo, key, request, fresh=True, material=(texts, spans)
+                )
+                reviews.append(
+                    {
+                        "id": row.id,
+                        "persona": key,
+                        "status": row.status,
+                        "model": row.model,
+                        "findings": len(row.findings or []),
+                        "summary": (row.summary or "")[:300],
+                        "attempts": attempt,
+                    }
+                )
+                break
+            except personas.PersonaError as e:
+                if attempt == 1 and "could not write the review" in str(e):
+                    continue
+                reviews.append(
+                    {
+                        "id": "",
+                        "persona": key,
+                        "status": "failed",
+                        "model": "",
+                        "findings": 0,
+                        "summary": str(e)[:300],
+                        "attempts": attempt,
+                    }
+                )
+                break
     done = [r for r in reviews if r["status"] == "done"]
     db.add(
         AuditEvent(
@@ -537,6 +657,9 @@ def _work_pr(db: Session, run: AgentRun, full_name: str, number: int, make_clien
             detail=detail,
         )
         return
+    if agent_controls.cancelled(db, run):
+        return
+    draft_review(db, run, repo, full_name, number, head, [r["id"] for r in done])
     total = sum(r["findings"] for r in done)
     _finish(db, run, "started", f"{len(done)} review(s) of {len(texts)} file(s): {total} finding(s)", detail=detail)
 
@@ -567,6 +690,16 @@ def describe_runs(db: Session, runs: list[AgentRun]) -> list[dict]:
                 if model and model not in d["models"]:
                     d["models"].append(model)
                 d["tokens"] += int(tin or 0) + int(tout or 0)
+    wfs = {r.id: agent_controls.workflow_ids(r) for r in runs}
+    per_wf: dict[str, int] = {}
+    if any(wfs.values()):
+        for w, tin, tout in db.execute(
+            select(LLMCallEvent.workflow_id, LLMCallEvent.input_tokens, LLMCallEvent.output_tokens).where(
+                LLMCallEvent.workflow_id.in_([i for ids in wfs.values() for i in ids]), LLMCallEvent.kind == "chat"
+            )
+        ):
+            per_wf[w] = per_wf.get(w, 0) + int(tin or 0) + int(tout or 0)
+    per_run = {rid: sum(per_wf.get(i, 0) for i in ids) for rid, ids in wfs.items()}
     out = []
     for r in runs:
         d = r.detail or {}
@@ -584,6 +717,10 @@ def describe_runs(db: Session, runs: list[AgentRun]) -> list[dict]:
             {
                 "id": r.id,
                 "event": r.event,
+                "retry": retry_kind(r),
+                "can_cancel": r.status == "started",
+                "trace": d.get("trace", []),
+                "tokens": per_run.get(r.id, 0),
                 "repo_id": r.repo_id,
                 "title": r.title,
                 "status": r.status,
@@ -598,3 +735,167 @@ def describe_runs(db: Session, runs: list[AgentRun]) -> list[dict]:
             }
         )
     return out
+
+
+# ------------------------------------------------------------------------------------------------ the inbox
+def reviews_of(db: Session, org_id: str, number: int) -> int:
+    """How many times a pull request was reviewed (each new commit that was reviewed counts)."""
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(AgentRun)
+            .where(
+                AgentRun.org_id == org_id,
+                AgentRun.event == PR,
+                AgentRun.status == "started",
+                AgentRun.event_key.like(f"{number}-%"),
+            )
+        )
+        or 0
+    )
+
+
+PERSONA_NAMES = {"developer": "Developer", "security-auditor": "Security auditor"}
+FOOTER = (
+    "\n\n---\n_Written by an AI model through RepoLens and posted after a person approved it. "
+    "It can be wrong: check each point against the code._"
+)
+MAX_COMMENT = 60_000  # GitHub allows 65,536 characters
+
+
+def compose_review_comment(rows: list[PersonaRun], number: int, head: str) -> str:
+    """The reviews of one pull request as one Markdown comment. Only what the reviews say: no new claims."""
+    out = [f"### RepoLens review of #{number} at `{head[:7]}`", ""]
+    models = sorted({r.model for r in rows if r.model})
+    out.append(f"_AI generated by {', '.join(models) or 'a language model'}. Findings quote the code they are about._")
+    for r in rows:
+        out += ["", f"#### {PERSONA_NAMES.get(r.persona, r.persona)}", (r.summary or "").strip() or "No summary."]
+        findings = r.findings or []
+        if not findings:
+            out.append("")
+            out.append("No findings.")
+        for f in findings:
+            where = f"`{f.get('file')}:{f.get('line')}`" if f.get("line") else f"`{f.get('file')}`"
+            out += ["", f"- **{f.get('severity', 'info')}**: {f.get('title', '')} ({where})"]
+            if f.get("explanation"):
+                out.append(f"  {f['explanation']}")
+            if f.get("suggestion"):
+                out.append(f"  Suggestion: {f['suggestion']}")
+    return "\n".join(out)[:MAX_COMMENT]
+
+
+def draft_review(
+    db: Session, run: AgentRun, repo: Repository, full_name: str, number: int, head: str, persona_run_ids: list[str]
+) -> None:
+    rows = [r for r in (db.get(PersonaRun, i) for i in persona_run_ids) if r is not None]
+    if not rows:
+        return
+    db.add(
+        AgentDraft(
+            org_id=run.org_id,
+            repo_id=repo.id,
+            run_id=run.id,
+            kind="pr_comment",
+            title=run.title,
+            body=compose_review_comment(rows, number, head),
+            meta={"repo": full_name, "number": number, "head": head, "link": run.link},
+        )
+    )
+    db.commit()
+
+
+def draft_investigations(db: Session, run: AgentRun, repo: Repository, ids: list[str]) -> None:
+    if ids:
+        db.add(
+            AgentDraft(
+                org_id=run.org_id,
+                repo_id=repo.id,
+                run_id=run.id,
+                kind="investigation",
+                title=run.title,
+                meta={"link": run.link},
+            )
+        )
+        db.commit()
+
+
+def post_draft(db: Session, draft: AgentDraft, user_id: str, body: str | None = None) -> AgentDraft:
+    """Put a drafted comment on its pull request. Called only from an admin's approval; the one place the agent writes
+    to GitHub. A footer says an AI wrote it and a person approved it. On a refusal the draft stays, with the reason."""
+    from ..api.github import make_client
+
+    if draft.kind != "pr_comment":
+        raise ValueError("Only a pull request comment can be posted")
+    if (draft.meta or {}).get("pending"):
+        raise ValueError("The investigation is still running, so the comment is not ready yet")
+    text = (body if body is not None else draft.body).strip()
+    if not text or len(text) > MAX_COMMENT:
+        raise ValueError(f"The comment must be 1 to {MAX_COMMENT} characters")
+    if FOOTER.strip() not in text:
+        text += FOOTER
+    try:
+        url = make_client(db, draft.org_id).comment_pull(str(draft.meta["repo"]), int(draft.meta["number"]), text)
+    except GitHubError as e:
+        draft.error = str(e)[:400]
+        db.commit()
+        raise
+    draft.body, draft.status, draft.posted_url, draft.error = text, "posted", url, ""
+    draft.decided_by, draft.decided_at = user_id, datetime.now(UTC)
+    db.add(
+        AuditEvent(
+            org_id=draft.org_id,
+            actor_id=user_id,
+            action="automation.comment_posted",
+            target=str(draft.meta.get("repo", ""))[:200],
+            allowed=True,
+            detail={"pull_request": draft.meta.get("number"), "comment": url, "draft": draft.id},
+        )
+    )
+    db.commit()
+    return draft
+
+
+def retry_kind(run: AgentRun) -> str | None:
+    """What the button for this run says, or None when there is nothing to try again."""
+    if run.status == "failed":
+        return "try_again"
+    if run.status == "skipped":
+        return "run_anyway"
+    if run.event == PR and run.status == "started":
+        return "review_again"
+    return None
+
+
+def retry_run(db: Session, run: AgentRun, user_id: str) -> AgentRun:
+    """Run one record again on purpose: a failed run again, a skipped one anyway (past its branch or daily limit), or a
+    pull request that was reviewed once more. It reuses the record, so the same delivery is still handled only once;
+    drafts the earlier try left in the inbox are dismissed so the newest review is the one waiting."""
+    from .github import parse_github_repo
+
+    repo = db.get(Repository, run.repo_id)
+    full = parse_github_repo(repo.url) if repo else None
+    kind = retry_kind(run)
+    if repo is None or not full or kind is None:
+        raise ValueError("This run cannot be tried again")
+    target = int(run.event_key.split("-")[0])
+    for d in db.scalars(select(AgentDraft).where(AgentDraft.run_id == run.id, AgentDraft.status.in_(("new", "read")))):
+        d.status, d.error = "dismissed", "Replaced by a newer try"
+    run.status, run.reason = "started", "Trying again"
+    run.detail = {"trace": (run.detail or {}).get("trace", [])}
+    agent_controls.trace(run, f"An admin chose: {kind.replace('_', ' ')}")
+    db.add(
+        AuditEvent(
+            org_id=run.org_id,
+            actor_id=user_id,
+            action="automation.retry",
+            target=repo.name[:200],
+            allowed=True,
+            detail={"event": run.event, "how": kind, "link": run.link},
+        )
+    )
+    db.commit()
+    if run.event == PR:
+        _submit(work_pr, run.id, full, target)
+    else:
+        _submit(work, run.id, full, target, MAX_PER_RUN)
+    return run

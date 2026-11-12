@@ -210,7 +210,7 @@ export type Tier = "light" | "standard" | "strong";
 export interface RegModel { id: string; model: string; tier: Tier; enabled: boolean; input_price: number | null; output_price: number | null }
 export interface RegConnection { id: string; provider: string; base_url: string | null; has_key: boolean; legacy?: boolean; models: RegModel[] }
 export interface PlanRow { kind: string; label: string; tier: Tier; model: string | null; provider: string | null; why: string }
-export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; independent_review?: boolean; plan: PlanRow[]; multi: boolean; active: number }
+export interface ModelRegistry { connections: RegConnection[]; savings_mode: boolean; independent_review?: boolean; explorer?: boolean; plan: PlanRow[]; multi: boolean; active: number }
 export interface MemoryStats { enabled: boolean; entries: number; hits: number; tokens_saved: number; threshold: number; ttl_hours: number }
 
 export interface PageHit { repo: string; repo_id: string; path: string; title: string; snippet: string; start_line: number; score: number }
@@ -362,14 +362,20 @@ export interface PersonaDesign { hld: string; lld: string; diagram: string; comp
 export interface PersonaRunShort { id: string; persona: string; persona_name: string; mode?: string; title: string; status: string; repo: string; repo_id: string; created_at: string; found: number; high: number; tokens: FeatureTokens; shared: boolean; mine: boolean; author_name: string }
 export interface PersonaFinding { title: string; severity: string; file: string; line: number; evidence: string; explanation: string; suggestion: string; code: string; code_ok: boolean | null }
 export interface PersonaRunView extends PersonaRunShort { request: string; summary: string; findings: PersonaFinding[]; notes: { mode?: string; coverage: { file: string; whole: boolean; outline?: boolean }[]; main_files?: string[]; design?: PersonaDesign; dropped: number; reasons: string[]; limit: string; dependencies?: { facts: FeatureFact[]; hidden: number } }; model: string; error: string; base_sha: string; reused?: boolean }
-export interface AutomationRule { enabled: boolean; daily_limit: number; all_branches: boolean }
+export interface AutomationRule { enabled: boolean; daily_limit: number; all_branches: boolean; re_review?: boolean }
 export interface AutomationEvent { all: AutomationRule; repositories: (AutomationRule & { id: string; name: string; own_rule: boolean })[]; used_today: number }
 export interface AutomationInvestigation { id: string; title: string; status: string; ai: boolean; models: string[]; tokens: number }
-export interface AutomationReview { id: string; persona: string; status: string; model: string; findings: number; summary: string; ai: boolean }
+export interface AutomationReview { id: string; persona: string; status: string; model: string; findings: number; summary: string; ai: boolean; attempts?: number }
 export interface AutomationRun {
-  id: string; event: "ci_failure" | "pr_review"; repo: string; title: string; status: "started" | "skipped" | "failed"; reason: string; link: string; created_at: string;
-  investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[];
+  id: string; event: "ci_failure" | "pr_review" | "drift_draft" | "watch"; repo: string; title: string; status: "started" | "skipped" | "failed" | "cancelled"; reason: string; link: string; created_at: string;
+  investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[]; retry: "try_again" | "run_anyway" | "review_again" | null;
+  can_cancel: boolean; trace: { at: string; what: string }[]; tokens: number;
+}
+export interface AgentDraft {
+  id: string; kind: "pr_comment" | "investigation" | "wiki_proposal" | "watch"; pending?: boolean; title: string; body: string; status: "new" | "read" | "dismissed" | "posted"; error: string; posted_url: string;
+  repo: string; link: string; created_at: string; investigations: AutomationInvestigation[]; reviews: AutomationReview[]; files: string[];
 }
 export interface AutomationRouting { task: string; tier: string; provider: string | null; model: string | null; why: string }
-export interface AutomationOverview { model: { ai: boolean; provider: string; model: string; multi: boolean; routing: AutomationRouting[] }; events: { ci_failure: AutomationEvent; pr_review: AutomationEvent }; runs: AutomationRun[] }
+export interface AutomationOverview { model: { ai: boolean; provider: string; model: string; multi: boolean; routing: AutomationRouting[] }; events: { ci_failure: AutomationEvent; pr_review: AutomationEvent; drift_draft: AutomationEvent; watch: AutomationEvent }; runs: AutomationRun[];
+  controls: { paused: boolean; token_budget: number; tokens_used: number; failed_24h: number; stuck: number; problems: string[] } }
 export interface GithubLoginSettings { configured: boolean; app_configured: boolean; redirect_uri: string; allowed_domains?: string[]; default_role?: string; auto_provision?: boolean; enabled?: boolean }
