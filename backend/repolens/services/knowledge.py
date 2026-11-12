@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..models import CacheEntry, CodeChunk, Document, KGEdge, KGNode, Repository
 from ..telemetry import ANSWER_SECONDS, ANSWERS
-from . import answer_memory, context, name_check, skills, usage, walkthrough
+from . import answer_memory, context, inventory, name_check, skills, usage, walkthrough
 from .access import Scope
 from .graph import neighbors, node_dict
 from .links import file_url
@@ -356,7 +356,7 @@ def _named_leg(
     the question first), and up to two of their direct neighbours in the code graph (who calls them). Taken from the
     index by name, so it does not depend on how a search ranks them: code that never writes the word is still found."""
     like = [or_(CodeChunk.file_path.ilike(f"%{j}%"), CodeChunk.symbol_name.ilike(f"%{j}%")) for j in joined]
-    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type.notin_(("routes", "pr")), or_(*like))
+    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type.notin_(("routes", "pr", *inventory.TYPES)), or_(*like))
     if repo_ids:
         stmt = stmt.where(CodeChunk.repo_id.in_(repo_ids))
     rows = [

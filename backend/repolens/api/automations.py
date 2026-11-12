@@ -254,6 +254,7 @@ def mark(draft_id: str, body: DraftPatch, p: Principal = Depends(current_princip
         if d.status != "archived":
             raise HTTPException(409, "Only an archived draft can be restored")
         d.status = "posted" if d.posted_url else "new"
+        d.error = ""  # a reason it was set aside no longer applies
     elif status == "archived":
         if d.status == "archived":
             raise HTTPException(409, "It is archived already")
