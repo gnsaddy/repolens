@@ -1,0 +1,29 @@
+name: Release
+# Publish the GitHub Release for a version that already has images, for example one made before releases were automatic.
+# Run it from the Actions tab with the version (0.2.2). It tags the commit CI passed on if the tag is missing and never
+# changes a tag or Release that exists.
+on:
+  workflow_dispatch:
+    inputs:
+      version: { description: "Version without the v, for example 0.2.2", required: true }
+      commit: { description: "Commit to tag if the tag is missing (leave empty to use the tag as it is)", required: false }
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "the version must look like 0.2.2"; exit 1; }
+          SHA="${COMMIT:-$(git rev-parse "v$VERSION^{commit}" 2>/dev/null || true)}"
+          [ -n "$SHA" ] || { echo "v$VERSION does not exist yet, so give the commit to tag"; exit 1; }
+          .github/scripts/release.sh "$VERSION" "$SHA"

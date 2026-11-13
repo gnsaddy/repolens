@@ -27,6 +27,7 @@ KIND_TIER = {
     "runbook-writer": "standard",
     "feature-writer": "strong",  # a whole feature a person will review
     "persona-reviewer": "strong",  # a specialist review whose findings people act on
+    "explorer": "light",  # choosing the next look at the code: a short answer
     "fix-writer": "strong",  # writing code that a person will review: use the best model available
 }
 KIND_LABEL = {
@@ -129,6 +130,12 @@ def review_enabled(db: Session, org_id: str) -> bool:
     """Whether investigations get an independent second look (an extra model call). Off until an admin turns it on."""
     row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
     return bool(row and row.independent_review)
+
+
+def explorer_enabled(db: Session, org_id: str) -> bool:
+    """Whether investigations may look further with read only tools the model chooses. Off until an admin opts in."""
+    row = db.scalar(select(LLMSetting).where(LLMSetting.org_id == org_id))
+    return bool(row and row.explorer)
 
 
 def savings_mode(db: Session, org_id: str) -> bool:

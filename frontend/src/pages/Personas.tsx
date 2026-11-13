@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Lock, ShareNetwork as Share2, Sparkle as Sparkles, Trash as Trash2 } from "@phosphor-icons/react";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import { Badge, Button, Card, CardTitle, Empty, ErrorNote, Label, PageHeader, Panel, Spinner, Textarea } from "@/components/ui";
 import { api, type Persona, type PersonaDesign, type PersonaOverview, type PersonaRunView, type PersonaRunShort, type Repo } from "@/lib/api";
@@ -23,7 +24,8 @@ export default function PersonasPage() {
   const [repoId, setRepoId] = useState("");
   const [request, setRequest] = useState("");
   const [mode, setMode] = useState<"review" | "design">("review");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [sp] = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(sp.get("run"));  // a link such as /personas?run=ID opens that review
   const [reusedId, setReusedId] = useState<string | null>(null);
   const personas = useQuery({ queryKey: ["personas"], queryFn: () => api<{ personas: Persona[] }>("/personas") });
   const repos = useQuery({ queryKey: ["repos"], queryFn: () => api<Repo[]>("/repositories") });

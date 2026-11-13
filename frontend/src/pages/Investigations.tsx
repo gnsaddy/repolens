@@ -60,7 +60,7 @@ export default function Investigations() {
             <thead className="text-left caption-5 text-muted"><tr><th className="pb-2 font-medium">Title</th><th className="font-medium">Status</th><th className="font-medium">Confidence</th><th className="font-medium">Jira</th><th className="text-right font-medium">Started</th></tr></thead>
             <tbody>{list.data.map((i) => (
               <tr key={i.id} className="border-t border-line">
-                <td className="max-w-sm truncate py-2"><Link className="text-brand hover:underline" to={`/investigations/${i.id}`}>{i.title}</Link></td>
+                <td className="max-w-sm truncate py-2"><Link className="text-brand hover:underline" to={`/investigations/${i.id}`}>{i.title}</Link>{i.source === "ci_auto" && <Badge tone="blue" className="ml-2" title="Started by an automation when a CI run failed">automatic</Badge>}</td>
                 <td><Badge tone={statusTone(i.status)}>{i.status}</Badge></td>
                 <td>{i.status === "completed" ? pct(i.confidence) : "—"}</td>
                 <td className="text-muted">{i.jira_issue_key ?? "—"}</td>

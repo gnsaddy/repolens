@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # A failed index is tried again after each of these many seconds when the error can pass by itself (a timeout, a
     # network drop); a wrong path or password is not retried. Empty turns retries off.
     index_retry_delays: list[float] = Field(default_factory=lambda: [60.0, 300.0])
+    # Seconds to wait before an automatic run is tried again after GitHub could not be reached (one entry per retry).
+    # Empty turns it off. A refusal (a token without access) is never retried.
+    automation_retry_delays: list[float] = Field(default_factory=lambda: [60.0, 300.0, 900.0])
     # Seconds git may take to read a repository's commit history while indexing. A blob-less clone fetches the files
     # each commit changed as it goes, so a big repository such as OpenSSL needs far longer than the 120 seconds of
     # other git calls.

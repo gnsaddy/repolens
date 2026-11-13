@@ -13,6 +13,7 @@ from .api import (
     account,
     audit,
     auth,
+    automations,
     bitbucket,
     chat,
     features,
@@ -137,6 +138,28 @@ async def _retention_sweeper(hours: float = 24.0) -> None:
         await asyncio.sleep(hours * 3600)
 
 
+async def _agent_watcher(hours: float = 24.0) -> None:
+    """Once a day the agent's watch lists pages that have been out of date for a long time (no model is used)."""
+    from .db import session_factory
+    from .services import agent_triggers
+
+    def run() -> None:
+        with session_factory()() as db:
+            made = agent_triggers.nightly(db)
+            if made:
+                logging.getLogger("repolens.automations").info("the nightly watch made %d list(s)", made)
+
+    await asyncio.sleep(900)  # not during start-up
+    while True:
+        try:
+            await asyncio.to_thread(run)
+            job_ok("agent-watch")
+        except Exception as e:
+            logging.getLogger("repolens.automations").exception("the nightly watch failed")
+            job_failed("agent-watch", e)
+        await asyncio.sleep(hours * 3600)
+
+
 async def _auto_reindexer(hours: float) -> None:
     """Once every `hours`, index again each repository that changed since its last index or whose last index failed."""
     from .api import repos
@@ -161,6 +184,7 @@ async def _auto_reindexer(hours: float) -> None:
 async def _investigation_reaper(seconds: float = 60.0) -> None:
     """Fail investigations left 'running' by a restart or a hung call, so they never spin forever."""
     from .db import session_factory
+    from .services import agent_controls
     from .services import investigations as inv_svc
 
     def sweep(restart: bool) -> None:
@@ -168,6 +192,9 @@ async def _investigation_reaper(seconds: float = 60.0) -> None:
             n = inv_svc.reap_stuck(db, restart=restart)
             if n:
                 logging.getLogger("repolens.investigations").warning("stopped %d stuck investigation(s)", n)
+            m = agent_controls.reap_stuck(db)
+            if m:
+                logging.getLogger("repolens.automations").warning("stopped %d stuck automatic run(s)", m)
 
     first = True
     await asyncio.sleep(5)  # let the app finish starting
@@ -195,11 +222,13 @@ async def lifespan(app: FastAPI):
     register_job("investigation-reaper", 60, 5)
     register_job("system-sampler", sysmetrics.INTERVAL)
     register_job("retention", 24 * 3600, 600)
+    register_job("agent-watch", 24 * 3600, 900)
     tasks = [
         asyncio.create_task(_source_scheduler()),
         asyncio.create_task(_investigation_reaper()),
         asyncio.create_task(_system_sampler()),
         asyncio.create_task(_retention_sweeper()),  # was written but never started, so the daily clean-up never ran
+        asyncio.create_task(_agent_watcher()),
     ]
     if s.auto_reindex_hours > 0 and not s.run_jobs_inline:
         register_job("daily-reindex", s.auto_reindex_hours * 3600, 900)
@@ -257,6 +286,7 @@ def create_app() -> FastAPI:
         github_login.public,
         github_login.admin,
         personas.router,
+        automations.router,
         fixes.router,
         chat.router,
         golden.router,
