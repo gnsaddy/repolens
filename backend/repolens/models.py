@@ -1067,3 +1067,19 @@ class AgentSetting(Base):
     token_budget: Mapped[int] = mapped_column(Integer, default=0)  # tokens the agent may use in a day; 0 = no limit
     updated_by: Mapped[str] = mapped_column(String(32), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class WebhookDelivery(Base):
+    """One webhook GitHub sent (or a self test), with what RepoLens did with it. For checking that the connection works.
+    Only a short note is kept, never the payload."""
+
+    __tablename__ = "webhook_deliveries"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), default="", index=True)  # "" when no repository matched
+    delivery_id: Mapped[str] = mapped_column(String(64), default="")  # GitHub's own id for the delivery
+    event: Mapped[str] = mapped_column(String(40), default="")
+    action: Mapped[str] = mapped_column(String(40), default="")
+    repo: Mapped[str] = mapped_column(String(200), default="")
+    outcome: Mapped[str] = mapped_column(String(20), default="ok")  # ok | ignored | rejected | error
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import get_db
 from ..deps import Principal, current_principal
 from ..models import AgentDraft, AgentRule, AgentRun, AgentSetting, Repository, User
 from ..services import agent_controls as controls
 from ..services import automations as svc
+from ..services import webhook_log
 from ..services.github import GitHubError
 from ..services.policy import authorize
 
@@ -184,6 +186,56 @@ def summary(p: Principal = Depends(current_principal), db: Session = Depends(get
     """The agent at a glance for the Dashboard and Insights (admins)."""
     authorize(db, p, "automation.read", "summary")
     return controls.summary(db, p.org_id)
+
+
+# ------------------------------------------------------------------------------------------------ the GitHub connection
+EVENTS_NEEDED = [
+    {"event": "Pull requests", "for": "reviewing each new pull request and keeping pull requests in sync"},
+    {"event": "Workflow runs", "for": "investigating a failed CI run"},
+    {"event": "Issue comments", "for": "the /repolens review and /repolens ask commands in a pull request comment"},
+    {"event": "Pushes", "for": "indexing a repository again after a push"},
+]
+
+
+def _delivery_view(d) -> dict:  # type: ignore[no-untyped-def]
+    return {
+        "id": d.id,
+        "event": d.event,
+        "action": d.action,
+        "repo": d.repo,
+        "outcome": d.outcome,
+        "note": d.note,
+        "at": d.created_at,
+    }
+
+
+@router.get("/webhook")
+def webhook(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """What is needed to connect GitHub, whether the server is ready for it, and the latest deliveries."""
+    authorize(db, p, "automation.read", "webhook")
+    rows = webhook_log.recent(db, p.org_id)
+    last_ok = next((d for d in rows if d.outcome in ("ok", "ignored") and d.event != "selftest"), None)
+    return {
+        "secret_set": bool(get_settings().github_webhook_secret),
+        "path": "/api/webhooks/github",
+        "events": EVENTS_NEEDED,
+        "last_delivery_at": last_ok.created_at if last_ok else None,
+        "deliveries": [_delivery_view(d) for d in rows],
+    }
+
+
+@router.post("/webhook/test")
+def webhook_test(p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """Check the receiving side without GitHub: sign a ping with the server's secret and run it through the same path.
+    It proves the secret is set and the receiver works; only a real delivery from GitHub proves GitHub can reach it."""
+    authorize(db, p, "automation.configure", "webhook_test")
+    secret = get_settings().github_webhook_secret
+    if not secret:
+        raise HTTPException(409, "No webhook secret is set on the server (REPOLENS_GITHUB_WEBHOOK_SECRET)")
+    from .webhooks import handle
+
+    handle(db, "selftest", {"action": "ping"}, "self-test", [p.org_id])
+    return webhook(p, db)
 
 
 TABS = {

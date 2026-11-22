@@ -90,7 +90,7 @@ function modelNote(ai: boolean, models: string[]) {
   return ai ? <Badge tone="green" title="The text of this report was written by an AI model">AI written{models.length ? ` · ${models.join(", ")}` : ""}</Badge> : <Badge tone="gray" title="No model wrote text for this: it is built from evidence by code">evidence only</Badge>;
 }
 
-const RETRY_LABEL = { try_again: "Try again", run_anyway: "Run anyway", review_again: "Review again" } as const;
+const RETRY_LABEL = { try_again: "Try again", run_anyway: "Run anyway", review_again: "Review again", answer_again: "Answer again" } as const;
 
 function RunItem({ r }: { r: AutomationRun }) {
   const qc = useQueryClient();

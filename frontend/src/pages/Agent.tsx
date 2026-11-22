@@ -1,6 +1,7 @@
-import { FileMagnifyingGlass, GitPullRequest, Lightning, Moon, ShieldCheck, UserCheck } from "@phosphor-icons/react";
+import { ChatCircleText, FileMagnifyingGlass, GitPullRequest, Lightning, Moon, ShieldCheck, UserCheck } from "@phosphor-icons/react";
 import AgentInbox from "@/components/AgentInbox";
 import AutomationPanel from "@/components/AutomationPanel";
+import GitHubConnection from "@/components/GitHubConnection";
 import { Card, CardTitle, PageHeader } from "@/components/ui";
 
 const FLOWS = [
@@ -18,6 +19,14 @@ const FLOWS = [
       "It reads the changed files as the pull request has them, up to ten, and the lines that changed.",
       "The Developer and the Security auditor each review them. A finding is kept only if it quotes real code.",
       "The reviews wait in the Inbox below as a draft comment. It is posted on the pull request only if an admin approves it.",
+    ],
+  },
+  {
+    icon: ChatCircleText, title: "Someone writes a command in a pull request", steps: [
+      "An owner, a member or a collaborator writes /repolens review, or /repolens ask followed by a question, as the first line of a comment. Anyone else, and any bot, is ignored.",
+      "It runs under the same switch, daily limit, pause and token budget as the review of a new pull request.",
+      "A review is made as above. A question is answered from the repository's index, and only if a model is connected.",
+      "The result waits in the Inbox as a draft. It is posted on the pull request only if an admin approves it.",
     ],
   },
   {
@@ -53,6 +62,7 @@ export default function AgentPage() {
       </Card>
       <AgentInbox />
       <AutomationPanel />
+      <GitHubConnection />
     </div>
   );
 }

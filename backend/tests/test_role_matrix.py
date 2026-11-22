@@ -266,6 +266,7 @@ ADMIN_ONLY_READS = {
     "/api/automations",  # which automatic rules are on and what they started
     "/api/automations/summary",  # the agent at a glance
     "/api/automations/inbox",  # what the agent drafted, waiting for a person
+    "/api/automations/webhook",  # the GitHub connection and the latest deliveries
     "/api/auth/people",
     "/api/auth/users",  # emails, roles and whether two-step sign-in is on, for everyone
     "/api/feedback/export",

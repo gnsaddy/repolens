@@ -309,7 +309,11 @@ def _finish(
 ) -> None:
     if run.status == "cancelled":
         return  # an admin cancelled it: that stands
-    keep = {k: v for k, v in (run.detail or {}).items() if k in ("trace", "attempts", "pull_requests", "workflow_ids")}
+    keep = {
+        k: v
+        for k, v in (run.detail or {}).items()
+        if k in ("trace", "attempts", "pull_requests", "workflow_ids", "question")
+    }
     run.status, run.reason = status, reason[:500]
     if ids is not None:
         run.investigation_ids = ids
@@ -915,7 +919,7 @@ def retry_kind(run: AgentRun) -> str | None:
     if run.status == "skipped":
         return "run_anyway"
     if run.event == PR and run.status == "started" and not agent_controls.working(run):
-        return "review_again"
+        return "answer_again" if run.event_key.startswith("ask-") else "review_again"
     return None
 
 
@@ -930,11 +934,16 @@ def retry_run(db: Session, run: AgentRun, user_id: str) -> AgentRun:
     kind = retry_kind(run)
     if repo is None or not full or kind is None:
         raise ValueError("This run cannot be tried again")
-    target = int(run.event_key.split("-")[0])
+    asked = run.event_key.startswith("ask-")  # a question put in a pull request comment, not a review
+    target = int(run.event_key.split("-")[1 if asked else 0])
     for d in db.scalars(select(AgentDraft).where(AgentDraft.run_id == run.id, AgentDraft.status.in_(("new", "read")))):
         db.delete(d)  # the newer try replaces it: an old review is not kept unless it was posted or archived
     run.status, run.reason = "started", "Trying again"
-    run.detail = {"trace": (run.detail or {}).get("trace", []), "working": True}
+    run.detail = {
+        "trace": (run.detail or {}).get("trace", []),
+        "working": True,
+        **({"question": run.detail["question"]} if asked and run.detail and run.detail.get("question") else {}),
+    }
     agent_controls.trace(run, f"An admin chose: {kind.replace('_', ' ')}")
     db.add(
         AuditEvent(
@@ -947,7 +956,11 @@ def retry_run(db: Session, run: AgentRun, user_id: str) -> AgentRun:
         )
     )
     db.commit()
-    if run.event == PR:
+    if asked:
+        from .agent_commands import work_ask
+
+        _submit(work_ask, run.id, full, target, str((run.detail or {}).get("question") or ""))
+    elif run.event == PR:
         _submit(work_pr, run.id, full, target)
     else:
         _submit(work, run.id, full, target, MAX_PER_RUN)
