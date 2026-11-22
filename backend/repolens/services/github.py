@@ -168,6 +168,26 @@ class GitHubClient:
         priv = d.get("private")
         return None if not isinstance(priv, bool) else not priv
 
+    def repo_access(self, repo: str) -> dict:
+        """What the saved token may do on a repository, as GitHub reports it, without changing anything: whether it is
+        public, whether the token can push (None when GitHub does not say, as it may not for some tokens), and the
+        default branch."""
+        d = self._get(f"/repos/{repo}")
+        if not isinstance(d, dict):
+            return {"public": None, "push": None, "default_branch": "main"}
+        perms = d.get("permissions")
+        push = perms.get("push") if isinstance(perms, dict) else None
+        vis, priv = d.get("visibility"), d.get("private")
+        public = (vis == "public") if isinstance(vis, str) and vis else (not priv if isinstance(priv, bool) else None)
+        return {
+            "public": public,
+            "push": push if isinstance(push, bool) else None,
+            "default_branch": str(d.get("default_branch", "main")),
+        }
+
+    def delete_branch(self, repo: str, branch: str) -> None:
+        self._send("DELETE", f"/repos/{repo}/git/refs/heads/{branch}", {})
+
     def branch_head(self, repo: str, branch: str) -> str:
         d = self._get(f"/repos/{repo}/git/ref/heads/{branch}")
         return str(d["object"]["sha"]) if isinstance(d, dict) else ""

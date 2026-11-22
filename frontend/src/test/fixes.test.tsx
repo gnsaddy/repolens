@@ -15,11 +15,12 @@ const fix = (over = {}) => ({
   tests: ["test the deleted user"], result: "", pr_url: "", created_at: new Date().toISOString(), checks: { syntax_ok: true, lines_changed: 2, notes: [] }, ...over,
 });
 
-function show(items: unknown[], canAct = true) {
+function show(items: unknown[], canAct = true, pre: unknown = { github: true, repo: "acme/shop", branch: "repolens/fix-abcdef12", push: true, public: false, token_user: "bot" }) {
   const calls: { url: string; method: string; body?: string }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
     calls.push({ url, method, body: init?.body as string | undefined });
+    if (url.endsWith("/preflight")) return json(pre);
     if (url.endsWith("/decision")) return json(fix({ status: "approved", pr_url: "https://github.com/a/b/pull/9" }));
     if (url.endsWith("/fix-proposals") && method === "POST") return json(fix(), 201);
     return json(items);
@@ -86,5 +87,29 @@ describe("Suggested fix", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Open draft pull request" }));
       await waitFor(() => expect(calls.find((c) => c.url.endsWith("/decision"))?.body).toBe(JSON.stringify({ decision: "approve" })));
     }
+  });
+
+  it("says before approving what the saved token can do, without writing anything", async () => {
+    const calls = show([fix()]);
+    expect(await screen.findByText(/can push to acme\/shop/)).toHaveTextContent("The saved token (bot)");
+    expect(screen.getByRole("status")).toHaveTextContent("branch repolens/fix-abcdef12");
+    expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/decision"))).toBe(false);
+  });
+
+  it("warns in red when the token can read but not push, and when GitHub does not say", async () => {
+    show([fix()], true, { github: true, repo: "acme/shop", push: false });
+    expect(await screen.findByText(/can read acme\/shop but cannot push to it/)).toBeInTheDocument();
+    vi.restoreAllMocks();
+    show([fix()], true, { github: true, repo: "acme/shop", branch: "b", push: null });
+    expect((await screen.findAllByText(/did not say whether the saved token can push/)).length).toBeGreaterThan(0);
+  });
+
+  it("offers Try again for a failed fix, with the reason GitHub gave", async () => {
+    const calls = show([fix({ status: "failed", result: "GitHub refused (403) while committing the change in acme/shop. The saved token needs Contents: Read and write on this repository." })]);
+    expect(await screen.findByText(/needs Contents: Read and write/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /reject/i })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Open draft pull request" }));
+    await waitFor(() => expect(calls.find((c) => c.url.endsWith("/decision"))?.body).toContain("approve"));
   });
 });

@@ -99,12 +99,44 @@ def patch(fix_id: str, p: Principal = Depends(current_principal), db: Session = 
     )
 
 
+@router.get("/api/fix-proposals/{fix_id}/preflight")
+def preflight(fix_id: str, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
+    """What approving would do on GitHub and whether the saved token can do it, found without changing anything:
+    the repository, whether it is public, whether the token can push, and the branch that would be made."""
+    f = _get(db, p, fix_id)
+    authorize(db, p, "fix.decide", f.id, decision="preflight")
+    repo = db.get(Repository, f.repo_id)
+    if repo is None or not scope_for(db, p).can(repo.id):
+        raise HTTPException(404, "Repository not found")
+    gh_repo = resolve_gh_repo(repo, None)
+    if not gh_repo:
+        return {
+            "github": False,
+            "message": "This repository is not on GitHub. Download the patch and apply it yourself.",
+        }
+    out: dict = {
+        "github": True,
+        "repo": gh_repo,
+        "branch": f"repolens/fix-{f.id[:8]}",
+        "files": sorted({e["path"] for e in f.edits}),
+    }
+    try:
+        client = make_client(db, p.org_id)
+        out.update(client.repo_access(gh_repo))
+        out["token_user"] = str(client.whoami().get("login") or "")
+    except HTTPException:
+        out["message"] = "GitHub is not connected. Connect it under Settings, or download the patch."
+    except GitHubError as e:
+        out["message"] = f"GitHub could not be checked: {e}"
+    return out
+
+
 @router.post("/api/fix-proposals/{fix_id}/decision")
 def decide(fix_id: str, body: FixDecisionIn, p: Principal = Depends(current_principal), db: Session = Depends(get_db)):
     """Reject a fix, or approve it and open a draft pull request. Nothing is merged; a person reviews the pull request."""
     f = _get(db, p, fix_id)
     authorize(db, p, "fix.decide", f.id, decision=body.decision)
-    if f.status != "pending":
+    if f.status not in ("pending", "failed"):  # a failed one can be tried again; the others are decided
         raise HTTPException(409, f"This fix was already {f.status}")
     if body.decision == "reject":
         f.decided_at = datetime.now(UTC)
@@ -119,9 +151,16 @@ def decide(fix_id: str, body: FixDecisionIn, p: Principal = Depends(current_prin
         raise HTTPException(400, "This repository is not on GitHub. Download the patch and apply it yourself.")
     client = make_client(db, p.org_id)
     try:
-        public = client.is_public(gh_repo)
+        access = client.repo_access(gh_repo)
     except GitHubError:
-        public = None
+        access = {"public": None, "push": None}
+    public = access["public"]
+    if access["push"] is False:
+        raise HTTPException(
+            409,
+            f"The saved GitHub token can read {gh_repo} but cannot push to it, so nothing was changed. Give it "
+            "Contents and Pull requests: Read and write on this repository (or the repo scope), or download the patch.",
+        )
     if public and not body.confirm_public:
         raise HTTPException(
             409,
@@ -129,6 +168,7 @@ def decide(fix_id: str, body: FixDecisionIn, p: Principal = Depends(current_prin
             "everyone. Read them again and confirm explicitly (confirm_public) to continue.",
         )
     f.decided_at = datetime.now(UTC)
+    f.result = ""
     inv = db.get(Investigation, f.investigation_id)
     try:
         f.pr_url = fixes.open_pull_request(db, f, client, gh_repo, inv.title if inv else "")

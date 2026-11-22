@@ -18,6 +18,7 @@ from ..models import FixProposal, Investigation, Repository
 from ..security import redact_stored
 from . import cause_hints, gitops
 from . import risk as oracle
+from .github import GitHubError
 from .llm import LLMClient
 from .llm_router import Task
 
@@ -361,15 +362,46 @@ def open_pull_request(db: Session, row: FixProposal, client, gh_repo: str, inv_t
         raise FixError(
             f"The code changed since this fix was drafted, so it no longer applies ({err}). Run the investigation again."
         ) from err
-    client.create_branch(gh_repo, branch, head_sha)
-    for path, (text, blob) in files.items():
-        if after[path] != text:
-            client.put_file(
-                gh_repo, path, branch, after[path], f"{row.title}\n\nDrafted by RepoLens, approved by a person.", blob
-            )
+    try:
+        client.create_branch(gh_repo, branch, head_sha)
+    except GitHubError as e:
+        raise GitHubError(_explain(e, "creating the branch", gh_repo, branch), e.status) from e
     body = (
         f"{row.rationale}\n\n**Found by RepoLens investigation:** {inv_title}\n\n"
         + ("**Tests to add or run:**\n" + "\n".join(f"- {t}" for t in row.tests) + "\n\n" if row.tests else "")
         + "_This is a draft written by RepoLens and approved by a person in RepoLens. Review it like any other change; it was not run._"
     )
-    return client.open_pull(gh_repo, row.title, branch, base, body, draft=True)
+    step = "committing the change"
+    try:
+        for path, (text, blob) in files.items():
+            if after[path] != text:
+                client.put_file(
+                    gh_repo,
+                    path,
+                    branch,
+                    after[path],
+                    f"{row.title}\n\nDrafted by RepoLens, approved by a person.",
+                    blob,
+                )
+        step = "opening the pull request"
+        return client.open_pull(gh_repo, row.title, branch, base, body, draft=True)
+    except GitHubError as e:
+        try:  # do not leave a half made branch behind
+            client.delete_branch(gh_repo, branch)
+            left = " The branch RepoLens made was removed, so nothing is left on GitHub."
+        except GitHubError:
+            left = f" The branch {branch} was left on GitHub: delete it by hand before trying again."
+        raise GitHubError(_explain(e, step, gh_repo, branch) + left, e.status) from e
+
+
+def _explain(e: GitHubError, step: str, repo: str, branch: str) -> str:
+    """A refusal says which permission the saved token lacks, instead of a bare status."""
+    if e.status in (401, 403, 404):
+        need = "Pull requests: Read and write" if "pull request" in step else "Contents: Read and write"
+        return (
+            f"GitHub refused ({e.status}) while {step} in {repo}. The saved token needs {need} on this repository "
+            "(or the repo scope for a classic token)."
+        )
+    if e.status == 422 and "already exists" in str(e):
+        return f"The branch {branch} already exists in {repo} from an earlier try: delete it on GitHub and try again."
+    return f"GitHub failed while {step} in {repo}: {e}"

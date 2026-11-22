@@ -83,7 +83,7 @@ def test_the_diff_masks_secrets():
 # ---------- end to end ----------
 @pytest.fixture
 def pr_flow(monkeypatch, demo_repo):
-    state = {"puts": [], "pulls": [], "refs": [], "fail_put": False}
+    state = {"puts": [], "pulls": [], "refs": [], "deleted": []}
     path = "src/user_profile.py"
     text = (demo_repo[0] / path).read_text()
 
@@ -108,9 +108,18 @@ def pr_flow(monkeypatch, demo_repo):
                 },
             )
         if p == f"/repos/acme/user-service/contents/{path}" and m == "PUT":
+            if state.get("put_status"):
+                return httpx.Response(state["put_status"], json={"message": "Resource not accessible"})
             state["puts"].append(request.read())
             return httpx.Response(200, json={})
+        if p.startswith("/repos/acme/user-service/git/refs/heads/") and m == "DELETE":
+            if state.get("delete_status"):
+                return httpx.Response(state["delete_status"], json={})
+            state["deleted"].append(p.rsplit("/", 1)[-1])
+            return httpx.Response(204)
         if p == "/repos/acme/user-service/pulls" and m == "POST":
+            if state.get("pull_status"):
+                return httpx.Response(state["pull_status"], json={"message": "Resource not accessible"})
             state["pulls"].append(request.read())
             return httpx.Response(201, json={"html_url": "https://github.com/acme/user-service/pull/9"})
         if p == "/user":
@@ -289,3 +298,102 @@ def test_the_plain_keyerror_template_guards_the_read(session):
     d = fixes._deterministic(inv, {"src/f.py": text})
     assert d and d.by == "template" and '.get("name")' in d.edits[0]["new"] and "decide whether" in d.rationale
     assert fixes.apply_edits({"src/f.py": text}, d.edits)["src/f.py"].count(".get(") == 1
+
+
+# ------------------------------------------------------------------------------------------------ real GitHub behaviour
+def _decide(client, auth, f, **body):
+    return client.post(f"/api/fix-proposals/{f['id']}/decision", headers=auth, json={"decision": "approve", **body})
+
+
+def test_a_token_that_cannot_push_is_told_before_anything_is_written(client, auth, confirmed, monkeypatch, pr_flow):
+    pr_flow["repo_info"] = {"private": True, "permissions": {"pull": True, "push": False}}
+    f = _pending(client, auth, confirmed, monkeypatch)
+    r = _decide(client, auth, f)
+    assert r.status_code == 409 and "can read acme/user-service but cannot push" in r.json()["detail"]
+    assert not pr_flow["refs"] and not pr_flow["puts"] and not pr_flow["pulls"]
+    assert client.get(f"/api/fix-proposals/{f['id']}", headers=auth).json()["status"] == "pending"  # still decidable
+
+
+def test_a_refused_commit_names_the_missing_permission_and_removes_the_branch(
+    client, auth, confirmed, monkeypatch, pr_flow
+):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    pr_flow["put_status"] = 403
+    r = _decide(client, auth, f)
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert "while committing the change" in detail and "Contents: Read and write" in detail
+    assert "branch RepoLens made was removed" in detail
+    assert pr_flow["deleted"] == [f"fix-{f['id'][:8]}"] and not pr_flow["pulls"]
+
+
+def test_a_refused_pull_request_names_that_permission(client, auth, confirmed, monkeypatch, pr_flow):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    pr_flow["pull_status"] = 403
+    detail = _decide(client, auth, f).json()["detail"]
+    assert "while opening the pull request" in detail and "Pull requests: Read and write" in detail
+    assert pr_flow["deleted"]  # the branch that had been made is removed
+
+
+def test_when_the_branch_cannot_be_removed_the_message_says_to_delete_it(client, auth, confirmed, monkeypatch, pr_flow):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    pr_flow["put_status"], pr_flow["delete_status"] = 403, 403
+    detail = _decide(client, auth, f).json()["detail"]
+    assert f"repolens/fix-{f['id'][:8]} was left on GitHub: delete it by hand" in detail
+
+
+def test_a_failed_fix_can_be_tried_again_once_the_token_is_fixed(client, auth, confirmed, monkeypatch, pr_flow):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    pr_flow["put_status"] = 403
+    assert _decide(client, auth, f).status_code == 502
+    got = client.get(f"/api/fix-proposals/{f['id']}", headers=auth).json()
+    assert got["status"] == "failed" and "Contents: Read and write" in got["result"]
+    pr_flow["put_status"] = 0
+    ok = _decide(client, auth, f)
+    assert (
+        ok.status_code == 200
+        and ok.json()["status"] == "approved"
+        and ok.json()["result"] == "Draft pull request opened"
+    )
+    assert pr_flow["pulls"] and _decide(client, auth, f).status_code == 409  # approved ones are decided
+
+
+def test_the_access_check_changes_nothing_and_says_what_approving_would_do(
+    client, auth, confirmed, monkeypatch, pr_flow
+):
+    pr_flow["repo_info"] = {"private": True, "permissions": {"push": True}}
+    f = _pending(client, auth, confirmed, monkeypatch)
+    got = client.get(f"/api/fix-proposals/{f['id']}/preflight", headers=auth).json()
+    assert got["github"] is True and got["repo"] == "acme/user-service"
+    assert got["push"] is True and got["public"] is False and got["token_user"] == "bot"
+    assert got["branch"] == f"repolens/fix-{f['id'][:8]}" and got["files"] == f["files"]
+    assert not pr_flow["refs"] and not pr_flow["puts"] and not pr_flow["pulls"]
+    pr_flow["repo_info"] = {"private": False, "permissions": {"push": False}}
+    got = client.get(f"/api/fix-proposals/{f['id']}/preflight", headers=auth).json()
+    assert got["push"] is False and got["public"] is True
+    pr_flow["repo_info"] = {}
+    assert (
+        client.get(f"/api/fix-proposals/{f['id']}/preflight", headers=auth).json()["push"] is None
+    )  # GitHub did not say
+
+
+def test_the_access_check_says_so_when_github_cannot_be_asked(client, auth, confirmed, monkeypatch, pr_flow):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    pr_flow["repo_status"] = 500
+    assert (
+        "could not be checked" in client.get(f"/api/fix-proposals/{f['id']}/preflight", headers=auth).json()["message"]
+    )
+
+
+def test_only_a_member_can_run_the_access_check(client, auth, confirmed, monkeypatch, pr_flow):
+    f = _pending(client, auth, confirmed, monkeypatch)
+    client.post(
+        "/api/auth/users", headers=auth, json={"email": "v2@acme.io", "password": "viewer-pass-12", "role": "viewer"}
+    )
+    tok = client.post("/api/auth/login", json={"email": "v2@acme.io", "password": "viewer-pass-12"}).json()[
+        "access_token"
+    ]
+    assert (
+        client.get(f"/api/fix-proposals/{f['id']}/preflight", headers={"Authorization": f"Bearer {tok}"}).status_code
+        == 403
+    )

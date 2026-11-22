@@ -11,6 +11,19 @@ export interface FixProposal {
   checks: { syntax_ok: boolean; lines_changed: number; notes: string[] };
 }
 
+interface Preflight { github: boolean; repo?: string; branch?: string; push?: boolean | null; public?: boolean | null; token_user?: string; message?: string }
+
+/** What approving would do on GitHub and whether the saved token can do it, found without changing anything. */
+function Access({ id }: { id: string }) {
+  const q = useQuery({ queryKey: ["fix-preflight", id], queryFn: () => api<Preflight>(`/fix-proposals/${id}/preflight`), staleTime: 30000 });
+  const d = q.data;
+  if (q.isLoading) return <p className="mt-2 caption-5 text-muted">Checking what the saved GitHub token can do…</p>;
+  if (!d) return <ErrorNote error={q.error} />;
+  if (d.message) return <p className="mt-2 caption-5 text-muted">{d.message}</p>;
+  if (d.push === false) return <p role="status" className="mt-2 caption-5 text-red-600">The saved token can read {d.repo} but cannot push to it, so approving would be refused. Give it Contents and Pull requests: Read and write on this repository, or download the patch.</p>;
+  return <p role="status" className="mt-2 caption-5 text-muted">{d.push === true ? `The saved token${d.token_user ? ` (${d.token_user})` : ""} can push to ${d.repo}.` : `GitHub did not say whether the saved token can push to ${d.repo}; approving will tell you.`} Approving makes the branch {d.branch} and a draft pull request; nothing is merged.</p>;
+}
+
 const tone = (s: string) => (s === "approved" ? "green" : s === "pending" ? "amber" : s === "failed" ? "red" : "gray");
 
 function Diff({ text }: { text: string }) {
@@ -70,6 +83,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
           {f.checks.notes.map((n) => <p key={n} className="caption-5 text-red-600">{n}</p>)}
           <div className="mt-2"><Diff text={f.diff} /></div>
           {!!f.tests.length && <div className="mt-2 caption-5"><span className="font-medium">Tests to add or run:</span><ul className="list-disc pl-4">{f.tests.map((t) => <li key={t}>{t}</li>)}</ul></div>}
+          {canAct && (f.status === "pending" || f.status === "failed") && <Access id={f.id} />}
           {f.result && f.status !== "approved" && <p className="mt-2 caption-5 text-red-600">{f.result}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => patch(f)}><Download className="h-3.5 w-3.5" />Download patch</Button>
@@ -77,6 +91,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
               <Button size="sm" disabled={decide.isPending || !f.checks.syntax_ok} onClick={() => approve(f)}><GitPullRequest className="h-3.5 w-3.5" />Approve and open draft PR</Button>
               <Button size="sm" variant="outline" disabled={decide.isPending} onClick={() => decide.mutate({ id: f.id, decision: "reject" })}><X className="h-3.5 w-3.5" />Reject</Button>
             </>)}
+            {f.status === "failed" && canAct && f.checks.syntax_ok && <Button size="sm" disabled={decide.isPending} onClick={() => approve(f)}><GitPullRequest className="h-3.5 w-3.5" />Try again</Button>}
             {f.pr_url && safeHref(f.pr_url) && <a className="inline-flex items-center gap-1 body-6 text-indigo-600 hover:underline" href={safeHref(f.pr_url)} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" />View pull request</a>}
           </div>
         </div>

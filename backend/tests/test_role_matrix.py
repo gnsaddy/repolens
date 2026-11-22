@@ -283,7 +283,12 @@ ADMIN_ONLY_READS = {
     "/api/wiki/confluence/spaces",
     "/api/wiki/confluence/spaces/{key}/pages",
 }
-MEMBER_ONLY_READS = {"/api/jira/issue-types", "/api/jira/issues", "/api/jira/issues/{key}", "/api/jira/projects"}
+MEMBER_ONLY_READS = {
+    "/api/jira/issue-types",
+    "/api/jira/issues",
+    "/api/jira/issues/{key}",
+    "/api/jira/projects",
+}
 
 
 def test_which_reads_each_role_has_is_pinned_so_a_new_one_is_a_decision(client, auth, people):
@@ -326,6 +331,7 @@ VIEWER_READS = """
     /api/feedback/summary
     /api/fix-proposals/{fix_id}
     /api/fix-proposals/{fix_id}/patch
+    /api/fix-proposals/{fix_id}/preflight
     /api/github/connection
     /api/github/repos
     /api/github/repos/{owner}/{name}/branches
