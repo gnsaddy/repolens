@@ -11,7 +11,7 @@ from ..agents.workflow import Ctx, Features, run_workflow
 from ..config import get_settings
 from ..db import session_factory
 from ..models import Hypothesis, Investigation, MemoryEntry
-from . import agent_context
+from . import agent_context, llm_router
 from .access import repo_ids_in_evidence, scope_for_user_id
 from .embeddings import Embedder
 from .llm import LLMClient
@@ -123,6 +123,7 @@ def run_investigation(inv_id: str, features: Features | None = None) -> None:
             jira_issue_key=inv.jira_issue_key,
             features=features or Features(),
             scope=scope,
+            explorer=llm_router.explorer_enabled(db, inv.org_id),
         )
         state = run_workflow(ctx, inv.query, repo_ids)
         inv = db.get(Investigation, inv_id)
@@ -150,12 +151,14 @@ def run_investigation(inv_id: str, features: Features | None = None) -> None:
             "memory": state.get("memory", []),
             "callers": state.get("callers", []),
             "llm_used": state.get("llm_used", False),
+            **({"explorer": state["explored"]} if state.get("explored") else {}),
             "duration_s": round((datetime.now(UTC) - started).total_seconds(), 2),
         }
         inv.status = "completed"
         inv.finished_at = datetime.now(UTC)
         db.commit()
         agent_context.publish(db, inv.org_id, inv.id, agent_context.digest_of(inv))
+        _tell_agent(db, inv)
         if (features or Features()).memory:
             _remember(db, inv)
     except Exception as e:
@@ -167,8 +170,21 @@ def run_investigation(inv_id: str, features: Features | None = None) -> None:
             inv.error = f"{type(e).__name__}: {e}"[:1000]
             inv.finished_at = datetime.now(UTC)
             db.commit()
+            _tell_agent(db, inv)
     finally:
         db.close()
+
+
+def _tell_agent(db: Session, inv: Investigation) -> None:
+    """An investigation the agent started has finished: let it fill in the comment that was waiting for it."""
+    if inv.source != "ci_auto":
+        return
+    try:
+        from . import agent_triggers
+
+        agent_triggers.on_investigation_done(db, inv)
+    except Exception:  # a side effect must never turn a finished investigation into a failed one
+        log.exception("could not update the agent's draft for investigation %s", inv.id)
 
 
 def _remember(db: Session, inv: Investigation) -> None:

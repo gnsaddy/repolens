@@ -21,7 +21,7 @@ from ..models import (
     User,
     UserSession,
 )
-from ..services import answer_memory, sysmetrics, usage
+from ..services import agent_controls, answer_memory, sysmetrics, usage
 from ..services.access import scope_for
 from ..services.policy import authorize
 
@@ -121,12 +121,15 @@ def health(p: Principal = Depends(current_principal), db: Session = Depends(get_
         .limit(1)
     )
     problems = [f"The {j['name']} loop is {j['state']}" for j in jobs if j["state"] in ("late", "failing")]
+    agent = agent_controls.health(db, p.org_id)
+    problems += agent["problems"]
     if repos.get("error"):
         problems.append(f"{repos['error']} repositor{'y' if repos['error'] == 1 else 'ies'} failed to index")
     return {
         "version": VERSION_LABEL,
         "ok": not problems,
         "problems": problems,
+        "agent": agent,
         "jobs": jobs,
         "repositories": {s: repos.get(s, 0) for s in telemetry.REPO_STATUSES},
         "quality": (

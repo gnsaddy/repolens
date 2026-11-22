@@ -545,8 +545,10 @@ def run(
     request: str,
     fresh: bool = False,
     mode: str = "review",
+    material: tuple[dict[str, str], dict[str, list[tuple[int, int]]]] | None = None,
 ) -> tuple[PersonaRun, bool]:
-    """(the run, whether it is an earlier one reused at no cost)."""
+    """(the run, whether it is an earlier one reused at no cost). `material` is the text to read and the lines to
+    look at, given by the caller (a pull request's own files); without it the index is searched for the request."""
     persona = PERSONAS.get(persona_key)
     if persona is None:
         raise PersonaError("Unknown persona")
@@ -582,7 +584,7 @@ def run(
         err.__cause__ = cause
         return err
 
-    texts, spans = features.gather(db, org, scope, repo, request)
+    texts, spans = material if material is not None else features.gather(db, org, scope, repo, request)
     if design:  # a design overview also needs the repository's main files, whatever the request names
         texts = dict(list(texts.items())[:OVERVIEW_MATCHED])
         spans = {p: v for p, v in spans.items() if p in texts}

@@ -27,7 +27,7 @@ services:
 
   api:
     logging: *logging
-    image: ghcr.io/gnsaddy/repolens-api:${REPOLENS_VERSION:-0.2.2}
+    image: ghcr.io/gnsaddy/repolens-api:${REPOLENS_VERSION:-0.2.3}
     env_file: [{ path: .env, required: false }]
     environment:
       REPOLENS_ENV: ${REPOLENS_ENV:-dev}
@@ -42,7 +42,7 @@ services:
 
   web:
     logging: *logging
-    image: ghcr.io/gnsaddy/repolens-web:${REPOLENS_VERSION:-0.2.2}
+    image: ghcr.io/gnsaddy/repolens-web:${REPOLENS_VERSION:-0.2.3}
     environment:
       API_UPSTREAM: http://api:8000
     depends_on: [api]

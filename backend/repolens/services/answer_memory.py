@@ -51,7 +51,7 @@ def _similarity(qv: list[float], qw: frozenset[str], row: AnswerMemory) -> tuple
 
 
 SCOPE_KEY_MAX = 64  # the width of the scope_key column; PostgreSQL refuses a longer key, SQLite does not
-PIPELINE = "p5"  # bump when answers are produced differently, so older ones are never replayed or suggested
+PIPELINE = "p6"  # bump when answers are produced differently, so older ones are never replayed or suggested
 
 
 def scope_key(scope: Scope | None, repo_ids: list[str] | None, kinds: list[str] | None) -> str:

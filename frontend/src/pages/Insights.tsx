@@ -5,6 +5,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { Meter, Spark } from "@/components/charts";
 import { Badge, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
 import { api, type Calibration, type FeedbackSummary, type MetricsOverview, type SysHealth, type SysMetrics } from "@/lib/api";
+import AgentSummary from "@/components/AgentSummary";
 import { useAuth } from "@/lib/auth";
 import { Link } from "react-router-dom";
 import { dailyTokenSeries, fmtBytes, fmtCost, fmtDuration, fmtRate, fmtTokens, timeAgo } from "@/lib/utils";
@@ -82,6 +83,7 @@ export default function Insights() {
           </div>
         </section>
 
+        <AgentSummary detailed />
         {user?.role === "admin" && <ServerLoad sys={sys.data} loading={sys.isLoading} />}
         {user?.role === "admin" && health.data && <Housekeeping h={health.data} />}
 

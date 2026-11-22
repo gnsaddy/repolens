@@ -70,11 +70,11 @@ Please do not open a public issue; follow [SECURITY.md](SECURITY.md).
 - **Graph colours** come from `NODE_COLORS`, `REL_COLORS` and `COMMUNITY_COLORS` in `components/ForceGraph.tsx`: one calm palette, a colour means one thing.
 
 ## How a version is made (maintainers)
-Work for a version happens on a branch named after it, for example `0.2.2`; nothing is committed straight to `main`.
+Work for a version happens on a branch named after it, for example `0.2.3`; nothing is committed straight to `main`.
 1. Branch from `main`, change the version number (see `docs/operations.md`) if it is a new version, and commit there.
 2. Push the branch and open a pull request into `main`. CI runs on the pull request.
 3. When CI passes, merge it. CI runs again on `main`.
-4. When that CI run passes, the CD workflow publishes the images to GHCR tagged with the version (`0.2.2`). A tag is only needed to deploy to a cluster.
+4. When that CI run passes, the CD workflow publishes the images to GHCR tagged with the version (`0.2.3`). A tag is only needed to deploy to a cluster.
 `main` is protected: nothing is pushed to it directly, a pull request can only be merged when the `backend`, `frontend`, `browser tests` and `images` checks have passed and the branch is up to date with `main`, and this applies to maintainers too.
 Fixes before the next version go on the same branch and the same kind of pull request; the images of that version are replaced each time `main` passes CI. A new version is a new branch.
 

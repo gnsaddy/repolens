@@ -25,6 +25,7 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
   const put = (d: ModelRegistry) => qc.setQueryData(["model-registry"], d);
   const savings = useMutation({ mutationFn: (v: boolean) => api<ModelRegistry>("/settings/routing", { method: "PUT", json: { savings_mode: v } }), onSuccess: put });
   const review = useMutation({ mutationFn: (v: boolean) => api<ModelRegistry>("/settings/review", { method: "PUT", json: { enabled: v } }), onSuccess: put });
+  const explorer = useMutation({ mutationFn: (v: boolean) => api<ModelRegistry>("/settings/explorer", { method: "PUT", json: { enabled: v } }), onSuccess: put });
   const patch = useMutation({ mutationFn: (v: { id: string; tier?: Tier; enabled?: boolean }) => api<ModelRegistry>(`/settings/models/${v.id}`, { method: "PUT", json: { tier: v.tier, enabled: v.enabled } }), onSuccess: put });
   const del = useMutation({ mutationFn: (id: string) => api<ModelRegistry>(`/settings/models/${id}`, { method: "DELETE" }), onSuccess: put });
   const delConn = useMutation({ mutationFn: (id: string) => api<ModelRegistry>(`/settings/models/connections/${id}`, { method: "DELETE" }), onSuccess: (d) => { put(d); toast("Provider removed"); } });
@@ -63,13 +64,17 @@ export default function ModelRoutingCard({ admin }: { admin: boolean }) {
               <input type="checkbox" className="mt-1" aria-label="Independent review of investigations" checked={!!data.independent_review} disabled={!admin || review.isPending} onChange={(e) => review.mutate(e.target.checked)} />
               <span><span className="font-medium">Independent review of investigations</span><span className="block caption-5 text-muted">Off by default. When on, each investigation gets a second model pass that sees only the evidence, not the conclusion, and the report shows whether it agrees. It costs one extra model call per investigation and never changes the confidence score.</span></span>
             </label>
+            <label className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 body-6">
+              <input type="checkbox" className="mt-1" aria-label="Let investigations look further" checked={!!data.explorer} disabled={!admin || explorer.isPending} onChange={(e) => explorer.mutate(e.target.checked)} />
+              <span><span className="font-medium">Let investigations look further</span><span className="block caption-5 text-muted">Off by default. When on, an investigation can make up to five more read only looks at the code, chosen by the model: search with other words, open a file, find who calls a function. What it finds is ordinary indexed code and goes through the same ranking and checks, and the report shows what it looked at. It never runs or changes anything, and it costs a few short model calls per investigation.</span></span>
+            </label>
             {data.active > 1 && (
               <table className="w-full body-6" aria-label="Routing plan">
                 <thead><tr className="text-left caption-5 text-muted"><th className="py-1 font-normal">Task</th><th className="font-normal">Model now</th><th className="font-normal">Why</th></tr></thead>
                 <tbody>{data.plan.map((r) => <tr key={r.kind} className="border-t border-line"><td className="py-2">{r.label}</td><td><code className="caption-5">{r.model ?? "—"}</code> <Badge tone={tierTone(r.tier)}>{r.tier}</Badge></td><td className="caption-5 text-muted">{r.why}</td></tr>)}</tbody>
               </table>)}
           </div>)}
-        <ErrorNote error={patch.error ?? del.error ?? savings.error ?? review.error} />
+        <ErrorNote error={patch.error ?? del.error ?? savings.error ?? review.error ?? explorer.error} />
       </ConnectionCard>
       {open && <Modal title="Add models" subtitle="Test the key, tick the models to use and give each a tier." onClose={() => setOpen(false)}><AddModels data={data} onDone={(d) => { put(d); setOpen(false); toast("Models added"); }} /></Modal>}
     </>

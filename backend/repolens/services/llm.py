@@ -47,6 +47,7 @@ class LLMUnavailable(Exception):
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"  # Google's OpenAI-compatible endpoint
+RETRY_TOKENS = 16_000  # the most a call is asked for again when a reply came back empty because the budget ran out
 CHAT_PROVIDERS = ("anthropic", "openai", "github-models", "gemini")
 
 
@@ -335,6 +336,10 @@ class LLMClient:
         for i, route in enumerate(decision.chain):
             try:
                 res = self._call(route, agent, system, prompt, max_tokens)
+                if res.truncated and not res.text.strip() and max_tokens < RETRY_TOKENS:
+                    # A model that thinks before it answers can spend the whole budget on thinking and return nothing.
+                    # Ask the same model again with more room before giving up on it.
+                    res = self._call(route, agent, system, prompt, min(max_tokens * 3, RETRY_TOKENS))
             except Exception as e:  # rate limit, outage, unknown model: try the next model
                 last = e
                 continue

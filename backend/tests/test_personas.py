@@ -475,3 +475,34 @@ def test_the_main_files_come_entry_points_first_without_tests_or_docs_and_long_f
     text = svc.outline(big)
     assert "a long file" in text and "def f0" in text and "def f199" not in text
     assert svc.outline("a = 1\n") == "    1  a = 1"
+
+
+def test_a_model_that_spends_its_whole_budget_thinking_is_asked_again_with_more_room(
+    client, auth, repo, model, monkeypatch
+):
+    seen = []
+    real = llm._anthropic_call
+
+    def thinking(system, prompt, max_tokens, cfg=None):
+        seen.append(max_tokens)
+        if len(seen) == 1:
+            return LLMResult("", 100, max_tokens, 0, truncated=True)  # all of it went on thinking: no answer at all
+        return real(system, prompt, max_tokens, cfg)
+
+    monkeypatch.setattr(llm, "_anthropic_call", thinking)
+    r = run(client, auth, repo)
+    assert r.status_code == 201 and r.json()["status"] == "done" and r.json()["findings"]
+    assert seen == [6000, 16000]  # the same call again, with room (never more than 16,000)
+
+
+def test_a_reply_that_is_empty_for_another_reason_is_not_asked_again(client, auth, repo, model, monkeypatch):
+    seen = []
+
+    def empty(system, prompt, max_tokens, cfg=None):
+        seen.append(max_tokens)
+        return LLMResult("", 100, 0, 0, truncated=False)
+
+    monkeypatch.setattr(llm, "_anthropic_call", empty)
+    r = run(client, auth, repo)
+    assert r.status_code == 409 and "could not write the review" in r.json()["detail"]
+    assert seen == [6000]

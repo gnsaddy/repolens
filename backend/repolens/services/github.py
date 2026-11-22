@@ -43,6 +43,7 @@ class GitHubClient:
         self, token: str, api_base: str = "https://api.github.com", transport: httpx.BaseTransport | None = None
     ):
         self.base = validate_api_base(api_base)
+        self._transport = transport
         self.http = httpx.Client(
             base_url=self.base,
             timeout=30,
@@ -87,6 +88,70 @@ class GitHubClient:
             raise GitHubError(f"GitHub returned {r.status_code}", r.status_code)
         out = r.json() if r.content else {}
         return out if isinstance(out, dict) else {}
+
+    def comment_pull(self, repo: str, number: int, body: str) -> str:
+        """Add a comment to a pull request (GitHub treats it as an issue comment). Returns the comment's address."""
+        try:
+            out = self._send("POST", f"/repos/{repo}/issues/{number}/comments", {"body": body})
+        except GitHubError as e:
+            if e.status in (401, 403, 404):  # a comment needs pull request access, not the contents a fix needs
+                raise GitHubError(
+                    f"GitHub refused ({e.status}). The saved token needs write access to pull requests "
+                    "(Pull requests: Read and write, or the repo scope) on this repository.",
+                    e.status,
+                ) from e
+            raise
+        return str(out.get("html_url") or "")
+
+    # ---- reading CI: the jobs of a workflow run that failed, and their logs ----
+    def failed_jobs(self, repo: str, run_id: int) -> list[dict]:
+        d = self._get(f"/repos/{repo}/actions/runs/{run_id}/jobs", per_page=100, filter="latest")
+        jobs = d.get("jobs", []) if isinstance(d, dict) else []
+        return [
+            j for j in jobs if isinstance(j, dict) and j.get("conclusion") in ("failure", "timed_out") and j.get("id")
+        ]
+
+    def job_log(self, repo: str, job_id: int, keep: int = 2_000_000, read_cap: int = 20_000_000) -> str:
+        """The end of one job's log (the failure is at the end). GitHub answers with a redirect to a short lived address;
+        that address is fetched without the token, so the token is never sent to another host."""
+        try:
+            r = self.http.get(f"/repos/{repo}/actions/jobs/{job_id}/logs")
+            if r.status_code in (301, 302, 303, 307, 308):
+                url = r.headers.get("location", "")
+                if not url.startswith("https://"):
+                    raise GitHubError("GitHub sent the log to an address that is not https")
+                buf = b""
+                with httpx.Client(timeout=60, transport=self._transport, follow_redirects=False) as plain:
+                    with plain.stream("GET", url) as resp:
+                        if resp.status_code >= 400:
+                            raise GitHubError(f"GitHub returned {resp.status_code} for the log", resp.status_code)
+                        for chunk in resp.iter_bytes():
+                            buf = (buf + chunk)[-keep:] if len(buf) + len(chunk) > keep else buf + chunk
+                            read_cap -= len(chunk)
+                            if read_cap <= 0:
+                                break
+                return buf.decode("utf-8", "replace")
+            if r.status_code >= 400:
+                raise GitHubError(f"GitHub returned {r.status_code} for the log", r.status_code)
+            return r.content[-keep:].decode("utf-8", "replace")
+        except httpx.HTTPError as e:
+            raise GitHubError(f"GitHub unreachable: {type(e).__name__}") from e
+
+    def file_text(self, repo: str, path: str, ref: str, cap: int = 120_000) -> str | None:
+        """A file as it is at a commit, or None when it is not there, is binary or is too large to be worth reading."""
+        try:
+            r = self.http.get(
+                f"/repos/{repo}/contents/{path}",
+                params={"ref": ref},
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+        except httpx.HTTPError as e:
+            raise GitHubError(f"GitHub unreachable: {type(e).__name__}") from e
+        if r.status_code in (404, 403, 422) or r.status_code >= 400:
+            return None
+        if len(r.content) > cap or b"\x00" in r.content[:2000]:
+            return None
+        return r.content.decode("utf-8", "replace")
 
     def default_branch(self, repo: str) -> str:
         d = self._get(f"/repos/{repo}")

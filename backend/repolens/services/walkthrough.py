@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import CodeChunk, Repository
-from . import routes
+from . import inventory, routes
 from .access import Scope
 
 EXPLAIN = re.compile(
@@ -214,7 +214,7 @@ def route_sources(db: Session, org: str, question: str, repo_ids: list[str] | No
                 CodeChunk.repo_id.in_({c.repo_id for _h, _r, c in cands}),
                 CodeChunk.file_path.in_({c.file_path for _h, _r, c in cands}),
                 CodeChunk.symbol_name.in_(wanted),
-                CodeChunk.chunk_type != "routes",
+                CodeChunk.chunk_type.notin_(("routes", *inventory.TYPES)),
             )
         ):
             handlers.setdefault((row.repo_id, row.file_path, row.symbol_name), row)
@@ -282,7 +282,7 @@ def _callees(db: Session, handler: CodeChunk, repo: str, want: frozenset[str], s
         select(CodeChunk).where(
             CodeChunk.repo_id == handler.repo_id,
             CodeChunk.symbol_name.in_(names),
-            CodeChunk.chunk_type != "routes",
+            CodeChunk.chunk_type.notin_(("routes", *inventory.TYPES)),
             CodeChunk.id != handler.id,
         )
     ).all()

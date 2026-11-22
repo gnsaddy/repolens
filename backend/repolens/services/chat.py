@@ -6,6 +6,7 @@ inform a follow-up, a `.txt` or `.log` file can be attached for debugging, and a
 when the sources do not cover the question (only with a model, and always labelled)."""
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..models import ChatMessage, ChatThread, CodeChunk, Repository
 from ..security import redact_secrets
-from . import context, name_check, routes, skills, walkthrough
+from . import context, inventory, name_check, routes, skills, walkthrough
 from . import knowledge as kb
 from .access import Scope
 from .llm import LLMClient, describe_failure
@@ -124,9 +125,58 @@ def wants_all_routes(question: str) -> bool:
     return bool(_LIST_ALL.search(question) and _ROUTE_WORD.search(question))
 
 
-def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) -> dict | None:
-    """Every route written down at index time, as an exact list. Nothing is left out because a search had to pick the best few."""
-    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type == "routes")
+# the other inventories written at index time (services/inventory.py): what the question must say, and how a list reads
+_ASKS = re.compile(r"\b(list|enumerate|show|give|what|which|how many)\b|\b(all|every|each|complete)\b", re.I)
+_KIND_WORDS = {
+    inventory.TABLES: re.compile(r"\b(database|db|sql)?\s*tables?\b|\b(database|db) (schema|models?)\b", re.I),
+    inventory.ENV: re.compile(
+        r"\benv(ironment)?[ _-]?(vars?|variables?)\b|\.env\b|\b(config(uration)?|settings?) (variables?|options|keys)\b",
+        re.I,
+    ),
+    inventory.CLI: re.compile(
+        r"\b(cli|command[ -]line|subcommands?|make (targets?|commands?)|npm scripts?|(shell|terminal|cli) commands?)\b|\bcommands?\b",
+        re.I,
+    ),
+}
+_KIND_NOUN = {
+    inventory.TABLES: ("table", "tables"),
+    inventory.ENV: ("environment variable", "environment variables"),
+    inventory.CLI: ("command or option", "commands and options"),
+}
+_KIND_NOTE = {
+    inventory.TABLES: "Listed from the model classes and SQL files in the index; migrations are not counted, so a table "
+    "that only a migration creates is not shown.",
+    inventory.ENV: "Listed from the places the code reads the environment, the settings classes and the example env "
+    "files, so a name built at run time is not shown.",
+    inventory.CLI: "Listed from the command definitions, make targets and package scripts in the index, so a command "
+    "registered in an unusual way is not shown.",
+}
+
+
+def wanted_inventory(question: str) -> str | None:
+    """Which inventory the question asks to list in full (`tables`, `envvars` or `cli`), or none."""
+    if not _ASKS.search(question):
+        return None
+    if not (_LIST_ALL.search(question) or re.search(r"\b(what|which|show|list|give)\b", question, re.I)):
+        return None
+    for kind in (inventory.TABLES, inventory.ENV, inventory.CLI):
+        if _KIND_WORDS[kind].search(question):
+            return kind
+    return None
+
+
+def _listing(
+    db: Session,
+    org: str,
+    scope: Scope,
+    ids: list[str] | None,
+    chunk_type: str,
+    heading: Callable[[int, int], str],
+    lines: Callable[[CodeChunk], list[str]],
+    footer: str,
+) -> dict | None:
+    """Every item of one inventory as an exact, cited list. Nothing is left out because a search had to pick the best few."""
+    stmt = select(CodeChunk).where(CodeChunk.org_id == org, CodeChunk.chunk_type == chunk_type)
     if ids:
         stmt = stmt.where(CodeChunk.repo_id.in_(ids))
     rows = [c for c in db.scalars(stmt.order_by(CodeChunk.repo_id, CodeChunk.file_path)) if scope.can(c.repo_id)]
@@ -152,21 +202,52 @@ def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) 
         for c in shown
     ]
     sources = kb.sources_from(results)
-    listed = {c.id: routes.parse(c.content) for c in rows}
-    total = sum(len(v) for v in listed.values())
-    out = [f"Found **{total}** endpoint{'s' if total != 1 else ''} in {len(rows)} file{'s' if len(rows) != 1 else ''}."]
+    per_file = {c.id: lines(c) for c in rows}
+    out = [heading(sum(len(v) for v in per_file.values()), len(rows))]
     for src, c in zip(sources, shown, strict=True):
-        found = listed[c.id]
         out.append(f"\n**{src['repo']}: `{c.file_path}`** [{src['id']}]")
-        out += [f"- `{r.method} {r.path}`" + (f" → `{r.handler}`" if r.handler else "") for r in found]
+        out += per_file[c.id]
     if len(rows) > len(shown):
         out.append(
             f"\n_{len(rows) - len(shown)} more file(s) not shown. Narrow the scope to a repository to see them._"
         )
-    out.append(
-        "\n_Listed from the index of route declarations, so it is complete for routes written in the usual way._"
-    )
+    out.append(f"\n_{footer}_")
     return {"content": "\n".join(out), "sources": sources, "connections": [], "mode": "extractive", "listed": True}
+
+
+def _plural(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
+def route_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None) -> dict | None:
+    """Every route written down at index time, as an exact list."""
+    return _listing(
+        db,
+        org,
+        scope,
+        ids,
+        "routes",
+        lambda n, files: f"Found **{n}** endpoint{'s' if n != 1 else ''} in {_plural(files, 'file')}.",
+        lambda c: [
+            f"- `{r.method} {r.path}`" + (f" → `{r.handler}`" if r.handler else "") for r in routes.parse(c.content)
+        ],
+        "Listed from the index of route declarations, so it is complete for routes written in the usual way.",
+    )
+
+
+def kind_inventory(db: Session, org: str, scope: Scope, ids: list[str] | None, kind: str) -> dict | None:
+    """Every environment variable, command or table written down at index time, as an exact list."""
+    one, many = _KIND_NOUN[kind]
+    return _listing(
+        db,
+        org,
+        scope,
+        ids,
+        kind,
+        lambda n, files: f"Found **{n}** {one if n == 1 else many} in {_plural(files, 'file')}.",
+        lambda c: [f"- `{i.name}`" + (f": {i.detail}" if i.detail else "") for i in inventory.parse(c.content)],
+        _KIND_NOTE[kind],
+    )
 
 
 def _answer(
@@ -190,6 +271,11 @@ def _answer(
     ids = scope.resolve(wanted or None) or None
     if wants_all_routes(question) and not attachment:
         listed = route_inventory(db, org, scope, ids)
+        if listed:
+            return listed
+    kind = None if attachment else wanted_inventory(question)
+    if kind:
+        listed = kind_inventory(db, org, scope, ids, kind)
         if listed:
             return listed
     asked = [m.content for m in before if m.role == "user"]

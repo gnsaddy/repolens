@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-rou
 import Logo from "@/components/Logo";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useTheme } from "@/lib/theme";
-import { BookOpen, Brain as BrainCircuit, Bug, Robot as Bot, Coins, FolderOpen as FolderGit2, Gauge, GitFork, GitPullRequest as GitPullRequestArrow, Hammer, SquaresFour as LayoutDashboard, SignOut as LogOut, ChatCircleText as MessageSquareText, Moon, Graph as Network, Scroll as ScrollText, MagnifyingGlass as Search, Gear as Settings, ShieldWarning as ShieldAlert, Sun, Ticket, Users } from "@phosphor-icons/react";
+import { BookOpen, Lightning, Brain as BrainCircuit, Bug, Robot as Bot, Coins, FolderOpen as FolderGit2, Gauge, GitFork, GitPullRequest as GitPullRequestArrow, Hammer, SquaresFour as LayoutDashboard, SignOut as LogOut, ChatCircleText as MessageSquareText, Moon, Graph as Network, Scroll as ScrollText, MagnifyingGlass as Search, Gear as Settings, ShieldWarning as ShieldAlert, Sun, Ticket, Users } from "@phosphor-icons/react";
 import type { Icon as IconType } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
@@ -24,6 +24,7 @@ const Knowledge = lazy(() => import("./pages/Knowledge"));
 const GraphPage = lazy(() => import("./pages/Graph"));
 const FeaturesPage = lazy(() => import("./pages/Features"));
 const PersonasPage = lazy(() => import("./pages/Personas"));
+const AgentPage = lazy(() => import("./pages/Agent"));
 const Risk = lazy(() => import("./pages/Risk"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const Investigations = lazy(() => import("./pages/Investigations"));
@@ -47,6 +48,7 @@ const groups: { label: string; items: NavItem[] }[] = [
   { label: "Work", items: [
     { to: "/ask", label: "Ask", icon: MessageSquareText },
     { to: "/investigations", label: "Investigations", icon: Bug },
+    { to: "/agent", label: "Agent", icon: Lightning, adminOnly: true },
     { to: "/features", label: "Build a feature", icon: Hammer },
     { to: "/personas", label: "Agent personas", icon: Bot },
     { to: "/risk", label: "Change Risk", icon: ShieldAlert },
@@ -163,6 +165,7 @@ export default function App() {
         <Route path="graph" element={<GraphPage />} />
         <Route path="features" element={<FeaturesPage />} />
         <Route path="personas" element={<PersonasPage />} />
+        <Route path="agent" element={<AgentPage />} />
         <Route path="wiki" element={<Wiki />} />
         <Route path="risk" element={<Risk />} />
         <Route path="ownership" element={<Ownership />} />

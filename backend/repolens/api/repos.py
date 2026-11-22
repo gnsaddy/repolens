@@ -13,7 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, IndexRun, RepoAccess, Repository, User
 from ..schemas import AccessIn, RepoCreate, RepoOut, StorageCleanup
 from ..security import redact_stored
-from ..services import checkouts, gitops, golden, groups, index_jobs, repo_links, retrieval
+from ..services import agent_triggers, checkouts, gitops, golden, groups, index_jobs, repo_links, retrieval
 from ..services.access import scope_for
 from ..services.indexer import clone_auth_for, index_repository
 from ..services.links import has_embedded_credentials
@@ -68,6 +68,11 @@ def _run_index(repo_id: str) -> None:
             repo_links.after_index(org_id)
         except Exception:
             logging.getLogger("repolens.links").exception("could not refresh the dependencies between repositories")
+    if status == "completed" and org_id:  # a page that now describes changed code may get a drafted update
+        try:
+            agent_triggers.after_index(org_id)
+        except Exception:
+            logging.getLogger("repolens.automations").exception("could not start the agent after indexing")
     if status == "completed" and org_id and s.auto_quality_checks:  # did the new index change any saved answer?
         try:
             golden.after_index(org_id)

@@ -295,6 +295,9 @@ class Investigation(Base):
     evidence: Mapped[dict] = mapped_column(JSON, default=dict)
     verification: Mapped[dict] = mapped_column(JSON, default=dict)
     jira_issue_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(20), default=""
+    )  # "" = a person started it | ci_auto = an automation did
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -490,6 +493,9 @@ class LLMSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
     savings_mode: Mapped[bool] = mapped_column(Boolean, default=True)  # route simple tasks to cheaper models
     independent_review: Mapped[bool] = mapped_column(Boolean, default=False)  # a second, evidence-only look in each RCA
+    explorer: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # the investigation may look further, with read only tools
 
 
 class LLMConnection(Base):
@@ -987,3 +993,77 @@ class GithubLoginConfig(Base):
     auto_provision: Mapped[bool] = mapped_column(Boolean, default=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentRule(Base):
+    """An admin's switch that lets RepoLens start work by itself when something happens (today: a CI run fails).
+    Off until an admin turns it on. The work runs as the admin who set it up, with that person's access."""
+
+    __tablename__ = "agent_rules"
+    __table_args__ = (UniqueConstraint("org_id", "repo_id", "event"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), default="")  # "" = every repository in the workspace
+    event: Mapped[str] = mapped_column(String(30), default="ci_failure")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    daily_limit: Mapped[int] = mapped_column(Integer, default=5)  # investigations started per day, at most
+    all_branches: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # false: only failures on the repository's branch
+    re_review: Mapped[bool] = mapped_column(Boolean, default=False)  # pull requests: review again after a new commit
+    created_by: Mapped[str] = mapped_column(String(32), default="")  # the work runs as this person
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class AgentRun(Base):
+    """One time a rule fired (or was skipped, with the reason). It also stops the same CI run being handled twice."""
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (UniqueConstraint("org_id", "event", "event_key"),)
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    rule_id: Mapped[str] = mapped_column(String(32), default="")
+    repo_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    event: Mapped[str] = mapped_column(String(30), default="ci_failure")
+    event_key: Mapped[str] = mapped_column(String(100))  # for a CI run: its id on the host
+    status: Mapped[str] = mapped_column(String(10), default="started")  # started | skipped | failed
+    reason: Mapped[str] = mapped_column(Text, default="")
+    title: Mapped[str] = mapped_column(String(300), default="")
+    link: Mapped[str] = mapped_column(String(500), default="")  # the CI run's page
+    investigation_ids: Mapped[list] = mapped_column(JSON, default=list)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)  # a pull request review: its files and the reviews made
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class AgentDraft(Base):
+    """What the agent made, waiting for a person: a comment for a pull request (posted only after an approval), or a
+    pointer to the investigations a CI failure started. This is the inbox."""
+
+    __tablename__ = "agent_drafts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), index=True)
+    repo_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    run_id: Mapped[str] = mapped_column(String(32), default="", index=True)
+    kind: Mapped[str] = mapped_column(String(20))  # pr_comment | investigation
+    title: Mapped[str] = mapped_column(String(300), default="")
+    body: Mapped[str] = mapped_column(Text, default="")  # the comment, in Markdown, as it would be posted
+    meta: Mapped[dict] = mapped_column(JSON, default=dict)  # pr_comment: {repo (owner/name), number, head, link}
+    status: Mapped[str] = mapped_column(String(10), default="new", index=True)  # new | read | dismissed | posted
+    error: Mapped[str] = mapped_column(Text, default="")  # why the last attempt to post failed
+    posted_url: Mapped[str] = mapped_column(String(500), default="")
+    decided_by: Mapped[str] = mapped_column(String(32), default="")
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class AgentSetting(Base):
+    """Workspace wide controls over the agent: a pause switch and a daily token budget."""
+
+    __tablename__ = "agent_settings"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    org_id: Mapped[str] = mapped_column(String(32), unique=True)
+    paused: Mapped[bool] = mapped_column(Boolean, default=False)  # true: nothing starts by itself
+    token_budget: Mapped[int] = mapped_column(Integer, default=0)  # tokens the agent may use in a day; 0 = no limit
+    updated_by: Mapped[str] = mapped_column(String(32), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
