@@ -63,6 +63,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
     if (ok) decide.mutate({ id: f.id, decision: "approve", confirmPublic: pub });
   };
   const items = Array.isArray(list.data) ? list.data : [];
+  const checked = items.find((f) => f.status === "pending" || f.status === "failed")?.id; // one check, for the fix to act on
 
   return (
     <Card>
@@ -83,7 +84,7 @@ export default function FixProposals({ investigationId, canAct }: { investigatio
           {f.checks.notes.map((n) => <p key={n} className="caption-5 text-red-600">{n}</p>)}
           <div className="mt-2"><Diff text={f.diff} /></div>
           {!!f.tests.length && <div className="mt-2 caption-5"><span className="font-medium">Tests to add or run:</span><ul className="list-disc pl-4">{f.tests.map((t) => <li key={t}>{t}</li>)}</ul></div>}
-          {canAct && (f.status === "pending" || f.status === "failed") && <Access id={f.id} />}
+          {canAct && f.id === checked && <Access id={f.id} />}
           {f.result && f.status !== "approved" && <p className="mt-2 caption-5 text-red-600">{f.result}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => patch(f)}><Download className="h-3.5 w-3.5" />Download patch</Button>

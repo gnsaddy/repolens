@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from ..models import WebhookDelivery
 
 KEEP = 300  # rows kept in all
+KEEP_REFUSED = 50  # of those, refused deliveries (anyone who knows the address can send one)
+REPEAT_SECONDS = 60  # an identical refused delivery inside this time adds no row
 SHOWN = 20  # rows shown on the Agent page
 STALE_DAYS = 30
 
@@ -41,6 +43,15 @@ def record(
     note: str = "",
 ) -> None:
     """Write one row for each workspace the delivery belongs to (one with no workspace when no repository matched)."""
+    if outcome == "rejected" and db.scalar(
+        select(WebhookDelivery.id).where(
+            WebhookDelivery.outcome == "rejected",
+            WebhookDelivery.event == _clip(event, 40),
+            WebhookDelivery.note == _clip(note, 300),
+            WebhookDelivery.created_at > datetime.now(UTC) - timedelta(seconds=REPEAT_SECONDS),
+        )
+    ):
+        return  # the same refusal a moment ago is already shown
     for org in dict.fromkeys(org_ids or [""]):
         db.add(
             WebhookDelivery(
@@ -58,6 +69,16 @@ def record(
 
 
 def prune(db: Session) -> None:
+    refused = db.scalars(
+        select(WebhookDelivery.id)
+        .where(WebhookDelivery.outcome == "rejected")
+        .order_by(WebhookDelivery.created_at.desc())
+        .limit(KEEP_REFUSED)
+    ).all()
+    if len(refused) >= KEEP_REFUSED:  # a flood of refusals never pushes out the real deliveries
+        db.execute(
+            delete(WebhookDelivery).where(WebhookDelivery.outcome == "rejected", WebhookDelivery.id.notin_(refused))
+        )
     keep = db.scalars(select(WebhookDelivery.id).order_by(WebhookDelivery.created_at.desc()).limit(KEEP)).all()
     old = datetime.now(UTC) - timedelta(days=STALE_DAYS)
     if len(keep) >= KEEP:

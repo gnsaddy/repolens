@@ -109,6 +109,23 @@ def test_the_documentation_checker_reads_the_readme_and_docs_against_the_code(cl
     assert r.json()["notes"]["standing_files"] == ["README.md", "docs/guide.md"]
 
 
+def test_a_long_dependency_file_is_read_whole_and_a_very_long_one_says_where_it_was_cut(client, auth, tmp_path, seen):
+    p = tmp_path / "big"
+    p.mkdir()
+    git(p, "init", "-q", "-b", "main")
+    lines = [f"package{i}==1.{i}.0" for i in range(1, 500)]
+    lines[149] = "leftpad>=0"
+    commit(p, {"app/auth.py": AUTH, "requirements.txt": "\n".join(lines) + "\n"}, "feat: deps", days_ago(3))
+    repo = add_repo(client, auth, p, name="big")
+    r = run(client, auth, repo, persona="dependency-reviewer", request=REQUEST)
+    assert r.status_code == 201, r.text
+    prompt = seen.prompts[0]
+    assert "leftpad>=0" in prompt  # line 150 is shown, not lost in an outline
+    assert "cut: only the first 400 of 499 lines are shown" in prompt and "package450==" not in prompt
+    cov = {c["file"]: c for c in r.json()["notes"]["coverage"]}
+    assert cov["requirements.txt"].get("cut") is True and "outline" not in cov["requirements.txt"]
+
+
 def test_a_persona_without_standing_files_does_not_get_any(client, auth, project, seen):
     r = run(client, auth, project, persona="security-auditor", request=REQUEST)
     assert r.status_code == 201 and r.json()["notes"]["standing_files"] == []

@@ -190,7 +190,26 @@ def test_events_are_recorded_with_what_was_done_and_unused_ones_as_ignored(clien
     )
     assert rows[("pull_request", "opened")]["repo"] == "acme/shop"
     assert rows[("workflow_run", "completed")]["outcome"] == "ok"
-    assert rows[("issue_comment", "created")]["note"] == "command=none"
+    assert ("issue_comment", "created") not in rows  # an ordinary comment is not recorded
+    comment(client, "/repolens review", assoc="NONE", cid=77)
+    notes = {d["note"] for d in deliveries(client, auth)["deliveries"] if d["event"] == "issue_comment"}
+    assert any("not from an owner, member or collaborator" in n for n in notes)  # a refused command is
+
+
+def test_unsigned_posts_cannot_flood_the_record_or_push_real_deliveries_out(client, auth, ci, session, model):
+    from repolens.services import webhook_log
+
+    ci["send_pr"]()
+    bad = {"X-GitHub-Event": "push", "X-Hub-Signature-256": "x"}
+    for _ in range(30):
+        assert client.post("/api/webhooks/github", content=b"{}", headers=bad).status_code == 401
+    for i in range(80):  # other events dodge the one a minute rule, so the cap on refused rows must hold too
+        other = {"X-GitHub-Event": f"e{i}", "X-Hub-Signature-256": "x"}
+        client.post("/api/webhooks/github", content=b"{}", headers=other)
+    session.expire_all()
+    assert session.query(WebhookDelivery).filter_by(outcome="rejected").count() <= webhook_log.KEEP_REFUSED
+    assert session.query(WebhookDelivery).filter_by(event="pull_request").count() == 1  # the real one is still there
+    assert session.query(WebhookDelivery).filter_by(event="push", outcome="rejected").count() <= 1  # repeats not kept
 
 
 def test_an_event_nobody_uses_is_marked_ignored(client, auth, ci):

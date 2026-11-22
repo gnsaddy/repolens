@@ -292,6 +292,7 @@ DIAGRAM_MAX_CHARS = 4000
 OVERVIEW_FILES = 7  # main files read for an overview, or when nothing matched the request
 OVERVIEW_MATCHED = 4  # of the files that matched the request, so the prompt stays a reasonable size
 STANDING_FILES = 8  # files a persona that always reads some (dependency files, docs) is given
+STANDING_LINES = 400  # lines of one such file shown: a manifest or a README is read whole, not as an outline
 OVERVIEW_HEAD = 60  # first lines of a long file, followed by an outline of its declarations
 OUTLINE_MAX = 80
 _ENTRY = re.compile(
@@ -551,6 +552,15 @@ def always_files(
     return found
 
 
+def standing_view(text: str) -> str:
+    """A dependency file or a doc whole, numbered, up to STANDING_LINES lines; a longer one says where it was cut."""
+    lines = text.splitlines()
+    shown = "\n".join(f"{i + 1:5d}  {ln}" for i, ln in enumerate(lines[:STANDING_LINES]))
+    if len(lines) > STANDING_LINES:
+        shown += f"\n... (cut: only the first {STANDING_LINES} of {len(lines)} lines are shown)"
+    return shown
+
+
 def outline(text: str) -> str:
     """A small file whole; a long one as its first lines and the list of what it declares, so the shape fits."""
     lines = text.splitlines()
@@ -669,10 +679,13 @@ def run(
         texts = {**texts, **main_files}
     if not texts:
         raise fail("This repository has no code to read.")
-    shown = "\n\n".join(
-        f"FILE {p}\n{outline(t) if p in main_files or p in standing else features._shown(t, spans.get(p, []))}"
-        for p, t in texts.items()
-    )
+
+    def view(p: str, t: str) -> str:
+        if p in standing:
+            return standing_view(t)
+        return outline(t) if p in main_files else features._shown(t, spans.get(p, []))
+
+    shown = "\n\n".join(f"FILE {p}\n{view(p, t)}" for p, t in texts.items())
     heading = "WHAT TO DESCRIBE" if design else "WHAT TO LOOK AT"
     prompt = f"{heading}:\n{request}\n\nCODE:\n{shown}"
     if design:
@@ -722,11 +735,8 @@ def run(
             {
                 "file": p,
                 "whole": len(t.splitlines()) <= features.SMALL_FILE_LINES,
-                **(
-                    {"outline": True}
-                    if (p in main_files or p in standing) and len(t.splitlines()) > features.SMALL_FILE_LINES
-                    else {}
-                ),
+                **({"outline": True} if p in main_files and len(t.splitlines()) > features.SMALL_FILE_LINES else {}),
+                **({"cut": True} if p in standing and len(t.splitlines()) > STANDING_LINES else {}),
             }
             for p, t in texts.items()
         ],

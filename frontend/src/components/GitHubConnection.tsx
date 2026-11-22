@@ -32,7 +32,9 @@ export default function GitHubConnection() {
   const w = q.data;
   const url = w ? `${window.location.origin}${w.path}` : "";
   const local = LOCAL.test(window.location.hostname);
-  const state = !w ? null : w.last_delivery_at ? { tone: "green", text: `GitHub reached RepoLens ${timeAgo(w.last_delivery_at)}` } : !w.secret_set ? { tone: "red", text: "No webhook secret is set on the server" } : { tone: "amber", text: "Waiting for the first delivery from GitHub" };
+  const newest = w?.deliveries.find((d) => d.event !== "selftest");
+  const refused = newest && (newest.outcome === "rejected" || newest.outcome === "error");
+  const state = !w ? null : refused ? { tone: "red", text: `The latest delivery was refused ${timeAgo(newest.at)}` } : w.last_delivery_at ? { tone: "green", text: `GitHub reached RepoLens ${timeAgo(w.last_delivery_at)}` } : !w.secret_set ? { tone: "red", text: "No webhook secret is set on the server" } : { tone: "amber", text: "Waiting for the first delivery from GitHub" };
   return (
     <Card aria-label="GitHub connection">
       <CardTitle icon={PlugsConnected} right={state && <Badge tone={state.tone as "green" | "red" | "amber"}>{state.text}</Badge>}>GitHub connection</CardTitle>

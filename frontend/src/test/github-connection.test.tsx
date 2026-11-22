@@ -57,6 +57,14 @@ describe("GitHub connection", () => {
     expect(list).toHaveTextContent("secret on GitHub differs");
   });
 
+  it("turns red when the newest delivery was refused, even if an earlier one worked", async () => {
+    const refusedFirst = { ...working, deliveries: [{ ...working.deliveries[1] }, working.deliveries[0]] };
+    show(refusedFirst);
+    const card = await screen.findByLabelText("GitHub connection");
+    expect(await within(card).findByText(/The latest delivery was refused/)).toBeInTheDocument();
+    expect(within(card).queryByText(/GitHub reached RepoLens/)).toBeNull();
+  });
+
   it("checks the receiver and says it is not from GitHub", async () => {
     const calls = show(waiting);
     const card = await screen.findByLabelText("GitHub connection");

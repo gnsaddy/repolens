@@ -99,7 +99,10 @@ def handle(db: Session, event: str, payload: dict, delivery_id: str = "", org_id
         if event == "issue_comment":
             from ..services import agent_commands
 
-            return done(agent_commands.on_issue_comment(db, payload))
+            result = agent_commands.on_issue_comment(db, payload)
+            if result.get("command") in ("none", "ignored") and not result.get("why"):
+                return result  # an ordinary comment: not worth a row, it would push real deliveries out of the record
+            return done(result)
         if event != "push":
             return done({"ignored": event}, outcome="ignored", note=f"RepoLens does not use {event} events")
         clone_url = _norm(payload.get("repository", {}).get("clone_url", ""))
