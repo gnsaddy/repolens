@@ -12,6 +12,7 @@ when behaviour, design or protections move. Entries are added in the same commit
 ## Versions
 
 <!-- versions:start -->
+- [v0.2.4](v0.2.4.md) · 1 entry · 2026-11-22 to 2026-11-22
 - [v0.2.3](v0.2.3.md) · 2 entries · 2026-11-11 to 2026-11-11
 - [v0.2.2](v0.2.2.md) · 12 entries · 2026-11-04 to 2026-11-04
 - [v0.2.1](v0.2.1.md) · 26 entries · 2026-10-27 to 2026-11-03
