@@ -41,7 +41,7 @@ const designRun: PersonaRunView = {
   },
 };
 
-function open(opts: { design?: boolean; mainFiles?: boolean;  role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean; architectNotes?: boolean } = {}) {
+function open(opts: { design?: boolean; mainFiles?: boolean; standing?: string;  role?: string; fail?: string; reuse?: boolean; theirs?: boolean; empty?: boolean; architectNotes?: boolean } = {}) {
   const calls: { url: string; method: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
     const url = String(input), method = init?.method ?? "GET";
@@ -55,6 +55,7 @@ function open(opts: { design?: boolean; mainFiles?: boolean;  role?: string; fai
     if (url.includes("/personas/runs/r1") && method === "PATCH") return json({ ...full, shared: JSON.parse(String(init?.body)).shared });
     if (url.includes("/personas/runs/r1") && opts.architectNotes) return json({ ...full, notes: { ...full.notes, dependencies: { hidden: 2, facts: [{ direction: "used_by", path: "app/auth.py", repo: "billing", repo_id: "b", from: "billing/invoice.py:total", to: "app/auth.py:find_user", kind: "import", trust: "fact", evidence: "total calls find_user" }] } } });
     if (url.includes("/personas/runs/r1") && opts.design) return json(designRun);
+    if (url.includes("/personas/runs/r1") && opts.standing) return json({ ...full, persona: opts.standing, notes: { ...full.notes, standing_files: ["README.md", "docs/guide.md"] } });
     if (url.includes("/personas/runs/r1") && opts.mainFiles) return json({ ...full, notes: { ...full.notes, main_files: ["app/auth.py", "app/main.py"] } });
     if (url.includes("/personas/runs/r1")) return json(opts.empty ? { ...full, findings: [], notes: { ...full.notes, dropped: 0 } } : opts.theirs ? { ...full, mine: false, shared: true, author_name: "ann" } : full);
     return json({});
@@ -190,6 +191,12 @@ describe("Agent personas", () => {
     open({ mainFiles: true });
     await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
     expect(await screen.findByRole("note")).toHaveTextContent("it read the repository's main files: app/auth.py, app/main.py");
+  });
+
+  it("says which files a dependency or documentation review always reads", async () => {
+    open({ standing: "docs-reviewer" });
+    await userEvent.click(await screen.findByRole("button", { name: /^the user lookup/ }));
+    expect(await screen.findByRole("note")).toHaveTextContent("always reads the repository's documentation, whatever you ask about: README.md, docs/guide.md");
   });
 
   it("gives each persona its own overview: a threat model, a test plan, a code walkthrough", async () => {

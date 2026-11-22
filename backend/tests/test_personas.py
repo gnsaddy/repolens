@@ -114,7 +114,14 @@ def test_nothing_about_personas_is_available_without_signing_in(client):
 
 def test_the_personas_are_listed_with_what_each_one_does(client, auth):
     got = client.get("/api/personas", headers=auth).json()["personas"]
-    assert [p["key"] for p in got] == ["security-auditor", "test-engineer", "architect", "developer"]
+    assert [p["key"] for p in got] == [
+        "security-auditor",
+        "test-engineer",
+        "architect",
+        "developer",
+        "dependency-reviewer",
+        "docs-reviewer",
+    ]
     assert all(p["summary"] and p["placeholder"] for p in got)
 
 
@@ -413,8 +420,14 @@ OVERVIEWS = {  # persona: (the choice on the page, a phrase its instruction must
 
 def test_every_persona_can_describe_the_repository_in_its_own_way_and_the_list_says_so(client, auth, repo, model):
     listed = {p["key"]: p for p in client.get("/api/personas", headers=auth).json()["personas"]}
-    assert all(p["modes"] == ["review", "design"] for p in listed.values())
-    assert {k: p["overview"]["label"] for k, p in listed.items()} == {k: v[0] for k, v in OVERVIEWS.items()}
+    assert all(listed[k]["modes"] == ["review", "design"] for k in OVERVIEWS)
+    assert {k: p["overview"]["label"] for k, p in listed.items() if k in OVERVIEWS} == {
+        k: v[0] for k, v in OVERVIEWS.items()
+    }
+    # the dependency reviewer and the documentation checker review only: nothing for them to describe
+    assert all(
+        listed[k]["modes"] == ["review"] and not listed[k]["overview"] for k in ("dependency-reviewer", "docs-reviewer")
+    )
     assert listed["security-auditor"]["overview"]["first"] == "Threat model"
     assert listed["developer"]["overview"]["second"] == "Where to change what"
     model.reply = design_text(DESIGN)

@@ -137,6 +137,8 @@ function Review({ d, titles, reused, admin, write, again, onShare, onDelete }: {
         {d.status === "failed" ? <p role="alert" className="rounded-lg bg-red-50 p-3 body-6 text-red-700">{d.error}</p> : <p className="body-6">{d.summary}</p>}
       </Card>
       {d.status === "done" && (<>
+        {!!d.notes.standing_files?.length && (
+          <p role="note" className="rounded-lg bg-blue-50 p-2 caption-5 text-blue-800">This kind of review always reads the repository's {d.persona === "docs-reviewer" ? "documentation" : "dependency and build files"}, whatever you ask about: {d.notes.standing_files.join(", ")}.</p>)}
         {!!d.notes.main_files?.length && d.notes.mode !== "design" && (
           <p role="note" className="rounded-lg bg-blue-50 p-2 caption-5 text-blue-800">Nothing in your request matched particular code, so it read the repository's main files: {d.notes.main_files.join(", ")}.</p>)}
         {d.notes.mode === "design" && d.notes.design ? <Design design={d.notes.design} titles={titles} copy={copy} /> : (

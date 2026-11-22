@@ -14,9 +14,10 @@ from dataclasses import dataclass, replace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import KGNode, PersonaRun, Repository
+from ..models import CodeChunk, KGNode, PersonaRun, Repository
 from ..security import redact_stored
-from . import features, fixes
+from . import features, fixes, gitops
+from . import risk as oracle
 from .access import Scope
 from .answer_memory import _words
 from .llm import LLMClient, LLMUnavailable, describe_failure
@@ -68,6 +69,7 @@ class Persona:
     system: str
     uses_dependencies: bool = False  # also told which other repositories use or are used by the code
     overview: Overview | None = None  # can also describe the repository from its own point of view
+    always: str = ""  # a pattern for files read whatever the request names (dependency files, the docs)
 
     @property
     def design(self) -> bool:
@@ -133,6 +135,52 @@ PERSONAS["developer"] = Persona(
     "names, dead or duplicated code, and changes that would break callers. Prefer a few real findings to many "
     "nitpicks. For each, say what goes wrong and when, and give the smallest fix, with code when you are confident of "
     "the names it needs. Severity is how likely and how costly the failure is. " + _SCHEMA,
+)
+
+
+# Dependency and build files, and the project's own documentation: what two of the personas read whatever is asked.
+MANIFESTS = (
+    r"(^|/)(package\.json|requirements[^/]*\.txt|pyproject\.toml|Pipfile|go\.mod|Gemfile|pom\.xml|build\.gradle(\.kts)?"
+    r"|Cargo\.toml|composer\.json|Dockerfile[^/]*|\.github/workflows/[^/]+\.ya?ml)$"
+)
+_SAMPLE_DIR = re.compile(r"(^|/)(tests?|__tests__|spec|fixtures?|examples?|samples?|node_modules|vendor)/", re.I)
+DOC_FILES = r"(^|/)(README[^/]*\.(md|rst)|CONTRIBUTING\.md|docs/[^/]+\.(md|rst))$"
+
+PERSONAS["dependency-reviewer"] = Persona(
+    "dependency-reviewer",
+    "Dependency reviewer",
+    "Reads the dependency and build files for supply chain risk: versions that are not pinned or are ranges so wide "
+    "that a build changes by itself, the same library at two versions, base images and actions on a moving tag, and "
+    "packages that look mistyped or abandoned. It cannot look up advisories, so it says what to check instead of "
+    "claiming a vulnerability.",
+    "The Python and Node dependencies, and the base image of the Dockerfile.",
+    "You are a careful reviewer of a project's dependencies and build files. From the manifests, Dockerfiles and "
+    "workflow files shown, find: versions that are not pinned or are ranges so wide that a build changes by itself; "
+    "the same library at two different versions; a base image, action or tool on a moving tag (latest, a major "
+    "version only); development tools listed as runtime dependencies; packages whose name is a near copy of a well "
+    "known one (possible typosquatting); packages you are sure are deprecated or no longer maintained; a build that "
+    "installs from a URL or runs a downloaded script; and no lock file where the files shown suggest one is needed. "
+    "You cannot see advisory databases: never claim a known vulnerability unless you are certain of that exact "
+    "version, and otherwise say which package to check. Quote the exact line. Rate severity by how much a bad "
+    "release of that dependency could damage the project. " + _SCHEMA,
+    always=MANIFESTS,
+)
+PERSONAS["docs-reviewer"] = Persona(
+    "docs-reviewer",
+    "Documentation checker",
+    "Reads the README and the docs against the code: commands, settings, endpoints and file names the docs mention "
+    "that the code does not have, steps that would fail, and behaviour the code has that the docs contradict. It "
+    "quotes both sides and ignores style.",
+    "The setup steps in the README and the settings the code reads.",
+    "You are a careful technical writer checking documentation against the code shown. Find statements in the docs "
+    "that the code shown contradicts or does not support: a command, flag, environment variable, endpoint, file "
+    "name, setting or default that the docs name and the code does not have or spells differently; steps that would "
+    "fail; and behaviour the code clearly has that the docs contradict or leave out where a reader would be misled. "
+    "For a wrong statement, quote the doc line (file is the doc) and say what the code does instead. For an "
+    "undocumented behaviour, quote the code line (file is the code) and say what the docs should say. Only report "
+    "what the files shown let you judge, and say in the summary what you could not check. Do not comment on style, "
+    "grammar or tone. Severity is how likely a reader is to be misled or stuck. " + _SCHEMA,
+    always=DOC_FILES,
 )
 
 
@@ -243,6 +291,7 @@ DESIGN_MAX_CHARS = 12000
 DIAGRAM_MAX_CHARS = 4000
 OVERVIEW_FILES = 7  # main files read for an overview, or when nothing matched the request
 OVERVIEW_MATCHED = 4  # of the files that matched the request, so the prompt stays a reasonable size
+STANDING_FILES = 8  # files a persona that always reads some (dependency files, docs) is given
 OVERVIEW_HEAD = 60  # first lines of a long file, followed by an outline of its declarations
 OUTLINE_MAX = 80
 _ENTRY = re.compile(
@@ -480,6 +529,28 @@ def overview_files(db: Session, repo: Repository, have: set[str], limit: int = O
     return found
 
 
+def always_files(
+    db: Session, repo: Repository, pattern: str, have: set[str], limit: int = STANDING_FILES
+) -> dict[str, str]:
+    """The files a persona reads whatever the request names (dependency files, the docs), shallowest first."""
+    rx = re.compile(pattern, re.I)
+    paths = db.scalars(select(CodeChunk.file_path).where(CodeChunk.repo_id == repo.id).distinct()).all()
+    chosen = sorted(
+        (p for p in paths if rx.search(p) and p not in have and not _SAMPLE_DIR.search(p)),
+        key=lambda p: (p.count("/"), p),
+    )
+    co = oracle._checkout(repo)
+    found: dict[str, str] = {}
+    for path in chosen:
+        if len(found) >= limit or not co:
+            break
+        try:
+            found[path] = gitops.read_file(co, repo.indexed_sha or "", path).decode("utf-8", errors="replace")
+        except gitops.GitError:
+            continue
+    return found
+
+
 def outline(text: str) -> str:
     """A small file whole; a long one as its first lines and the list of what it declares, so the shape fits."""
     lines = text.splitlines()
@@ -588,6 +659,10 @@ def run(
     if design:  # a design overview also needs the repository's main files, whatever the request names
         texts = dict(list(texts.items())[:OVERVIEW_MATCHED])
         spans = {p: v for p, v in spans.items() if p in texts}
+    standing: dict[str, str] = {}
+    if persona.always and material is None and not design:
+        standing = always_files(db, repo, persona.always, set(texts))
+        texts = {**texts, **standing}
     main_files: dict[str, str] = {}
     if design or not texts:  # a request that names no code (or an overview) is answered from the main files
         main_files = overview_files(db, repo, set(texts), OVERVIEW_FILES if design else OVERVIEW_FILES - 2)
@@ -595,7 +670,8 @@ def run(
     if not texts:
         raise fail("This repository has no code to read.")
     shown = "\n\n".join(
-        f"FILE {p}\n{outline(t) if p in main_files else features._shown(t, spans.get(p, []))}" for p, t in texts.items()
+        f"FILE {p}\n{outline(t) if p in main_files or p in standing else features._shown(t, spans.get(p, []))}"
+        for p, t in texts.items()
     )
     heading = "WHAT TO DESCRIBE" if design else "WHAT TO LOOK AT"
     prompt = f"{heading}:\n{request}\n\nCODE:\n{shown}"
@@ -646,10 +722,15 @@ def run(
             {
                 "file": p,
                 "whole": len(t.splitlines()) <= features.SMALL_FILE_LINES,
-                **({"outline": True} if p in main_files and len(t.splitlines()) > features.SMALL_FILE_LINES else {}),
+                **(
+                    {"outline": True}
+                    if (p in main_files or p in standing) and len(t.splitlines()) > features.SMALL_FILE_LINES
+                    else {}
+                ),
             }
             for p, t in texts.items()
         ],
+        "standing_files": sorted(standing),  # read whatever the request named, because of the kind of review
         "main_files": sorted(main_files),  # read because the request named no code, or an overview was asked for
         "dropped": len(dropped),
         "reasons": dropped[:5],
