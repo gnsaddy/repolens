@@ -10,6 +10,11 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..models import CodeChunk, Repository
+from .access import Scope
 from .parsing import EXAMPLE_ENV_RE, ParsedChunk
 
 ENV, CLI, TABLES = "envvars", "cli", "tables"
@@ -293,4 +298,40 @@ def parse(content: str) -> list[Item]:
         m = LINE.match(ln.strip())
         if m:
             out.append(Item(m.group(1), m.group(2) or "", int(m.group(3))))
+    return out
+
+
+MAX_ROWS = 5000  # items returned for one kind
+
+
+def collect(db: Session, org: str, scope: Scope, repo_ids: list[str] | None) -> dict:
+    """Every item written down at index time, for the repositories this person can see, by kind and then by file."""
+    names = {r.id: r.name for r in db.scalars(select(Repository).where(Repository.org_id == org)) if scope.can(r.id)}
+    wanted = [i for i in (repo_ids or names) if i in names]
+    out: dict = {}
+    for kind in TYPES:
+        rows = (
+            db.scalars(
+                select(CodeChunk)
+                .where(CodeChunk.org_id == org, CodeChunk.chunk_type == kind, CodeChunk.repo_id.in_(wanted))
+                .order_by(CodeChunk.repo_id, CodeChunk.file_path)
+            ).all()
+            if wanted
+            else []
+        )
+        files, total = [], 0
+        for c in rows:
+            items = parse(c.content)
+            if total >= MAX_ROWS:
+                break
+            total += len(items)
+            files.append(
+                {
+                    "repo_id": c.repo_id,
+                    "repo": names[c.repo_id],
+                    "file": c.file_path,
+                    "items": [{"name": i.name, "detail": i.detail, "line": i.line} for i in items],
+                }
+            )
+        out[kind] = {"count": total, "files": files}
     return out

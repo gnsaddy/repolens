@@ -13,7 +13,7 @@ from ..deps import Principal, current_principal
 from ..models import Change, CodeChunk, Document, KGEdge, KGNode, Repository
 from ..schemas import CollectionCreate, DocsUpload, HeatIn, KnowledgeQuery, RepoOut
 from ..security import redact_stored
-from ..services import answer_memory, importers
+from ..services import answer_memory, importers, inventory
 from ..services import graph as g
 from ..services import graph_insights as gi
 from ..services import knowledge as kb
@@ -512,3 +512,16 @@ def delete_repo_graph(db: Session, repo_id: str) -> None:
     db.execute(delete(KGEdge).where(KGEdge.repo_id == repo_id))
     db.execute(delete(KGNode).where(KGNode.repo_id == repo_id))
     db.execute(delete(Document).where(Document.repo_id == repo_id))
+
+
+@router.get("/inventory")
+def inventory_lists(
+    repo_id: str | None = Query(default=None), p: Principal = Depends(current_principal), db: Session = Depends(get_db)
+):
+    """The environment variables, commands and database tables written down when the repositories were indexed, for
+    one repository (`repo_id`) or all the person can see. The lists Ask gives for "list all the ...", without asking."""
+    scope = scope_for(db, p)
+    names = _names(db, p)  # only this workspace's repositories this person can see
+    if repo_id and repo_id not in names:
+        raise HTTPException(404, "Repository not found")
+    return {"repositories": names, **inventory.collect(db, p.org_id, scope, [repo_id] if repo_id else None)}

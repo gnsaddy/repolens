@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, FileText, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Graph as Network, SidebarSimple as PanelRightClose, SidebarSimple as PanelRightOpen, MagnifyingGlass as Search, Sparkle as Sparkles, Trash as Trash2, UploadSimple as Upload } from "@phosphor-icons/react";
+import { Brain, FileText, ListChecks, ArrowsOut as Maximize2, ArrowsIn as Minimize2, Graph as Network, SidebarSimple as PanelRightClose, SidebarSimple as PanelRightOpen, MagnifyingGlass as Search, Sparkle as Sparkles, Trash as Trash2, UploadSimple as Upload } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConfirm, useToast } from "@/components/feedback";
 import ForceGraph, { communityColor, HEAT_GRADIENT, NODE_COLORS, REL_COLORS } from "@/components/ForceGraph";
 import DocumentReader from "@/components/DocumentReader";
+import InventoryTab from "@/components/InventoryTab";
 import StartHere from "@/components/StartHere";
 import { IMPORT_ACCEPT, MAX_IMPORT_BYTES, MAX_IMPORT_TOTAL, MAX_TEXT_BYTES, needsImport, summarize, type ImportResult } from "@/lib/importFiles";
 import { Badge, Button, Card, CardTitle, CodeBlock, Empty, ErrorNote, Input, Label, PageHeader, Spinner, Stat, statusTone } from "@/components/ui";
@@ -16,7 +17,7 @@ import { api, type SimilarAnswer, type AskResult, type Connection, type DocRow, 
 import { canWrite, useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-const TABS = [["ask", "Ask & Search", Sparkles], ["graph", "Graph", Network], ["docs", "Documents", FileText], ["memory", "Memory", Brain]] as const;
+const TABS = [["ask", "Ask & Search", Sparkles], ["graph", "Graph", Network], ["docs", "Documents", FileText], ["inventory", "Inventory", ListChecks], ["memory", "Memory", Brain]] as const;
 type TabKey = (typeof TABS)[number][0];
 
 export default function Knowledge() {
@@ -38,6 +39,7 @@ export default function Knowledge() {
       {tab === "ask" && <AskTab repos={repos.data ?? []} openNode={(id) => go("graph", { node: id })} />}
       {tab === "graph" && <GraphTab repos={repos.data ?? []} initialNode={sp.get("node")} />}
       {tab === "docs" && <DocsTab repos={repos.data ?? []} />}
+      {tab === "inventory" && <InventoryTab repos={repos.data ?? []} />}
       {tab === "memory" && <MemoryTab admin={user?.role === "admin"} />}
     </div>
   );

@@ -385,3 +385,5 @@ export interface AutomationRouting { task: string; tier: string; provider: strin
 export interface AutomationOverview { model: { ai: boolean; provider: string; model: string; multi: boolean; routing: AutomationRouting[] }; events: { ci_failure: AutomationEvent; pr_review: AutomationEvent; drift_draft: AutomationEvent; watch: AutomationEvent }; runs: AutomationRun[];
   controls: { paused: boolean; token_budget: number; tokens_used: number; failed_24h: number; stuck: number; problems: string[] } }
 export interface GithubLoginSettings { configured: boolean; app_configured: boolean; redirect_uri: string; allowed_domains?: string[]; default_role?: string; auto_provision?: boolean; enabled?: boolean }
+export interface InventoryFile { repo_id: string; repo: string; file: string; items: { name: string; detail: string; line: number }[] }
+export interface Inventory { repositories: Record<string, string>; envvars: { count: number; files: InventoryFile[] }; cli: { count: number; files: InventoryFile[] }; tables: { count: number; files: InventoryFile[] } }

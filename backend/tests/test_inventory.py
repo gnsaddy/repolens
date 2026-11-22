@@ -117,3 +117,35 @@ def test_listing_all_of_them_is_exact_and_cited(client, auth, tmp_path):
         text = r.json()["items"][-1]["content"]
         for w in wants:
             assert w in text, (question, text)
+
+
+def test_the_inventory_lists_what_was_indexed_for_one_repository_or_all(client, auth, tmp_path):
+    d = tmp_path / "svc"
+    d.mkdir()
+    (d / "config.py").write_text('import os\nURL = os.environ["DATABASE_URL"]\n')
+    (d / "Makefile").write_text("check: ## lint and test\n\t@echo\n")
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]):
+        subprocess.run(["git", "-C", str(d), *cmd], check=True)
+    repo = add_repo(client, auth, str(d), name="svc")
+    got = client.get("/api/inventory", headers=auth).json()
+    assert got["repositories"] == {repo["id"]: "svc"}
+    assert got["envvars"]["count"] == 1 and got["envvars"]["files"][0]["file"] == "config.py"
+    assert got["envvars"]["files"][0]["items"] == [{"name": "DATABASE_URL", "detail": "read in the code", "line": 2}]
+    assert got["cli"]["files"][0]["items"][0]["name"] == "make check" and got["tables"] == {"count": 0, "files": []}
+    one = client.get(f"/api/inventory?repo_id={repo['id']}", headers=auth).json()
+    assert one["envvars"] == got["envvars"]
+    assert client.get("/api/inventory?repo_id=nope", headers=auth).status_code == 404
+
+
+def test_another_workspace_sees_none_of_it(client, auth, tmp_path):
+    from tests.conftest import register
+
+    d = tmp_path / "svc"
+    d.mkdir()
+    (d / "config.py").write_text('import os\nURL = os.environ["DATABASE_URL"]\n')
+    for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"]):
+        subprocess.run(["git", "-C", str(d), *cmd], check=True)
+    repo = add_repo(client, auth, str(d), name="svc")
+    other = register(client, "x@other.io", "Other")
+    assert client.get("/api/inventory", headers=other).json()["envvars"] == {"count": 0, "files": []}
+    assert client.get(f"/api/inventory?repo_id={repo['id']}", headers=other).status_code == 404

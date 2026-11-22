@@ -351,6 +351,7 @@ VIEWER_READS = """
     /api/graph/path
     /api/graph/report
     /api/graph/stats
+    /api/inventory
     /api/investigations
     /api/investigations/{inv_id}
     /api/investigations/{inv_id}/events
